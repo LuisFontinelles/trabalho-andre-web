@@ -23,6 +23,33 @@ export function useDependencies(): Dependencies {
   return value
 }
 
+const SESSION_KEY = 'carebridge.session'
+
+/**
+ * A sessao sobrevive ao recarregar a pagina. Sem isso, apertar F5 ou abrir
+ * uma rota direta joga a pessoa de volta no login, o que atrapalha quem esta
+ * avaliando o sistema. Fica em sessionStorage: some ao fechar a aba e nao
+ * vaza para outra. Leitura e escrita vao em try/catch porque o acesso falha
+ * em janela anonima ou com dados de site bloqueados.
+ */
+function readStoredSession(): Session | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY)
+    return raw === null ? null : (JSON.parse(raw) as Session)
+  } catch {
+    return null
+  }
+}
+
+function writeStoredSession(session: Session | null): void {
+  try {
+    if (session === null) sessionStorage.removeItem(SESSION_KEY)
+    else sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  } catch {
+    // Sem armazenamento a sessao vale so para esta navegacao, e tudo bem.
+  }
+}
+
 interface SessionStore {
   session: Session | null
   isAuthenticated: boolean
@@ -33,14 +60,20 @@ interface SessionStore {
 const SessionContext = createContext<SessionStore | null>(null)
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null)
+  const [session, setSession] = useState<Session | null>(readStoredSession)
 
   const value = useMemo<SessionStore>(
     () => ({
       session,
       isAuthenticated: session !== null,
-      signIn: setSession,
-      signOut: () => setSession(null),
+      signIn: (next: Session) => {
+        writeStoredSession(next)
+        setSession(next)
+      },
+      signOut: () => {
+        writeStoredSession(null)
+        setSession(null)
+      },
     }),
     [session],
   )
