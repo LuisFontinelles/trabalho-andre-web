@@ -42,7 +42,7 @@ export interface OpportunityDraft {
   audience: string
   modality: 'presencial' | 'online'
   address: string
-  accessMode: AccessMode
+  accessMode: AccessMode | null
   price: string
   totalVacancies: string
   opensAt: string
@@ -68,7 +68,8 @@ export function emptyOpportunityDraft(): OpportunityDraft {
     audience: '',
     modality: 'presencial',
     address: '',
-    accessMode: 'gratuito',
+    // Nenhuma modalidade vem marcada: o prototipo exige a escolha.
+    accessMode: null,
     price: '',
     totalVacancies: '',
     opensAt: '',
@@ -81,6 +82,7 @@ export function emptyOpportunityDraft(): OpportunityDraft {
 }
 
 export type DraftErrorCode =
+  | 'accessModeRequired'
   | 'descriptionRequired'
   | 'specialtyRequired'
   | 'audienceRequired'
@@ -96,6 +98,7 @@ export type DraftErrorCode =
   | 'documentsRequired'
 
 const DRAFT_ERROR_MESSAGE: Record<DraftErrorCode, string> = {
+  accessModeRequired: 'Escolha a modalidade de acesso.',
   descriptionRequired: 'Descreva o que sera oferecido.',
   specialtyRequired: 'Selecione a especialidade.',
   audienceRequired: 'Informe o publico-alvo.',
@@ -145,6 +148,8 @@ export function parsePrice(raw: string): number | null {
 }
 
 export function validateAccess(draft: OpportunityDraft): void {
+  if (draft.accessMode === null) throw new DraftError('accessModeRequired')
+
   if (allowsPrice(draft.accessMode)) {
     if (draft.price.trim() === '') throw new DraftError('priceRequired')
     const price = parsePrice(draft.price)

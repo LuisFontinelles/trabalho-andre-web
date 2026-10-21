@@ -15,6 +15,7 @@ import {
   validateTriage,
   type DraftErrorCode,
 } from '@/domain/opportunityDraft'
+import { allowsPrice } from '@/domain/professional'
 import { validOpportunityDraft } from '@/test/factories'
 
 function codeOf(run: () => void): DraftErrorCode {
@@ -90,6 +91,35 @@ describe('Passo 1, dados basicos', () => {
 })
 
 describe('Passo 2, condicoes de acesso', () => {
+  it('nenhuma modalidade vem marcada de inicio', () => {
+    expect(emptyOpportunityDraft().accessMode).toBeNull()
+  })
+
+  it('sem escolher a modalidade o passo e rejeitado', () => {
+    const draft = { ...validOpportunityDraft(), accessMode: null }
+    expect(codeOf(() => validateAccess(draft))).toBe('accessModeRequired')
+  })
+
+  it('a modalidade e checada antes do preco, das vagas e das datas', () => {
+    const draft = {
+      ...validOpportunityDraft(),
+      accessMode: null,
+      totalVacancies: '',
+      opensAt: '',
+      closesAt: '',
+    }
+    expect(codeOf(() => validateAccess(draft))).toBe('accessModeRequired')
+  })
+
+  it('sem modalidade o campo de preco fica indisponivel', () => {
+    expect(allowsPrice(null)).toBe(false)
+  })
+
+  it('escolher a modalidade libera o passo', () => {
+    const draft = { ...validOpportunityDraft(), accessMode: null }
+    expect(() => validateAccess(applyAccessMode(draft, 'gratuito'))).not.toThrow()
+  })
+
   it('rascunho gratuito completo passa', () => {
     expect(() => validateAccess(validOpportunityDraft())).not.toThrow()
   })

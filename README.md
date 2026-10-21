@@ -76,7 +76,7 @@ O cadastro aceita e-mails novos: o registro fica guardado em memória e a verifi
 
 ## Testes
 
-266 testes em Vitest, com **95,8% de cobertura de linhas** em domínio e camada de dados.
+271 testes em Vitest, com **95,8% de cobertura de linhas** em domínio e camada de dados.
 
 | Suíte | O que cobre |
 |---|---|

@@ -36,8 +36,8 @@ export const ACCESS_MODE_HINT: Record<AccessMode, string> = {
   pesquisa: 'Participacao em estudo',
 }
 
-/** So a modalidade de preco social admite valor. */
-export function allowsPrice(mode: AccessMode): boolean {
+/** So a modalidade de preco social admite valor. Sem escolha, nao admite. */
+export function allowsPrice(mode: AccessMode | null): boolean {
   return mode === 'preco-social'
 }
 

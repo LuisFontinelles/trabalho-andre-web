@@ -307,6 +307,9 @@ export function NewOpportunityPage() {
             <span className="cb-field__label">
               <Required /> {strings.newOpportunity.accessTitle}
             </span>
+            {errors.accessModeRequired && (
+              <Banner message={errors.accessModeRequired} />
+            )}
             <div className="cb-choice-grid">
               {ACCESS_MODES.map((mode) => (
                 <button

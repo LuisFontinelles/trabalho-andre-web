@@ -100,7 +100,8 @@ export function draftToDTO(draft: OpportunityDraft): CreateOpportunityRequestDTO
     audience: draft.audience.trim(),
     modality: draft.modality,
     address: draft.modality === 'presencial' ? draft.address.trim() : null,
-    accessMode: draft.accessMode,
+    // validateAccess ja garantiu a escolha antes de chegar aqui.
+    accessMode: draft.accessMode ?? 'gratuito',
     price: allowsPrice(draft.accessMode) ? parsePrice(draft.price) : null,
     totalVacancies: parseVacancies(draft.totalVacancies) ?? 0,
     opensAt: draft.opensAt,
