@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Quadro do projeto
+    url: https://trello.com/b/ukOsanc2
+    about: Backlog e andamento das sprints
+  - name: Contrato da API
+    url: https://github.com/LuisFontinelles/trabalho-andre-web/blob/main/CONTRATO-API-CareBridge.md
+    about: Rotas, formatos e codigos de status acordados com o backend

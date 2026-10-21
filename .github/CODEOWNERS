@@ -1,0 +1,6 @@
+# Quem revisa o que. Um dono por area evita PR parado sem revisor.
+*                       @LuisFontinelles
+/src/designSystem/      @LuisFontinelles
+/src/domain/            @LuisFontinelles
+/src/data/              @LuisFontinelles
+/.github/               @LuisFontinelles

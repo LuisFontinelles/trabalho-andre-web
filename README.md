@@ -1,5 +1,7 @@
 # CareBridge · painel web do profissional
 
+[![CI](https://github.com/LuisFontinelles/trabalho-andre-web/actions/workflows/ci.yml/badge.svg)](https://github.com/LuisFontinelles/trabalho-andre-web/actions/workflows/ci.yml)
+
 Aplicação web do trabalho final de **Soluções Computacionais** (Universidade Católica de Brasília, 2026/2, prof. Andre Gustavo Bastos Lima). É o cliente do profissional de saúde na plataforma CareBridge, que reúne oportunidades de cuidado em saúde gratuitas, acessíveis ou direcionadas a públicos específicos.
 
 O paciente usa o aplicativo iOS. Este painel é onde a instituição e o profissional acompanham o que publicaram e as candidaturas que receberam.
@@ -106,6 +108,14 @@ O contrato completo da API está documentado em `CONTRATO-API-CareBridge.md`, na
 ## Integração contínua
 
 O workflow em `.github/workflows/ci.yml` roda a cada push e pull request na `main`: checagem de tipos, lint, testes e build de produção, guardando o resultado do build como artefato.
+
+## Documentação
+
+| Onde | O que tem |
+|---|---|
+| [Wiki](https://github.com/LuisFontinelles/trabalho-andre-web/wiki) | Arquitetura, design system, backend simulado e fluxo de trabalho |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Como abrir um PR sem quebrar as regras de camada |
+| [CONTRATO-API-CareBridge.md](CONTRATO-API-CareBridge.md) | Rotas, formatos e códigos de status acordados com o backend |
 
 ## Equipe
 
