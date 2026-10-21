@@ -1,0 +1,6 @@
+{
+  "statusCode": 400,
+  "message": "Bad Request: the refresh token is missing",
+  "error": "Bad Request",
+  "requestId": "ddfd6adc-59d5-4ef0-a1f1-7bc904c9b17e"
+}

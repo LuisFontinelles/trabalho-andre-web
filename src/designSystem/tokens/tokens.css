@@ -1,0 +1,189 @@
+/* Tokens do CareBridge. Espelham os tokens do aplicativo iOS: uma paleta
+   primitiva com os valores brutos e um conjunto semantico que da nome ao uso.
+   Nenhum componente usa a paleta diretamente. */
+
+:root {
+  /* Paleta primitiva */
+  --cb-green-700: #0e9958;
+  --cb-green-600: #15a862;
+  --cb-green-500: #3e8569;
+  --cb-green-300: #79c7a4;
+  --cb-green-100: #e8f6ee;
+  --cb-yellow-500: #cfbd2e;
+  --cb-yellow-100: #faf4d2;
+  --cb-red-500: #df4242;
+  --cb-red-100: #fde8e8;
+  --cb-blue-500: #487686;
+  --cb-blue-100: #e6f0f3;
+  --cb-neutral-900: #161d16;
+  --cb-neutral-800: #2a322a;
+  --cb-neutral-600: #5f6a5f;
+  --cb-neutral-400: #9aa39a;
+  --cb-neutral-200: #e2e6e2;
+  --cb-neutral-100: #f2f4f2;
+  --cb-neutral-0: #ffffff;
+
+  /* Tokens semanticos */
+  --cb-brand: var(--cb-green-700);
+  --cb-brand-strong: var(--cb-green-600);
+  --cb-brand-muted: var(--cb-green-500);
+  --cb-brand-surface: var(--cb-green-100);
+
+  --cb-background: var(--cb-neutral-0);
+  --cb-surface: var(--cb-neutral-0);
+  --cb-surface-raised: var(--cb-neutral-100);
+  --cb-surface-field: var(--cb-neutral-100);
+
+  --cb-text-primary: var(--cb-neutral-900);
+  --cb-text-secondary: var(--cb-neutral-600);
+  --cb-text-tertiary: var(--cb-neutral-400);
+  --cb-text-on-brand: var(--cb-neutral-0);
+  --cb-text-disabled: var(--cb-neutral-400);
+
+  --cb-border: var(--cb-neutral-200);
+  --cb-border-focus: var(--cb-green-700);
+
+  --cb-danger: var(--cb-red-500);
+  --cb-danger-surface: var(--cb-red-100);
+  --cb-warning: var(--cb-yellow-500);
+  --cb-warning-surface: var(--cb-yellow-100);
+  --cb-info: var(--cb-blue-500);
+  --cb-info-surface: var(--cb-blue-100);
+  --cb-success: var(--cb-green-700);
+  --cb-success-surface: var(--cb-green-100);
+
+  --cb-disabled-background: var(--cb-neutral-100);
+  --cb-disabled-content: var(--cb-neutral-400);
+
+  /* Espacamento */
+  --cb-space-xxs: 2px;
+  --cb-space-xs: 4px;
+  --cb-space-sm: 8px;
+  --cb-space-md: 12px;
+  --cb-space-lg: 16px;
+  --cb-space-xl: 24px;
+  --cb-space-xxl: 32px;
+  --cb-space-xxxl: 48px;
+
+  /* Raio */
+  --cb-radius-sm: 8px;
+  --cb-radius-md: 12px;
+  --cb-radius-lg: 16px;
+  --cb-radius-xl: 24px;
+  --cb-radius-pill: 999px;
+
+  /* Tamanhos */
+  --cb-control-height: 48px;
+  --cb-field-height: 48px;
+  --cb-chip-height: 40px;
+  --cb-tap-target: 44px;
+  --cb-border-width: 1px;
+  --cb-border-width-strong: 2px;
+
+  /* Tipografia */
+  --cb-font-family: ui-rounded, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    system-ui, sans-serif;
+  --cb-font-display: 700 30px/1.2 var(--cb-font-family);
+  --cb-font-title: 700 24px/1.25 var(--cb-font-family);
+  --cb-font-headline: 600 20px/1.3 var(--cb-font-family);
+  --cb-font-subheadline: 600 17px/1.35 var(--cb-font-family);
+  --cb-font-body: 400 15px/1.5 var(--cb-font-family);
+  --cb-font-body-strong: 600 15px/1.5 var(--cb-font-family);
+  --cb-font-callout: 400 14px/1.45 var(--cb-font-family);
+  --cb-font-label: 600 13px/1.4 var(--cb-font-family);
+  --cb-font-caption: 400 13px/1.4 var(--cb-font-family);
+  --cb-font-caption-strong: 600 13px/1.4 var(--cb-font-family);
+  --cb-font-micro: 600 11px/1.3 var(--cb-font-family);
+
+  /* Sombra */
+  --cb-shadow-card: 0 1px 2px rgba(22, 29, 22, 0.06),
+    0 4px 12px rgba(22, 29, 22, 0.05);
+  --cb-shadow-raised: 0 2px 4px rgba(22, 29, 22, 0.08),
+    0 12px 28px rgba(22, 29, 22, 0.08);
+}
+
+/* O modo escuro redefine so os tokens semanticos, igual ao iOS. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --cb-brand: #27b873;
+    --cb-brand-strong: #38c783;
+    --cb-brand-muted: #79c7a4;
+    --cb-brand-surface: #10301f;
+
+    --cb-background: #0f140f;
+    --cb-surface: #161d16;
+    --cb-surface-raised: #1f271f;
+    --cb-surface-field: #1f271f;
+
+    --cb-text-primary: #f5f7f5;
+    --cb-text-secondary: #b4bdb4;
+    --cb-text-tertiary: #7d867d;
+    --cb-text-on-brand: #0f140f;
+    --cb-text-disabled: #5f6a5f;
+
+    --cb-border: #2e372e;
+    --cb-border-focus: #27b873;
+
+    --cb-danger: #ff7a7a;
+    --cb-danger-surface: #3a1a1a;
+    --cb-warning: #e4d45a;
+    --cb-warning-surface: #332e12;
+    --cb-info: #7fb2c4;
+    --cb-info-surface: #152a31;
+    --cb-success: #27b873;
+    --cb-success-surface: #10301f;
+
+    --cb-disabled-background: #1f271f;
+    --cb-disabled-content: #5f6a5f;
+
+    --cb-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4),
+      0 4px 12px rgba(0, 0, 0, 0.3);
+    --cb-shadow-raised: 0 2px 4px rgba(0, 0, 0, 0.45),
+      0 12px 28px rgba(0, 0, 0, 0.4);
+  }
+}
+
+:root[data-theme='dark'] {
+  --cb-brand: #27b873;
+  --cb-brand-strong: #38c783;
+  --cb-brand-muted: #79c7a4;
+  --cb-brand-surface: #10301f;
+  --cb-background: #0f140f;
+  --cb-surface: #161d16;
+  --cb-surface-raised: #1f271f;
+  --cb-surface-field: #1f271f;
+  --cb-text-primary: #f5f7f5;
+  --cb-text-secondary: #b4bdb4;
+  --cb-text-tertiary: #7d867d;
+  --cb-text-on-brand: #0f140f;
+  --cb-text-disabled: #5f6a5f;
+  --cb-border: #2e372e;
+  --cb-border-focus: #27b873;
+  --cb-danger: #ff7a7a;
+  --cb-danger-surface: #3a1a1a;
+  --cb-warning: #e4d45a;
+  --cb-warning-surface: #332e12;
+  --cb-info: #7fb2c4;
+  --cb-info-surface: #152a31;
+  --cb-success: #27b873;
+  --cb-success-surface: #10301f;
+  --cb-disabled-background: #1f271f;
+  --cb-disabled-content: #5f6a5f;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: var(--cb-font-body);
+  color: var(--cb-text-primary);
+  background: var(--cb-background);
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: var(--cb-border-width-strong) solid var(--cb-border-focus);
+  outline-offset: 2px;
+}

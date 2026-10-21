@@ -1,0 +1,13 @@
+{
+  "id": "op-004",
+  "title": "Cardiologia – vaga social",
+  "specialty": "cardiologia",
+  "modality": "online",
+  "offerType": "social",
+  "vacancies": 5,
+  "provider": { "id": "pr-004", "name": "Instituto movida", "kind": "INSTITUICAO", "verified": true },
+  "location": { "city": "Brasília", "state": "DF", "address": "Rua das Flores, 120", "distanceKm": 4.8 },
+  "summary": "Avaliação cardiológica com ECG, voltada a pacientes sem convênio. Requer triagem prévia.",
+  "requiredDocuments": ["RG"],
+  "updatedAt": "2026-10-05T14:00:00Z"
+}

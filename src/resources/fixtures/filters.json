@@ -1,0 +1,25 @@
+{
+  "specialties": [
+    { "id": "cardiologia", "label": "Cardiologia" },
+    { "id": "ortopedia", "label": "Ortopedia" },
+    { "id": "psicologia", "label": "Psicologia" },
+    { "id": "clinica-geral", "label": "Clínica geral" },
+    { "id": "fisioterapia", "label": "Fisioterapia" },
+    { "id": "odontologia", "label": "Odontologia" },
+    { "id": "terapia-ocupacional", "label": "Terapia ocupacional" }
+  ],
+  "modalities": [
+    { "id": "presencial", "label": "Presencial" },
+    { "id": "online", "label": "Online" }
+  ],
+  "distances": [
+    { "id": "2", "label": "Até 2km" },
+    { "id": "5", "label": "Até 5km" },
+    { "id": "10", "label": "Até 10km" }
+  ],
+  "offerTypes": [
+    { "id": "gratuita", "label": "Gratuita" },
+    { "id": "social", "label": "Social" },
+    { "id": "convenio", "label": "Convênio" }
+  ]
+}

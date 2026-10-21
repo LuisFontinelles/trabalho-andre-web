@@ -1,0 +1,25 @@
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fixture.medhub.pro",
+  "expiresIn": 3600,
+  "user": {
+    "username": "Marcos Vieira",
+    "email": "profissional@teste.com",
+    "enabled": true,
+    "profile": "PROFISSIONAL",
+    "address": {
+      "street": "SGAS 915",
+      "neighborhood": "Asa Sul",
+      "zipCode": "70390-150",
+      "number": "915",
+      "complement": "Bloco C, sala 204",
+      "city": "Brasília",
+      "state": "DF"
+    },
+    "birthday": "02/11/1984",
+    "income": null,
+    "concern": null,
+    "accessConditions": null,
+    "healthHistory": null,
+    "serviceRequests": null
+  }
+}

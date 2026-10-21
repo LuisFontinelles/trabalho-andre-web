@@ -1,0 +1,33 @@
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fixture.medhub",
+  "expiresIn": 3600,
+  "user": {
+    "username": "Ana Paula Ribeiro",
+    "email": "paciente@teste.com",
+    "enabled": true,
+    "profile": "PACIENTE",
+    "address": {
+      "street": "Rua das Flores",
+      "neighborhood": "Centro",
+      "zipCode": "01001-000",
+      "number": "123",
+      "complement": "Apartamento 201",
+      "city": "São Paulo",
+      "state": "SP"
+    },
+    "birthday": "15/05/1990",
+    "income": 2500.0,
+    "concern": [
+      "Acompanhamento preventivo",
+      "Orientação nutricional"
+    ],
+    "accessConditions": [
+      "Disponibilidade no período da manhã"
+    ],
+    "healthHistory": "Dados fictícios para teste. Sem histórico de doenças crônicas.",
+    "serviceRequests": [
+      "Consulta clínica geral",
+      "Avaliação nutricional"
+    ]
+  }
+}

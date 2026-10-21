@@ -1,0 +1,12 @@
+{
+  "id": "app-20418",
+  "protocolNumber": "20418",
+  "opportunityId": "op-004",
+  "status": "EM_ANALISE",
+  "timeline": [
+    { "title": "Recebida", "detail": "Hoje, 14:32", "done": true },
+    { "title": "Triagem concluída", "detail": "Hoje, 14:32", "done": true },
+    { "title": "Em análise", "detail": "Prazo estimado: 48 h", "done": false },
+    { "title": "Resposta do profissional", "detail": "Você será notificado", "done": false }
+  ]
+}

@@ -1,0 +1,363 @@
+{
+  "items": [
+    {
+      "id": "op-001",
+      "title": "Psicologia online",
+      "specialty": "psicologia",
+      "modality": "online",
+      "offerType": "gratuita",
+      "vacancies": 3,
+      "provider": {
+        "id": "pr-001",
+        "name": "Clínica Saúde",
+        "kind": "INSTITUICAO",
+        "verified": true
+      },
+      "location": {
+        "city": "Brasília",
+        "state": "DF",
+        "address": "Remoto",
+        "distanceKm": null
+      },
+      "summary": "Atendimento psicológico individual por videochamada, com agenda semanal.",
+      "requiredDocuments": [
+        "RG"
+      ],
+      "updatedAt": "2026-10-05T14:00:00Z"
+    },
+    {
+      "id": "op-002",
+      "title": "Ortopedia",
+      "specialty": "ortopedia",
+      "modality": "presencial",
+      "offerType": "social",
+      "vacancies": 8,
+      "provider": {
+        "id": "pr-002",
+        "name": "Boca Feliz",
+        "kind": "CLINICA",
+        "verified": true
+      },
+      "location": {
+        "city": "Brasília",
+        "state": "DF",
+        "address": "QNM 34, Ceilândia",
+        "distanceKm": 1.0
+      },
+      "summary": "Consulta ortopédica com avaliação de exames prévios.",
+      "requiredDocuments": [
+        "RG",
+        "Encaminhamento médico"
+      ],
+      "updatedAt": "2026-10-05T14:00:00Z"
+    },
+    {
+      "id": "op-003",
+      "title": "Avaliação odontológica",
+      "specialty": "odontologia",
+      "modality": "presencial",
+      "offerType": "gratuita",
+      "vacancies": 8,
+      "provider": {
+        "id": "pr-003",
+        "name": "Espaço Cuidar",
+        "kind": "CLINICA",
+        "verified": false
+      },
+      "location": {
+        "city": "Brasília",
+        "state": "DF",
+        "address": "SCS Quadra 2",
+        "distanceKm": 2.1
+      },
+      "summary": "Avaliação inicial e plano de tratamento em clínica-escola.",
+      "requiredDocuments": [
+        "RG",
+        "Comprovante de residência"
+      ],
+      "updatedAt": "2026-10-05T14:00:00Z"
+    },
+    {
+      "id": "op-004",
+      "title": "Cardiologia – vaga social",
+      "specialty": "cardiologia",
+      "modality": "online",
+      "offerType": "social",
+      "vacancies": 5,
+      "provider": {
+        "id": "pr-004",
+        "name": "Instituto movida",
+        "kind": "INSTITUICAO",
+        "verified": true
+      },
+      "location": {
+        "city": "Brasília",
+        "state": "DF",
+        "address": "Rua das Flores, 120",
+        "distanceKm": 4.8
+      },
+      "summary": "Avaliação cardiológica com ECG, voltada a pacientes sem convênio. Requer triagem prévia.",
+      "requiredDocuments": [
+        "RG"
+      ],
+      "updatedAt": "2026-10-05T14:00:00Z"
+    },
+    {
+      "id": "op-005",
+      "title": "Psicologia Infantil",
+      "specialty": "psicologia",
+      "modality": "presencial",
+      "offerType": "social",
+      "vacancies": 5,
+      "provider": {
+        "id": "pr-005",
+        "name": "Faculdade Ensine",
+        "kind": "UNIVERSIDADE",
+        "verified": true
+      },
+      "location": {
+        "city": "Brasília",
+        "state": "DF",
+        "address": "Campus Taguatinga",
+        "distanceKm": 12.3
+      },
+      "summary": "Acompanhamento psicológico infantil supervisionado por docentes.",
+      "requiredDocuments": [
+        "RG",
+        "Certidão de nascimento"
+      ],
+      "updatedAt": "2026-10-05T14:00:00Z"
+    },
+    {
+      "id": "op-006",
+      "title": "Fisioterapia respiratória",
+      "specialty": "fisioterapia",
+      "modality": "presencial",
+      "offerType": "gratuita",
+      "vacancies": 4,
+      "provider": {
+        "id": "pr-006",
+        "name": "Clínica-escola UCB",
+        "kind": "UNIVERSIDADE",
+        "verified": true
+      },
+      "location": {
+        "city": "Brasília",
+        "state": "DF",
+        "address": "QS 07 Taguatinga",
+        "distanceKm": 8.2
+      },
+      "summary": "Sessões de fisioterapia respiratória com encaminhamento médico recente.",
+      "requiredDocuments": [
+        "RG",
+        "Encaminhamento médico"
+      ],
+      "updatedAt": "2026-10-05T14:00:00Z"
+    },
+    {
+      "id": "op-007",
+      "title": "Clínica geral – mutirão",
+      "specialty": "clinica-geral",
+      "modality": "presencial",
+      "offerType": "gratuita",
+      "vacancies": 12,
+      "provider": {
+        "id": "pr-007",
+        "name": "Secretaria de Saúde",
+        "kind": "PODER_PUBLICO",
+        "verified": true
+      },
+      "location": {
+        "city": "Brasília",
+        "state": "DF",
+        "address": "UBS 2 Ceilândia",
+        "distanceKm": 6.4
+      },
+      "summary": "Mutirão de atendimento clínico com agendamento na própria UBS.",
+      "requiredDocuments": [
+        "Cartão SUS",
+        "RG"
+      ],
+      "updatedAt": "2026-10-05T14:00:00Z"
+    },
+    {
+      "id": "op-008",
+      "title": "Terapia ocupacional",
+      "specialty": "terapia-ocupacional",
+      "modality": "presencial",
+      "offerType": "convenio",
+      "vacancies": 2,
+      "provider": {
+        "id": "pr-008",
+        "name": "Centro Integrado",
+        "kind": "CLINICA",
+        "verified": false
+      },
+      "location": {
+        "city": "Brasília",
+        "state": "DF",
+        "address": "Asa Sul",
+        "distanceKm": 9.7
+      },
+      "summary": "Atendimento em terapia ocupacional para adultos.",
+      "requiredDocuments": [
+        "RG"
+      ],
+      "updatedAt": "2026-10-05T14:00:00Z"
+    },
+    {
+      "id": "op-009",
+      "title": "Odontologia preventiva",
+      "specialty": "odontologia",
+      "modality": "presencial",
+      "offerType": "social",
+      "vacancies": 6,
+      "provider": {
+        "id": "pr-009",
+        "name": "Espaço Cuidar",
+        "kind": "CLINICA",
+        "verified": false
+      },
+      "location": {
+        "city": "Brasília",
+        "state": "DF",
+        "address": "SCS Quadra 2",
+        "distanceKm": 2.1
+      },
+      "summary": "Profilaxia e orientação de higiene bucal.",
+      "requiredDocuments": [
+        "RG"
+      ],
+      "updatedAt": "2026-10-05T14:00:00Z"
+    },
+    {
+      "id": "op-010",
+      "title": "Psicologia adulto",
+      "specialty": "psicologia",
+      "modality": "online",
+      "offerType": "convenio",
+      "vacancies": 1,
+      "provider": {
+        "id": "pr-010",
+        "name": "Clínica Saúde",
+        "kind": "INSTITUICAO",
+        "verified": true
+      },
+      "location": {
+        "city": "Brasília",
+        "state": "DF",
+        "address": "Remoto",
+        "distanceKm": null
+      },
+      "summary": "Psicoterapia para adultos em modalidade remota.",
+      "requiredDocuments": [
+        "RG"
+      ],
+      "updatedAt": "2026-10-05T14:00:00Z"
+    },
+    {
+      "id": "op-011",
+      "title": "Cardiologia preventiva",
+      "specialty": "cardiologia",
+      "modality": "presencial",
+      "offerType": "gratuita",
+      "vacancies": 7,
+      "provider": {
+        "id": "pr-011",
+        "name": "Instituto movida",
+        "kind": "INSTITUICAO",
+        "verified": true
+      },
+      "location": {
+        "city": "Brasília",
+        "state": "DF",
+        "address": "Rua das Flores, 120",
+        "distanceKm": 4.8
+      },
+      "summary": "Triagem cardiológica preventiva com aferição e orientação.",
+      "requiredDocuments": [
+        "RG"
+      ],
+      "updatedAt": "2026-10-05T14:00:00Z"
+    },
+    {
+      "id": "op-012",
+      "title": "Ortopedia infantil",
+      "specialty": "ortopedia",
+      "modality": "presencial",
+      "offerType": "social",
+      "vacancies": 3,
+      "provider": {
+        "id": "pr-012",
+        "name": "Boca Feliz",
+        "kind": "CLINICA",
+        "verified": true
+      },
+      "location": {
+        "city": "Brasília",
+        "state": "DF",
+        "address": "QNM 34, Ceilândia",
+        "distanceKm": 1.0
+      },
+      "summary": "Avaliação ortopédica pediátrica.",
+      "requiredDocuments": [
+        "RG",
+        "Certidão de nascimento"
+      ],
+      "updatedAt": "2026-10-05T14:00:00Z"
+    },
+    {
+      "id": "op-013",
+      "title": "Nutrição clínica",
+      "specialty": "clinica-geral",
+      "modality": "online",
+      "offerType": "gratuita",
+      "vacancies": 9,
+      "provider": {
+        "id": "pr-013",
+        "name": "Faculdade Ensine",
+        "kind": "UNIVERSIDADE",
+        "verified": true
+      },
+      "location": {
+        "city": "Brasília",
+        "state": "DF",
+        "address": "Remoto",
+        "distanceKm": null
+      },
+      "summary": "Acompanhamento nutricional com estudantes supervisionados.",
+      "requiredDocuments": [
+        "RG"
+      ],
+      "updatedAt": "2026-10-05T14:00:00Z"
+    },
+    {
+      "id": "op-014",
+      "title": "Fisioterapia ortopédica",
+      "specialty": "fisioterapia",
+      "modality": "presencial",
+      "offerType": "social",
+      "vacancies": 4,
+      "provider": {
+        "id": "pr-014",
+        "name": "Clínica-escola UCB",
+        "kind": "UNIVERSIDADE",
+        "verified": true
+      },
+      "location": {
+        "city": "Brasília",
+        "state": "DF",
+        "address": "QS 07 Taguatinga",
+        "distanceKm": 8.2
+      },
+      "summary": "Reabilitação ortopédica pós-lesão.",
+      "requiredDocuments": [
+        "Encaminhamento médico"
+      ],
+      "updatedAt": "2026-10-05T14:00:00Z"
+    }
+  ],
+  "page": 1,
+  "totalPages": 3,
+  "totalItems": 14
+}

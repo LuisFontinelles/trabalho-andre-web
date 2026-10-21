@@ -1,0 +1,6 @@
+{
+  "statusCode": 500,
+  "message": "Internal Server Error: unexpected server error",
+  "error": "Internal Server Error",
+  "requestId": "f1d9b7a2-3c55-48ef-9a10-62b4c7e85d03"
+}

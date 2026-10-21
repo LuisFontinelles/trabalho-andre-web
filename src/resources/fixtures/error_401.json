@@ -1,0 +1,6 @@
+{
+  "statusCode": 401,
+  "message": "Unauthorized: invalid credentials",
+  "error": "Unauthorized",
+  "requestId": "4b1f27c8-1a3e-4c90-9f2b-5de70a8c6311"
+}

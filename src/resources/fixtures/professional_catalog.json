@@ -1,0 +1,58 @@
+{
+  "councils": [
+    {
+      "id": "CRM",
+      "label": "CRM"
+    },
+    {
+      "id": "COREN",
+      "label": "COREN"
+    },
+    {
+      "id": "CRO",
+      "label": "CRO"
+    },
+    {
+      "id": "CRP",
+      "label": "CRP"
+    },
+    {
+      "id": "CREFITO",
+      "label": "CREFITO"
+    },
+    {
+      "id": "CREF",
+      "label": "CREF"
+    }
+  ],
+  "states": [
+    {
+      "id": "DF",
+      "label": "DF"
+    },
+    {
+      "id": "MG",
+      "label": "MG"
+    },
+    {
+      "id": "RJ",
+      "label": "RJ"
+    },
+    {
+      "id": "SP",
+      "label": "SP"
+    },
+    {
+      "id": "GO",
+      "label": "GO"
+    },
+    {
+      "id": "PR",
+      "label": "PR"
+    },
+    {
+      "id": "MT",
+      "label": "MT"
+    }
+  ]
+}
