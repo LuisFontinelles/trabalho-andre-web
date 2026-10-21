@@ -197,3 +197,66 @@
   .cb-detail-grid { grid-template-columns: 1fr; }
   .cb-form-grid { grid-template-columns: 1fr; }
 }
+
+/* Paineis da triagem */
+.cb-panel {
+  display: flex; flex-direction: column; gap: var(--cb-space-md);
+  padding: var(--cb-space-xl);
+  background: var(--cb-surface);
+  border: var(--cb-border-width) solid var(--cb-border);
+  border-radius: var(--cb-radius-lg);
+}
+.cb-question-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--cb-space-md); }
+.cb-question {
+  display: flex; align-items: center; gap: var(--cb-space-sm);
+  padding: 0 var(--cb-space-lg); min-height: var(--cb-field-height);
+  background: var(--cb-surface-field);
+  border: var(--cb-border-width) solid var(--cb-border);
+  border-radius: var(--cb-radius-md);
+}
+.cb-question__index { color: var(--cb-text-tertiary); font: var(--cb-font-callout); flex: none; }
+.cb-question__input { flex: 1; min-width: 0; background: none; border: none; outline: none; font: var(--cb-font-callout); color: var(--cb-text-primary); }
+.cb-question__input:disabled { color: var(--cb-text-secondary); }
+
+.cb-add-button {
+  align-self: flex-start;
+  min-height: 32px; padding: 0 var(--cb-space-md);
+  background: var(--cb-brand-surface); color: var(--cb-brand-strong);
+  border: none; border-radius: var(--cb-radius-sm);
+  font: var(--cb-font-caption); cursor: pointer;
+}
+
+.cb-custom-document {
+  display: inline-flex; align-items: center; gap: var(--cb-space-xs);
+  min-height: var(--cb-chip-height); padding: 0 var(--cb-space-sm) 0 var(--cb-space-lg);
+  background: var(--cb-surface);
+  border: var(--cb-border-width) solid var(--cb-border);
+  border-radius: var(--cb-radius-pill);
+}
+.cb-custom-document__input {
+  width: 13ch; min-width: 0; background: none; border: none; outline: none;
+  font: var(--cb-font-label); color: var(--cb-text-primary);
+}
+.cb-custom-document__remove {
+  display: grid; place-items: center; width: 28px; height: 28px;
+  background: none; border: none; border-radius: 50%;
+  color: var(--cb-danger); cursor: pointer;
+}
+
+/* Autolayout: as acoes da tabela quebram em vez de espremer */
+@media (max-width: 1180px) {
+  .cb-table__actions { flex-wrap: wrap; justify-content: flex-end; }
+}
+@media (max-width: 720px) {
+  .cb-main { padding: var(--cb-space-lg); }
+  .cb-steps { justify-content: flex-start; }
+  .cb-form-actions { flex-direction: column-reverse; }
+  .cb-form-actions > div, .cb-form-actions button { width: 100%; }
+  .cb-fab { right: var(--cb-space-lg); bottom: var(--cb-space-lg); }
+  /* O texto da pergunta manda: o botao desce de linha em vez de espremer. */
+  .cb-question { flex-wrap: wrap; padding: var(--cb-space-sm) var(--cb-space-md); }
+  .cb-question__input { flex: 1 1 auto; min-width: 65%; }
+  .cb-question .cb-action { margin-left: auto; }
+  .cb-custom-document__input { width: 11ch; }
+  .cb-dialog { padding: var(--cb-space-xl); }
+}

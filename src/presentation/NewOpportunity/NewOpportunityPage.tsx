@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useDependencies } from '@/app/session'
-import { Banner, Button, SelectField, TextField } from '@/designSystem/components'
+import {
+  Banner,
+  Button,
+  SelectField,
+  Skeleton,
+  TextField,
+  ToggleChip,
+} from '@/designSystem/components'
 import { CbIcon } from '@/designSystem/tokens/icons'
 import {
   EMPTY_FILTER_CATALOG,
@@ -16,16 +23,26 @@ import {
 import {
   DRAFT_STEPS,
   DraftError,
+  addDocument,
+  addQuestion,
   applyAccessMode,
   applyModality,
+  applyTriageMode,
+  canEditTriage,
   emptyOpportunityDraft,
   nextStep,
   previousStep,
+  removeDocument,
+  removeQuestion,
+  renameDocument,
+  renameQuestion,
+  toggleDocument,
   validateStep,
   type DraftErrorCode,
   type DraftStep,
   type OpportunityDraft,
 } from '@/domain/opportunityDraft'
+import { draftFromManagedOpportunity } from '@/data/professionalMappers'
 import { strings } from '@/resources/strings'
 
 const ACCESS_MODES: readonly AccessMode[] = ['gratuito', 'preco-social', 'pesquisa']
@@ -45,6 +62,8 @@ function Required() {
 export function NewOpportunityPage() {
   const dependencies = useDependencies()
   const navigate = useNavigate()
+  const { id } = useParams()
+  const isEditing = id !== undefined
 
   const [draft, setDraft] = useState<OpportunityDraft>(emptyOpportunityDraft)
   const [step, setStep] = useState<DraftStep>('DADOS')
@@ -52,6 +71,28 @@ export function NewOpportunityPage() {
   const [errors, setErrors] = useState<Errors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setSubmitting] = useState(false)
+  const [isLoading, setLoading] = useState(isEditing)
+
+  // Na edicao o formulario abre com o que ja esta publicado.
+  useEffect(() => {
+    if (id === undefined) return
+    let active = true
+    dependencies.professionalRepository
+      .opportunity(id)
+      .then((item) => {
+        if (!active) return
+        setDraft(draftFromManagedOpportunity(item))
+        setLoading(false)
+      })
+      .catch(() => {
+        if (!active) return
+        setFormError(strings.newOpportunity.loadFailed)
+        setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [dependencies, id])
 
   useEffect(() => {
     let active = true
@@ -98,7 +139,11 @@ export function NewOpportunityPage() {
     setSubmitting(true)
     setFormError(null)
     try {
-      await dependencies.professionalRepository.createOpportunity(draft)
+      if (id === undefined) {
+        await dependencies.professionalRepository.createOpportunity(draft)
+      } else {
+        await dependencies.professionalRepository.updateOpportunity(id, draft)
+      }
       navigate('/oportunidades', { replace: true })
     } catch {
       setFormError(strings.newOpportunity.failed)
@@ -117,21 +162,37 @@ export function NewOpportunityPage() {
     setErrors({})
   }
 
+  const editable = canEditTriage(draft)
+
   const continueTitle =
     step === 'DADOS'
       ? strings.newOpportunity.continue
       : step === 'ACESSO'
         ? strings.newOpportunity.saveAndTriage
-        : strings.newOpportunity.publish
+        : isEditing
+          ? strings.newOpportunity.save
+          : strings.newOpportunity.publish
 
   return (
     <>
       <header className="cb-page-header">
         <h1 className="cb-page-header__title cb-page-header__title--brand">
-          {strings.newOpportunity.title}
+          {step === 'TRIAGEM'
+            ? isEditing
+              ? strings.newOpportunity.triageEditTitle
+              : strings.newOpportunity.triagePageTitle
+            : isEditing
+              ? strings.newOpportunity.editTitle
+              : strings.newOpportunity.title}
         </h1>
         <p className="cb-page-header__subtitle">
-          <Required /> {strings.newOpportunity.requiredHint}
+          {step === 'TRIAGEM' ? (
+            strings.newOpportunity.triageSubtitle
+          ) : (
+            <>
+              <Required /> {strings.newOpportunity.requiredHint}
+            </>
+          )}
         </p>
       </header>
 
@@ -151,7 +212,9 @@ export function NewOpportunityPage() {
         ))}
       </nav>
 
-      <div className="cb-card">
+      {isLoading && <Skeleton height={420} />}
+
+      <div className="cb-card" hidden={isLoading}>
         {step === 'DADOS' && (
           <div className="cb-form-stack">
             <TextField
@@ -338,11 +401,6 @@ export function NewOpportunityPage() {
 
         {step === 'TRIAGEM' && (
           <div className="cb-form-stack">
-            <div>
-              <h2 className="cb-section-header">{strings.newOpportunity.triageTitle}</h2>
-              <p className="cb-note">{strings.newOpportunity.triageSubtitle}</p>
-            </div>
-
             <div className="cb-choice-grid">
               <button
                 type="button"
@@ -353,7 +411,7 @@ export function NewOpportunityPage() {
                   .filter(Boolean)
                   .join(' ')}
                 aria-pressed={draft.triageMode === 'PADRAO'}
-                onClick={() => update({ triageMode: 'PADRAO' })}
+                onClick={() => setDraft((c) => applyTriageMode(c, 'PADRAO'))}
               >
                 <p className="cb-choice__title">{strings.newOpportunity.triageDefault}</p>
                 <p className="cb-choice__hint">{strings.newOpportunity.triageDefaultHint}</p>
@@ -367,64 +425,118 @@ export function NewOpportunityPage() {
                   .filter(Boolean)
                   .join(' ')}
                 aria-pressed={draft.triageMode === 'PERSONALIZADO'}
-                onClick={() => update({ triageMode: 'PERSONALIZADO' })}
+                onClick={() => setDraft((c) => applyTriageMode(c, 'PERSONALIZADO'))}
               >
                 <p className="cb-choice__title">{strings.newOpportunity.triageCustom}</p>
                 <p className="cb-choice__hint">{strings.newOpportunity.triageCustomHint}</p>
               </button>
             </div>
 
-            <h3 className="cb-section-header">{strings.newOpportunity.questions}</h3>
-            {draft.questions.map((question, index) => (
-              <div key={question.id} className="cb-question-row">
-                <TextField
-                  label={`${index + 1}`}
-                  placeholder={strings.newOpportunity.questionPlaceholder(index + 1)}
-                  value={question.label}
-                  isEnabled={draft.triageMode === 'PERSONALIZADO'}
-                  onChange={(label) =>
-                    update({
-                      questions: draft.questions.map((item) =>
-                        item.id === question.id ? { ...item, label } : item,
-                      ),
-                    })
-                  }
-                />
-                {draft.triageMode === 'PERSONALIZADO' && (
-                  <button
-                    type="button"
-                    className="cb-action cb-action--delete"
-                    aria-label={strings.newOpportunity.removeQuestion}
-                    onClick={() =>
-                      update({
-                        questions: draft.questions.filter((item) => item.id !== question.id),
-                      })
-                    }
-                  >
-                    <CbIcon.clear size={14} />
-                  </button>
+            <section className="cb-panel">
+              <h2 className="cb-section-header">{strings.newOpportunity.questions}</h2>
+              <ol className="cb-question-list">
+                {draft.questions.map((question, index) => (
+                  <li key={question.id} className="cb-question">
+                    <label
+                      className="cb-visually-hidden"
+                      htmlFor={`pergunta-${question.id}`}
+                    >
+                      {strings.newOpportunity.questionLabel(index + 1)}
+                    </label>
+                    <span className="cb-question__index" aria-hidden="true">
+                      {index + 1}.
+                    </span>
+                    <input
+                      id={`pergunta-${question.id}`}
+                      className="cb-question__input"
+                      value={question.label}
+                      disabled={!editable}
+                      onChange={(event) =>
+                        setDraft((c) => renameQuestion(c, question.id, event.target.value))
+                      }
+                    />
+                    {editable && (
+                      <button
+                        type="button"
+                        className="cb-action cb-action--delete"
+                        aria-label={`${strings.newOpportunity.removeQuestion}: ${question.label}`}
+                        onClick={() => setDraft((c) => removeQuestion(c, question.id))}
+                      >
+                        {strings.newOpportunity.remove}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ol>
+              {editable && (
+                <button
+                  type="button"
+                  className="cb-add-button"
+                  onClick={() => setDraft(addQuestion)}
+                >
+                  {strings.newOpportunity.addQuestion}
+                </button>
+              )}
+              {errors.questionsRequired && (
+                <Banner message={errors.questionsRequired} />
+              )}
+            </section>
+
+            <section className="cb-panel">
+              <h2 className="cb-section-header">{strings.newOpportunity.documentsTitle}</h2>
+              <div className="cb-chip-group">
+                {draft.documents.map((document) =>
+                  document.isCustom && editable ? (
+                    <span key={document.id} className="cb-custom-document">
+                      <label
+                        className="cb-visually-hidden"
+                        htmlFor={`documento-${document.id}`}
+                      >
+                        {strings.newOpportunity.newDocumentLabel}
+                      </label>
+                      <input
+                        id={`documento-${document.id}`}
+                        className="cb-custom-document__input"
+                        value={document.label}
+                        onChange={(event) =>
+                          setDraft((c) =>
+                            renameDocument(c, document.id, event.target.value),
+                          )
+                        }
+                      />
+                      <button
+                        type="button"
+                        className="cb-custom-document__remove"
+                        aria-label={`${strings.newOpportunity.removeDocument}: ${document.label}`}
+                        onClick={() => setDraft((c) => removeDocument(c, document.id))}
+                      >
+                        <CbIcon.clear size={14} />
+                      </button>
+                    </span>
+                  ) : (
+                    <ToggleChip
+                      key={document.id}
+                      title={document.label}
+                      isSelected={draft.selectedDocumentIds.includes(document.id)}
+                      isEnabled={editable}
+                      onClick={() => setDraft((c) => toggleDocument(c, document.id))}
+                    />
+                  ),
                 )}
               </div>
-            ))}
-
-            {draft.triageMode === 'PERSONALIZADO' && (
-              <Button
-                title={strings.newOpportunity.addQuestion}
-                kind="secondary"
-                size="compact"
-                fillsWidth={false}
-                onClick={() =>
-                  update({
-                    questions: [
-                      ...draft.questions,
-                      { id: `q${Date.now()}`, label: '' },
-                    ],
-                  })
-                }
-              />
-            )}
-
-            {errors.questionsRequired && <Banner message={errors.questionsRequired} />}
+              {editable && (
+                <button
+                  type="button"
+                  className="cb-add-button"
+                  onClick={() => setDraft(addDocument)}
+                >
+                  {strings.newOpportunity.addDocument}
+                </button>
+              )}
+              {errors.documentsRequired && (
+                <Banner message={errors.documentsRequired} />
+              )}
+            </section>
           </div>
         )}
 

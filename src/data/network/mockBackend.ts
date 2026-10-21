@@ -283,6 +283,46 @@ const ROUTES: Route[] = [
       )
       return { status: 204, body: null }
     } },
+  { method: 'GET', pattern: '/v1/professional/opportunities/{id}', status: 200, fixture: null, latencyMs: 250,
+    respond: (_body, path) => {
+      const id = pathIdOf(path, 3)
+      const found = panel.opportunities.find((item) => item.id === id)
+      if (!found) return { status: 404, body: loadFixture('error_404') }
+      return { status: 200, body: found }
+    } },
+  { method: 'PUT', pattern: '/v1/professional/opportunities/{id}', status: 200, fixture: null, latencyMs: 400,
+    respond: (body, path) => {
+      const id = pathIdOf(path, 3)
+      const request = body as Record<string, unknown> | null
+      if (!request) return errorPayload('Bad Request: malformed body', 400, 'Bad Request')
+      const current = panel.opportunities.find((item) => item.id === id)
+      if (!current) return { status: 404, body: loadFixture('error_404') }
+      // Encerrada nao volta a ser editavel, mesmo que o cliente tente.
+      if (current.status === 'ENCERRADA') {
+        return errorPayload(
+          'Unprocessable Entity: closed opportunity cannot be edited',
+          422,
+          'Unprocessable Entity',
+        )
+      }
+      const updated = {
+        ...current,
+        title: String(request.title ?? '') || current.title,
+        specialty: String(request.specialty ?? current.specialty),
+        accessMode: String(request.accessMode ?? current.accessMode),
+        price: request.price ?? null,
+        totalVacancies: Number(request.totalVacancies ?? current.totalVacancies),
+        modality: String(request.modality ?? current.modality),
+        address: request.address ?? null,
+        opensAt: request.opensAt ?? current.opensAt,
+        closesAt: request.closesAt ?? current.closesAt,
+        updatedAt: new Date().toISOString(),
+      }
+      panel.opportunities = panel.opportunities.map((item) =>
+        item.id === id ? updated : item,
+      )
+      return { status: 200, body: updated }
+    } },
   { method: 'DELETE', pattern: '/v1/professional/opportunities/{id}', status: 204, fixture: null, latencyMs: 300,
     respond: (_body, path) => {
       const id = pathIdOf(path, 3)

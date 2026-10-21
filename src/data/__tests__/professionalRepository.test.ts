@@ -260,3 +260,86 @@ describe('Isolamento entre testes', () => {
     expect(items.find((item) => item.id === 'req-002')?.status).toBe('EM_ANALISE')
   })
 })
+
+describe('Carregar uma oportunidade para edicao', () => {
+  it('traz a oportunidade pedida', async () => {
+    const item = await repo().opportunity('op-105')
+    expect(item.id).toBe('op-105')
+    expect(item.title).toBe('Psicologia adulto')
+    expect(item.status).toBe('ATIVA')
+  })
+
+  it('id inexistente responde 404', async () => {
+    await expect(repo().opportunity('op-999')).rejects.toMatchObject({
+      kind: 'notFound',
+    })
+  })
+})
+
+describe('Editar oportunidade', () => {
+  it('salva o que mudou', async () => {
+    const repository = repo()
+    const updated = await repository.updateOpportunity('op-105', {
+      ...validOpportunityDraft(),
+      title: 'Psicologia adulto e adolescente',
+      totalVacancies: '15',
+    })
+    expect(updated.title).toBe('Psicologia adulto e adolescente')
+    expect(updated.totalVacancies).toBe(15)
+  })
+
+  it('a mudanca aparece na lista', async () => {
+    const repository = repo()
+    await repository.updateOpportunity('op-105', {
+      ...validOpportunityDraft(),
+      title: 'Titulo novo',
+    })
+    const item = (await repository.myOpportunities()).find((i) => i.id === 'op-105')
+    expect(item?.title).toBe('Titulo novo')
+  })
+
+  it('editar nao cria uma oportunidade a mais', async () => {
+    const repository = repo()
+    await repository.updateOpportunity('op-105', validOpportunityDraft())
+    expect(await repository.myOpportunities()).toHaveLength(6)
+  })
+
+  it('preserva as vagas ja preenchidas e as solicitacoes', async () => {
+    const repository = repo()
+    const before = await repository.opportunity('op-105')
+    const updated = await repository.updateOpportunity('op-105', {
+      ...validOpportunityDraft(),
+      totalVacancies: '20',
+    })
+    expect(updated.filledVacancies).toBe(before.filledVacancies)
+    expect(updated.applicationCount).toBe(before.applicationCount)
+  })
+
+  it('oportunidade encerrada nao pode ser editada', async () => {
+    await expect(
+      repo().updateOpportunity('op-101', validOpportunityDraft()),
+    ).rejects.toMatchObject({ status: 422 })
+  })
+
+  it('encerrar e depois tentar editar tambem e barrado', async () => {
+    const repository = repo()
+    await repository.closeOpportunity('op-105')
+    await expect(
+      repository.updateOpportunity('op-105', validOpportunityDraft()),
+    ).rejects.toMatchObject({ status: 422 })
+  })
+
+  it('id inexistente responde 404', async () => {
+    await expect(
+      repo().updateOpportunity('op-999', validOpportunityDraft()),
+    ).rejects.toMatchObject({ kind: 'notFound' })
+  })
+
+  it('rascunho pode ser editado', async () => {
+    const updated = await repo().updateOpportunity('op-103', {
+      ...validOpportunityDraft(),
+      title: 'Estudo revisado',
+    })
+    expect(updated.title).toBe('Estudo revisado')
+  })
+})

@@ -70,5 +70,9 @@ export interface CreateOpportunityRequestDTO {
   totalVacancies: number
   opensAt: string
   closesAt: string
-  triage: { mode: string; questions: { id: string; label: string }[] }
+  triage: {
+    mode: string
+    questions: { id: string; label: string }[]
+    documents: { id: string; label: string }[]
+  }
 }

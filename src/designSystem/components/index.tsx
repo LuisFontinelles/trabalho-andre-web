@@ -1,4 +1,11 @@
-import { useId, useState, type ChangeEvent, type ReactNode } from 'react'
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from 'react'
 import { CbIcon } from '@/designSystem/tokens/icons'
 import { strings } from '@/resources/strings'
 import './components.css'
@@ -471,4 +478,143 @@ export function DisabledTag({ text = strings.common.soon }: { text?: string }) {
 
 export function BrandMark() {
   return <span className="cb-brand-mark">{strings.app.name}</span>
+}
+
+/**
+ * Dialogo de confirmacao. Fecha com Escape e por clique fora, devolve o foco
+ * para quem o abriu e prende o Tab dentro dele enquanto estiver aberto.
+ */
+export function ConfirmDialog({
+  isOpen,
+  title,
+  message,
+  confirmTitle,
+  cancelTitle,
+  isDestructive = false,
+  isBusy = false,
+  onConfirm,
+  onCancel,
+}: {
+  isOpen: boolean
+  title: string
+  message: string
+  confirmTitle: string
+  cancelTitle: string
+  isDestructive?: boolean
+  isBusy?: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const panel = useRef<HTMLDivElement>(null)
+  const titleId = useId()
+  const messageId = useId()
+
+  useEffect(() => {
+    if (!isOpen) return
+    const opener = document.activeElement as HTMLElement | null
+    panel.current?.querySelector<HTMLElement>('button')?.focus()
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCancel()
+        return
+      }
+      if (event.key !== 'Tab' || panel.current === null) return
+      const targets = panel.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled])',
+      )
+      if (targets.length === 0) return
+      const first = targets[0]!
+      const last = targets[targets.length - 1]!
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      opener?.focus()
+    }
+  }, [isOpen, onCancel])
+
+  if (!isOpen) return null
+
+  return (
+    <div
+      className="cb-overlay"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onCancel()
+      }}
+    >
+      <div
+        ref={panel}
+        className="cb-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={messageId}
+      >
+        <h2 id={titleId} className="cb-dialog__title">
+          {title}
+        </h2>
+        <p id={messageId} className="cb-dialog__message">
+          {message}
+        </p>
+        <div className="cb-dialog__actions">
+          <button
+            type="button"
+            className="cb-dialog__cancel"
+            disabled={isBusy}
+            onClick={onCancel}
+          >
+            {cancelTitle}
+          </button>
+          <button
+            type="button"
+            className={
+              isDestructive ? 'cb-dialog__destructive' : 'cb-dialog__confirm'
+            }
+            disabled={isBusy}
+            onClick={onConfirm}
+          >
+            {isBusy ? strings.common.loading : confirmTitle}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Chip que liga e desliga, usado nos documentos exigidos. */
+export function ToggleChip({
+  title,
+  isSelected,
+  isEnabled = true,
+  onClick,
+}: {
+  title: string
+  isSelected: boolean
+  isEnabled?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={['cb-chip', isSelected ? 'cb-chip--selected' : '']
+        .filter(Boolean)
+        .join(' ')}
+      aria-pressed={isSelected}
+      disabled={!isEnabled}
+      onClick={onClick}
+    >
+      {title}
+    </button>
+  )
 }

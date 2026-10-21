@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDependencies } from '@/app/session'
-import { Banner, EmptyState, Skeleton } from '@/designSystem/components'
+import { Banner, ConfirmDialog, EmptyState, Skeleton } from '@/designSystem/components'
 import { CbIcon } from '@/designSystem/tokens/icons'
 import {
   ACCESS_MODE_LABEL,
@@ -32,7 +32,11 @@ export function MyOpportunitiesPage() {
   const navigate = useNavigate()
   const [state, setState] = useState<State>({ status: 'loading' })
   const [notice, setNotice] = useState<string | null>(null)
-  const [busyId, setBusyId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isBusy, setBusy] = useState(false)
+  const [pending, setPending] = useState<
+    { action: 'close' | 'delete'; item: ManagedOpportunity } | null
+  >(null)
 
   const load = useCallback(async () => {
     setState({ status: 'loading' })
@@ -48,31 +52,27 @@ export function MyOpportunitiesPage() {
     void load()
   }, [load])
 
-  async function close(item: ManagedOpportunity) {
-    if (!window.confirm(strings.myOpportunities.confirmClose(item.title))) return
-    setBusyId(item.id)
+  async function confirmPending() {
+    if (pending === null) return
+    const { action, item } = pending
+    setBusy(true)
     setNotice(null)
+    setError(null)
     try {
-      await dependencies.professionalRepository.closeOpportunity(item.id)
+      if (action === 'close') {
+        await dependencies.professionalRepository.closeOpportunity(item.id)
+        setNotice(strings.myOpportunities.closed)
+      } else {
+        await dependencies.professionalRepository.deleteOpportunity(item.id)
+        setNotice(strings.myOpportunities.deleted)
+      }
+      setPending(null)
       await load()
     } catch {
-      setNotice(strings.myOpportunities.errorMessage)
+      setError(strings.myOpportunities.errorMessage)
+      setPending(null)
     } finally {
-      setBusyId(null)
-    }
-  }
-
-  async function remove(item: ManagedOpportunity) {
-    if (!window.confirm(strings.myOpportunities.confirmDelete(item.title))) return
-    setBusyId(item.id)
-    setNotice(null)
-    try {
-      await dependencies.professionalRepository.deleteOpportunity(item.id)
-      await load()
-    } catch {
-      setNotice(strings.myOpportunities.errorMessage)
-    } finally {
-      setBusyId(null)
+      setBusy(false)
     }
   }
 
@@ -103,7 +103,8 @@ export function MyOpportunitiesPage() {
         </div>
       </section>
 
-      {notice && <Banner message={notice} />}
+      {notice && <Banner message={notice} tone="success" />}
+      {error && <Banner message={error} />}
 
       {state.status === 'loading' && <Skeleton height={240} />}
 
@@ -162,24 +163,29 @@ export function MyOpportunitiesPage() {
                       <button
                         type="button"
                         className="cb-action cb-action--edit"
-                        disabled={!canEdit(item) || busyId !== null}
-                        title={strings.myOpportunities.editSoon}
+                        disabled={!canEdit(item) || isBusy}
+                        title={
+                          canEdit(item)
+                            ? undefined
+                            : strings.myOpportunities.cannotEditClosed
+                        }
+                        onClick={() => navigate(`/oportunidades/${item.id}/editar`)}
                       >
                         {strings.myOpportunities.edit}
                       </button>
                       <button
                         type="button"
                         className="cb-action cb-action--close"
-                        disabled={!canClose(item) || busyId !== null}
-                        onClick={() => void close(item)}
+                        disabled={!canClose(item) || isBusy}
+                        onClick={() => setPending({ action: 'close', item })}
                       >
                         {strings.myOpportunities.close}
                       </button>
                       <button
                         type="button"
                         className="cb-action cb-action--delete"
-                        disabled={!canDelete() || busyId !== null}
-                        onClick={() => void remove(item)}
+                        disabled={!canDelete() || isBusy}
+                        onClick={() => setPending({ action: 'delete', item })}
                       >
                         {strings.myOpportunities.remove}
                       </button>
@@ -199,6 +205,30 @@ export function MyOpportunitiesPage() {
       >
         {strings.myOpportunities.newOpportunity}
       </button>
+
+      <ConfirmDialog
+        isOpen={pending !== null}
+        title={
+          pending?.action === 'delete'
+            ? strings.myOpportunities.deleteTitle
+            : strings.myOpportunities.closeTitle
+        }
+        message={
+          pending?.action === 'delete'
+            ? strings.myOpportunities.deleteMessage
+            : strings.myOpportunities.closeMessage
+        }
+        confirmTitle={
+          pending?.action === 'delete'
+            ? strings.myOpportunities.remove
+            : strings.myOpportunities.close
+        }
+        cancelTitle={strings.myOpportunities.cancel}
+        isDestructive={pending?.action === 'delete'}
+        isBusy={isBusy}
+        onConfirm={() => void confirmPending()}
+        onCancel={() => setPending(null)}
+      />
     </>
   )
 }

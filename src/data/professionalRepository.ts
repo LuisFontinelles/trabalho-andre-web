@@ -24,7 +24,9 @@ import type {
 
 export interface ProfessionalRepository {
   myOpportunities(): Promise<readonly ManagedOpportunity[]>
+  opportunity(id: string): Promise<ManagedOpportunity>
   createOpportunity(draft: OpportunityDraft): Promise<ManagedOpportunity>
+  updateOpportunity(id: string, draft: OpportunityDraft): Promise<ManagedOpportunity>
   closeOpportunity(id: string): Promise<void>
   deleteOpportunity(id: string): Promise<void>
   receivedRequests(): Promise<readonly ReceivedRequest[]>
@@ -44,10 +46,26 @@ export function createProfessionalRepository(
       return dto.items.map(managedOpportunityFromDTO)
     },
 
+    async opportunity(id) {
+      const dto = await client.send<ManagedOpportunityDTO>({
+        path: `professional/opportunities/${id}`,
+      })
+      return managedOpportunityFromDTO(dto)
+    },
+
     async createOpportunity(draft) {
       const dto = await client.send<ManagedOpportunityDTO>({
         path: 'professional/opportunities',
         method: 'POST',
+        body: draftToDTO(draft),
+      })
+      return managedOpportunityFromDTO(dto)
+    },
+
+    async updateOpportunity(id, draft) {
+      const dto = await client.send<ManagedOpportunityDTO>({
+        path: `professional/opportunities/${id}`,
+        method: 'PUT',
         body: draftToDTO(draft),
       })
       return managedOpportunityFromDTO(dto)

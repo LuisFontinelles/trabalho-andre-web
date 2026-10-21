@@ -19,6 +19,22 @@ export interface TriageQuestion {
   label: string
 }
 
+export interface RequiredDocument {
+  id: string
+  label: string
+  /** Documento que o profissional acrescentou, e nao veio do catalogo. */
+  isCustom: boolean
+}
+
+/** Documentos que o prototipo oferece prontos. */
+export const DOCUMENT_CATALOG: readonly RequiredDocument[] = [
+  { id: 'rg', label: 'RG', isCustom: false },
+  { id: 'cpf', label: 'CPF', isCustom: false },
+  { id: 'encaminhamento', label: 'Encaminhamento medico', isCustom: false },
+  { id: 'renda', label: 'Comprovante de renda', isCustom: false },
+  { id: 'exames', label: 'Exames anteriores', isCustom: false },
+]
+
 export interface OpportunityDraft {
   title: string
   description: string
@@ -33,6 +49,8 @@ export interface OpportunityDraft {
   closesAt: string
   triageMode: TriageMode
   questions: readonly TriageQuestion[]
+  documents: readonly RequiredDocument[]
+  selectedDocumentIds: readonly string[]
 }
 
 export const DEFAULT_QUESTIONS: readonly TriageQuestion[] = [
@@ -57,6 +75,8 @@ export function emptyOpportunityDraft(): OpportunityDraft {
     closesAt: '',
     triageMode: 'PADRAO',
     questions: DEFAULT_QUESTIONS,
+    documents: DOCUMENT_CATALOG,
+    selectedDocumentIds: ['rg'],
   }
 }
 
@@ -73,6 +93,7 @@ export type DraftErrorCode =
   | 'closesAtRequired'
   | 'closesBeforeOpens'
   | 'questionsRequired'
+  | 'documentsRequired'
 
 const DRAFT_ERROR_MESSAGE: Record<DraftErrorCode, string> = {
   descriptionRequired: 'Descreva o que sera oferecido.',
@@ -87,6 +108,7 @@ const DRAFT_ERROR_MESSAGE: Record<DraftErrorCode, string> = {
   closesAtRequired: 'Informe o encerramento.',
   closesBeforeOpens: 'O encerramento precisa ser depois do inicio.',
   questionsRequired: 'Inclua ao menos uma pergunta na triagem.',
+  documentsRequired: 'Selecione ao menos um documento exigido.',
 }
 
 export class DraftError extends Error {
@@ -141,6 +163,115 @@ export function validateAccess(draft: OpportunityDraft): void {
 export function validateTriage(draft: OpportunityDraft): void {
   const filled = draft.questions.filter((item) => item.label.trim() !== '')
   if (filled.length === 0) throw new DraftError('questionsRequired')
+  if (draft.selectedDocumentIds.length === 0) {
+    throw new DraftError('documentsRequired')
+  }
+}
+
+/** So o formulario personalizado deixa mexer nas perguntas e documentos. */
+export function canEditTriage(draft: OpportunityDraft): boolean {
+  return draft.triageMode === 'PERSONALIZADO'
+}
+
+export function addQuestion(draft: OpportunityDraft): OpportunityDraft {
+  return {
+    ...draft,
+    questions: [
+      ...draft.questions,
+      { id: `q-${crypto.randomUUID()}`, label: 'Nova pergunta' },
+    ],
+  }
+}
+
+export function removeQuestion(
+  draft: OpportunityDraft,
+  id: string,
+): OpportunityDraft {
+  return { ...draft, questions: draft.questions.filter((item) => item.id !== id) }
+}
+
+export function renameQuestion(
+  draft: OpportunityDraft,
+  id: string,
+  label: string,
+): OpportunityDraft {
+  return {
+    ...draft,
+    questions: draft.questions.map((item) =>
+      item.id === id ? { ...item, label } : item,
+    ),
+  }
+}
+
+export function toggleDocument(
+  draft: OpportunityDraft,
+  id: string,
+): OpportunityDraft {
+  const selected = draft.selectedDocumentIds.includes(id)
+  return {
+    ...draft,
+    selectedDocumentIds: selected
+      ? draft.selectedDocumentIds.filter((item) => item !== id)
+      : [...draft.selectedDocumentIds, id],
+  }
+}
+
+/** O documento novo ja nasce marcado: foi o profissional que pediu por ele. */
+export function addDocument(draft: OpportunityDraft): OpportunityDraft {
+  const id = `doc-${crypto.randomUUID()}`
+  return {
+    ...draft,
+    documents: [...draft.documents, { id, label: 'Novo Documento', isCustom: true }],
+    selectedDocumentIds: [...draft.selectedDocumentIds, id],
+  }
+}
+
+export function renameDocument(
+  draft: OpportunityDraft,
+  id: string,
+  label: string,
+): OpportunityDraft {
+  return {
+    ...draft,
+    documents: draft.documents.map((item) =>
+      item.id === id ? { ...item, label } : item,
+    ),
+  }
+}
+
+export function removeDocument(
+  draft: OpportunityDraft,
+  id: string,
+): OpportunityDraft {
+  return {
+    ...draft,
+    documents: draft.documents.filter((item) => item.id !== id),
+    selectedDocumentIds: draft.selectedDocumentIds.filter((item) => item !== id),
+  }
+}
+
+export function selectedDocuments(
+  draft: OpportunityDraft,
+): readonly RequiredDocument[] {
+  return draft.documents.filter((item) =>
+    draft.selectedDocumentIds.includes(item.id),
+  )
+}
+
+/**
+ * Trocar para o formulario padrao devolve as perguntas originais: o que foi
+ * escrito no personalizado nao vale para o padrao, e manter misturado
+ * confundiria na hora de publicar.
+ */
+export function applyTriageMode(
+  draft: OpportunityDraft,
+  mode: TriageMode,
+): OpportunityDraft {
+  if (mode === draft.triageMode) return draft
+  if (mode === 'PADRAO') {
+    return { ...draft, triageMode: mode, questions: DEFAULT_QUESTIONS }
+  }
+  return { ...draft, triageMode: mode }
 }
 
 export function validateStep(draft: OpportunityDraft, step: DraftStep): void {

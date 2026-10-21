@@ -32,6 +32,7 @@ export function App() {
       >
         <Route path="/oportunidades" element={<MyOpportunitiesPage />} />
         <Route path="/oportunidades/nova" element={<NewOpportunityPage />} />
+        <Route path="/oportunidades/:id/editar" element={<NewOpportunityPage />} />
         <Route path="/solicitacoes" element={<RequestsPage />} />
         <Route path="/solicitacoes/:id" element={<RequestDetailPage />} />
       </Route>

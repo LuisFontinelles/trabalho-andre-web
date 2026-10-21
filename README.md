@@ -29,9 +29,10 @@ O backend ainda não existe. A aplicação roda inteira sobre um servidor simula
 | Minhas oportunidades, com indicadores e tabela | Pronto |
 | Encerrar e excluir oportunidade | Pronto |
 | Nova oportunidade, nos três passos do protótipo | Pronto |
+| Editar oportunidade | Pronto |
+| Triagem: perguntas editáveis e documentos exigidos | Pronto |
 | Solicitações recebidas, com filtro por status | Pronto |
 | Detalhe da solicitação: triagem, documentos, decisão e mensagens | Pronto |
-| Editar oportunidade | **Desativado e marcado na tela** |
 | Abrir documento anexado | **Desativado e marcado** |
 | Recuperação de senha | **Desativada e marcada** |
 
@@ -75,7 +76,7 @@ O cadastro aceita e-mails novos: o registro fica guardado em memória e a verifi
 
 ## Testes
 
-234 testes em Vitest, com **96,8% de cobertura de linhas** em domínio e camada de dados.
+266 testes em Vitest, com **95,8% de cobertura de linhas** em domínio e camada de dados.
 
 | Suíte | O que cobre |
 |---|---|
@@ -83,9 +84,10 @@ O cadastro aceita e-mails novos: o registro fica guardado em memória e a verifi
 | `entities` | Vagas, critérios de busca, perfis e valores desconhecidos |
 | `professional` | Status, ações permitidas por status, resumo do painel, filtros e tempo relativo |
 | `opportunityDraft` | Os três passos do formulário, campo a campo |
+| `triage` | Modos da triagem, perguntas e documentos exigidos |
 | `network` | Montagem de URL, casamento de rotas e cada código de erro |
 | `repositories` | Login, cadastro, verificação, busca e candidatura |
-| `professionalRepository` | Criar, encerrar, excluir, decidir e responder |
+| `professionalRepository` | Criar, editar, encerrar, excluir, decidir e responder |
 
 O estado do mock é reiniciado antes e depois de cada teste, então nenhum teste depende do que outro deixou.
 

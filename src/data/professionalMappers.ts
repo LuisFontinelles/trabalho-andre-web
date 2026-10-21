@@ -12,7 +12,14 @@ import {
   allowsPrice,
 } from '@/domain/professional'
 import type { OpportunityDraft } from '@/domain/opportunityDraft'
-import { parsePrice, parseVacancies } from '@/domain/opportunityDraft'
+import {
+  DOCUMENT_CATALOG,
+  DEFAULT_QUESTIONS,
+  emptyOpportunityDraft,
+  parsePrice,
+  parseVacancies,
+  selectedDocuments,
+} from '@/domain/opportunityDraft'
 import type {
   CreateOpportunityRequestDTO,
   ManagedOpportunityDTO,
@@ -103,6 +110,38 @@ export function draftToDTO(draft: OpportunityDraft): CreateOpportunityRequestDTO
       questions: draft.questions
         .filter((item) => item.label.trim() !== '')
         .map((item) => ({ id: item.id, label: item.label.trim() })),
+      documents: selectedDocuments(draft).map((item) => ({
+        id: item.id,
+        label: item.label.trim(),
+      })),
     },
+  }
+}
+
+/**
+ * Carrega uma oportunidade publicada no formulario de edicao. A API ainda nao
+ * devolve triagem junto da oportunidade, entao a edicao parte do formulario
+ * padrao ate esse campo existir no contrato.
+ */
+export function draftFromManagedOpportunity(
+  item: ManagedOpportunity,
+): OpportunityDraft {
+  return {
+    ...emptyOpportunityDraft(),
+    title: item.title,
+    description: item.title,
+    specialtyId: item.specialtyId,
+    audience: '',
+    modality: item.modality,
+    address: item.address ?? '',
+    accessMode: item.accessMode,
+    price: item.price === null ? '' : String(item.price).replace('.', ','),
+    totalVacancies: String(item.totalVacancies),
+    opensAt: item.opensAt ?? '',
+    closesAt: item.closesAt ?? '',
+    triageMode: 'PADRAO',
+    questions: DEFAULT_QUESTIONS,
+    documents: DOCUMENT_CATALOG,
+    selectedDocumentIds: ['rg'],
   }
 }
