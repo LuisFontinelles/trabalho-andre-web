@@ -1,6 +1,13 @@
 # CareBridge · painel web do profissional
 
 [![CI](https://github.com/LuisFontinelles/trabalho-andre-web/actions/workflows/ci.yml/badge.svg)](https://github.com/LuisFontinelles/trabalho-andre-web/actions/workflows/ci.yml)
+[![Pages](https://github.com/LuisFontinelles/trabalho-andre-web/actions/workflows/pages.yml/badge.svg)](https://github.com/LuisFontinelles/trabalho-andre-web/actions/workflows/pages.yml)
+
+## 🔗 Abrir o site
+
+**https://luisfontinelles.github.io/trabalho-andre-web/**
+
+Não precisa instalar nada: o site roda no navegador, sobre dados de demonstração. Entre com **`profissional@teste.com`** e qualquer senha; se o cadastro pedir código de verificação, use **`0000`**.
 
 Aplicação web do trabalho final de **Soluções Computacionais** (Universidade Católica de Brasília, 2026/2, prof. Andre Gustavo Bastos Lima). É o cliente do profissional de saúde na plataforma CareBridge, que reúne oportunidades de cuidado em saúde gratuitas, acessíveis ou direcionadas a públicos específicos.
 
@@ -30,7 +37,9 @@ As telas seguem o protótipo do profissional entregue pelo grupo: tabela de opor
 
 Recursos ainda não construídos ficam visíveis e explicitamente desabilitados, em vez de escondidos. É a mesma regra adotada no aplicativo iOS: dá para enxergar o que falta usando a aplicação, sem abrir o código.
 
-## Rodar
+## Rodar na própria máquina
+
+Só é necessário para mexer no código. Para apenas ver o sistema, use o link acima.
 
 Requer Node 22 ou superior.
 
@@ -127,6 +136,8 @@ Rotas dedicadas a exercitar o tratamento de erro: `/v1/debug/no-content` (204), 
 O contrato completo da API está documentado em `CONTRATO-API-CareBridge.md`, na raiz do projeto.
 
 ## Integração contínua
+
+Dois workflows rodam a cada push na `main`: o `ci.yml`, descrito abaixo, e o `pages.yml`, que publica o site.
 
 O workflow em `.github/workflows/ci.yml` roda a cada push e pull request na `main`, em dois jobs paralelos:
 

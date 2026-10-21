@@ -12,7 +12,7 @@ createRoot(container).render(
   <StrictMode>
     <DependenciesProvider>
       <SessionProvider>
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
           <App />
         </BrowserRouter>
       </SessionProvider>
