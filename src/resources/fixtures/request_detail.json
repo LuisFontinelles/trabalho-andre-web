@@ -1,0 +1,32 @@
+{
+  "id": "req-001",
+  "patientName": "Ana Souza",
+  "opportunityId": "op-101",
+  "opportunityTitle": "Cardiologia - vaga social",
+  "receivedAt": "2026-10-21T09:12:00Z",
+  "status": "EM_ANALISE",
+  "triage": [
+    { "question": "Motivo", "answer": "Dor no peito ao esforco" },
+    { "question": "Diagnostico previo", "answer": "Hipertensao" },
+    { "question": "Medicacao continua", "answer": "Losartana" },
+    { "question": "Urgencia", "answer": "Media" }
+  ],
+  "documents": [
+    { "id": "doc-1", "name": "RG_frente.jpg", "sizeKb": 420 },
+    { "id": "doc-2", "name": "Encaminhamento.pdf", "sizeKb": 128 }
+  ],
+  "messages": [
+    {
+      "id": "msg-1",
+      "author": "PACIENTE",
+      "text": "Ola, posso levar os exames antigos?",
+      "sentAt": "2026-10-21T12:45:00Z"
+    },
+    {
+      "id": "msg-2",
+      "author": "PROFISSIONAL",
+      "text": "Bom dia, pode sim!",
+      "sentAt": "2026-10-21T12:46:00Z"
+    }
+  ]
+}

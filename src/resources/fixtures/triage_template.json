@@ -1,0 +1,12 @@
+{
+  "questions": [
+    { "id": "q1", "label": "Qual o motivo principal?", "kind": "TEXTO", "required": true },
+    { "id": "q2", "label": "Ja possui diagnostico?", "kind": "SIM_NAO", "required": true },
+    { "id": "q3", "label": "Usa medicacao continua?", "kind": "SIM_NAO", "required": true },
+    { "id": "q4", "label": "Qual a urgencia percebida?", "kind": "ESCOLHA", "required": true }
+  ],
+  "documents": [
+    { "id": "d1", "label": "Documento com foto", "required": true },
+    { "id": "d2", "label": "Encaminhamento medico", "required": false }
+  ]
+}

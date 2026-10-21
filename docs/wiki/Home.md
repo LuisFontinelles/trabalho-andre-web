@@ -13,6 +13,7 @@ Trabalho final de **Soluções Computacionais**, UCB 2026/2, prof. Andre Gustavo
 | [[Design system]] | Quem vai mexer em tela |
 | [[Backend simulado]] | Quem precisa entender de onde vêm os dados |
 | [[Fluxo de trabalho]] | Todo mundo, antes do primeiro PR |
+| [[Telas do profissional]] | Quem precisa comparar o código com o protótipo |
 
 ## Os três clientes
 

@@ -1,0 +1,47 @@
+{
+  "items": [
+    {
+      "id": "req-001",
+      "patientName": "Ana Souza",
+      "opportunityId": "op-101",
+      "opportunityTitle": "Cardiologia - vaga social",
+      "receivedAt": "2026-10-21T09:12:00Z",
+      "status": "APROVADA",
+      "hasUnreadMessage": true,
+      "canMessage": true
+    },
+    {
+      "id": "req-002",
+      "patientName": "Carlos Lima",
+      "opportunityId": "op-102",
+      "opportunityTitle": "Fisioterapia ortopedica",
+      "receivedAt": "2026-10-20T15:40:00Z",
+      "status": "EM_ANALISE",
+      "hasUnreadMessage": true,
+      "canMessage": true
+    },
+    {
+      "id": "req-003",
+      "patientName": "Beatriz Alves",
+      "opportunityId": "op-101",
+      "opportunityTitle": "Cardiologia - vaga social",
+      "receivedAt": "2026-10-19T11:05:00Z",
+      "status": "APROVADA",
+      "hasUnreadMessage": false,
+      "canMessage": false
+    },
+    {
+      "id": "req-004",
+      "patientName": "Joao Santos",
+      "opportunityId": "op-102",
+      "opportunityTitle": "Fisioterapia ortopedica",
+      "receivedAt": "2026-10-18T16:20:00Z",
+      "status": "RECUSADA",
+      "hasUnreadMessage": false,
+      "canMessage": false
+    }
+  ],
+  "page": 1,
+  "totalPages": 1,
+  "totalItems": 4
+}

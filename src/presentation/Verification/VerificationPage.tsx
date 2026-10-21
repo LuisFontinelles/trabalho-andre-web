@@ -33,7 +33,7 @@ export function VerificationPage() {
     try {
       const result = await dependencies.verifyCode(pending.email, code, pending.codeLength)
       session.signIn(result)
-      navigate('/painel', { replace: true })
+      navigate('/oportunidades', { replace: true })
     } catch (error) {
       if (error instanceof ValidationError) {
         setCodeError(error.message)

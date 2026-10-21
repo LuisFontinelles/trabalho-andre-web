@@ -17,11 +17,16 @@ O backend ainda não existe. A aplicação roda inteira sobre um servidor simula
 | Login | Pronto, sobre fixture |
 | Cadastro de profissional, com conselho e registro | Pronto, com validação completa |
 | Verificação por código de 4 dígitos | Pronto |
-| Painel com indicadores | Pronto |
-| Lista de oportunidades, busca, filtro e paginação | Pronto |
-| Candidaturas com linha do tempo e triagem | Pronto |
-| Publicar nova oportunidade | **Desativado e marcado na tela** |
+| Minhas oportunidades, com indicadores e tabela | Pronto |
+| Encerrar e excluir oportunidade | Pronto |
+| Nova oportunidade, nos três passos do protótipo | Pronto |
+| Solicitações recebidas, com filtro por status | Pronto |
+| Detalhe da solicitação: triagem, documentos, decisão e mensagens | Pronto |
+| Editar oportunidade | **Desativado e marcado na tela** |
+| Abrir documento anexado | **Desativado e marcado** |
 | Recuperação de senha | **Desativada e marcada** |
+
+As telas seguem o protótipo do profissional entregue pelo grupo: tabela de oportunidades com status e ações por linha, solicitações com chips de contagem, e o formulário em três passos.
 
 Recursos ainda não construídos ficam visíveis e explicitamente desabilitados, em vez de escondidos. É a mesma regra adotada no aplicativo iOS: dá para enxergar o que falta usando a aplicação, sem abrir o código.
 
@@ -59,9 +64,25 @@ O cadastro aceita e-mails novos: o registro fica guardado em memória e a verifi
 
 ## Testes
 
-112 testes em Vitest, cobrindo validação de formulários, regras de domínio, montagem de requisição, mapeamento DTO para domínio, integridade das fixtures e os fluxos de autenticação, busca e candidatura contra o servidor simulado.
+234 testes em Vitest, com **96,8% de cobertura de linhas** em domínio e camada de dados.
 
-O estado do mock é reiniciado antes e depois de cada teste.
+| Suíte | O que cobre |
+|---|---|
+| `validation` | E-mail, senha e as regras do cadastro, na ordem dos campos |
+| `entities` | Vagas, critérios de busca, perfis e valores desconhecidos |
+| `professional` | Status, ações permitidas por status, resumo do painel, filtros e tempo relativo |
+| `opportunityDraft` | Os três passos do formulário, campo a campo |
+| `network` | Montagem de URL, casamento de rotas e cada código de erro |
+| `repositories` | Login, cadastro, verificação, busca e candidatura |
+| `professionalRepository` | Criar, encerrar, excluir, decidir e responder |
+
+O estado do mock é reiniciado antes e depois de cada teste, então nenhum teste depende do que outro deixou.
+
+Cobertura local:
+
+```bash
+npm run test:coverage
+```
 
 ## Arquitetura
 
@@ -107,7 +128,14 @@ O contrato completo da API está documentado em `CONTRATO-API-CareBridge.md`, na
 
 ## Integração contínua
 
-O workflow em `.github/workflows/ci.yml` roda a cada push e pull request na `main`: checagem de tipos, lint, testes e build de produção, guardando o resultado do build como artefato.
+O workflow em `.github/workflows/ci.yml` roda a cada push e pull request na `main`, em dois jobs paralelos:
+
+| Job | O que faz |
+|---|---|
+| **Testes unitários** | Checagem de tipos, testes com cobertura, resumo da cobertura no painel do workflow e relatório guardado como artefato |
+| **Lint e build** | ESLint e build de produção, com o `dist` guardado como artefato |
+
+A tabela de cobertura aparece no resumo da execução, sem precisar baixar o artefato.
 
 ## Documentação
 

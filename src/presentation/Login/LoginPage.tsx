@@ -39,7 +39,7 @@ export function LoginPage() {
     try {
       const result = await dependencies.login(email, password)
       session.signIn(result)
-      navigate('/painel', { replace: true })
+      navigate('/oportunidades', { replace: true })
     } catch (error) {
       if (error instanceof ValidationError) {
         if (error.code === 'emailRequired' || error.code === 'emailInvalid') {
@@ -110,7 +110,7 @@ export function LoginPage() {
                 setSubmitting(true)
                 try {
                   session.signIn(await dependencies.authRepository.loginWithGoogle())
-                  navigate('/painel', { replace: true })
+                  navigate('/oportunidades', { replace: true })
                 } catch (error) {
                   setFormError(messageFor(error))
                 } finally {

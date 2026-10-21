@@ -6,6 +6,10 @@ import opportunities from '@/resources/fixtures/opportunities.json'
 import opportunityDetail from '@/resources/fixtures/opportunity_detail.json'
 import filters from '@/resources/fixtures/filters.json'
 import applicationStatus from '@/resources/fixtures/application_status.json'
+import myOpportunities from '@/resources/fixtures/my_opportunities.json'
+import receivedRequests from '@/resources/fixtures/received_requests.json'
+import requestDetail from '@/resources/fixtures/request_detail.json'
+import triageTemplate from '@/resources/fixtures/triage_template.json'
 import error400 from '@/resources/fixtures/error_400.json'
 import error401 from '@/resources/fixtures/error_401.json'
 import error404 from '@/resources/fixtures/error_404.json'
@@ -41,6 +45,10 @@ const FIXTURES: Record<string, unknown> = {
   opportunity_detail: opportunityDetail,
   filters,
   application_status: applicationStatus,
+  my_opportunities: myOpportunities,
+  received_requests: receivedRequests,
+  request_detail: requestDetail,
+  triage_template: triageTemplate,
   error_400: error400,
   error_401: error401,
   error_404: error404,
@@ -68,10 +76,40 @@ interface RegisteredAccount {
 
 const registrations = new Map<string, RegisteredAccount>()
 
+/**
+ * O painel do profissional muda estado: encerrar, excluir, decidir e
+ * responder. O mock guarda isso em memoria para a tela refletir a acao,
+ * como o servidor fara.
+ */
+interface PanelState {
+  opportunities: Record<string, unknown>[]
+  requests: Record<string, unknown>[]
+  detail: Record<string, unknown> | null
+}
+
+let panel: PanelState = { opportunities: [], requests: [], detail: null }
+let sequence = 0
+
+function resetPanel(): void {
+  panel = {
+    opportunities: loadFixture<{ items: Record<string, unknown>[] }>(
+      'my_opportunities',
+    ).items,
+    requests: loadFixture<{ items: Record<string, unknown>[] }>(
+      'received_requests',
+    ).items,
+    detail: loadFixture<Record<string, unknown>>('request_detail'),
+  }
+  sequence = 0
+}
+
 export function resetMockBackend(): void {
   registrations.clear()
   requestLog.length = 0
+  resetPanel()
 }
+
+resetPanel()
 
 export const requestLog: string[] = []
 
@@ -92,7 +130,7 @@ function errorPayload(message: string, status: number, error: string): MockRespo
   }
 }
 
-type Handler = (body: unknown) => MockResponse
+type Handler = (body: unknown, path: string) => MockResponse
 
 interface Route {
   method: HttpMethod
@@ -171,6 +209,55 @@ const verifyResponder: Handler = (body) => {
   return { status: 200, body: session }
 }
 
+function pathIdOf(path: string, index: number): string {
+  return path.split('/').filter(Boolean)[index] ?? ''
+}
+
+/** O handler recebe o corpo e o caminho, para as rotas com id. */
+const listMyOpportunities: Handler = () => ({
+  status: 200,
+  body: {
+    items: panel.opportunities,
+    page: 1,
+    totalPages: 1,
+    totalItems: panel.opportunities.length,
+  },
+})
+
+const createOpportunity: Handler = (body) => {
+  const request = body as Record<string, unknown> | null
+  if (!request) return errorPayload('Bad Request: malformed body', 400, 'Bad Request')
+  sequence += 1
+  const created = {
+    id: `op-2${String(sequence).padStart(2, '0')}`,
+    title: String(request.title ?? '') || 'Oportunidade sem titulo',
+    specialty: String(request.specialty ?? ''),
+    accessMode: String(request.accessMode ?? 'gratuito'),
+    price: request.price ?? null,
+    filledVacancies: 0,
+    totalVacancies: Number(request.totalVacancies ?? 0),
+    applicationCount: 0,
+    status: 'ATIVA',
+    modality: String(request.modality ?? 'presencial'),
+    address: request.address ?? null,
+    opensAt: request.opensAt ?? null,
+    closesAt: request.closesAt ?? null,
+    updatedAt: new Date().toISOString(),
+  }
+  panel.opportunities = [created, ...panel.opportunities]
+  return { status: 201, body: created }
+}
+
+const listRequests: Handler = () => ({
+  status: 200,
+  body: {
+    items: panel.requests,
+    page: 1,
+    totalPages: 1,
+    totalItems: panel.requests.length,
+  },
+})
+
 const ROUTES: Route[] = [
   { method: 'POST', pattern: '/v1/auth/login', status: 200, fixture: 'auth_login', latencyMs: 400, respond: loginResponder },
   { method: 'POST', pattern: '/v1/auth/google', status: 200, fixture: 'auth_login', latencyMs: 500 },
@@ -182,6 +269,96 @@ const ROUTES: Route[] = [
   { method: 'GET', pattern: '/v1/opportunities/{id}', status: 200, fixture: 'opportunity_detail', latencyMs: 250 },
   { method: 'GET', pattern: '/v1/filters', status: 200, fixture: 'filters', latencyMs: 200 },
   { method: 'GET', pattern: '/v1/applications/{id}', status: 200, fixture: 'application_status', latencyMs: 250 },
+
+  // Painel do profissional
+  { method: 'GET', pattern: '/v1/professional/opportunities', status: 200, fixture: 'my_opportunities', latencyMs: 300, respond: listMyOpportunities },
+  { method: 'POST', pattern: '/v1/professional/opportunities', status: 201, fixture: null, latencyMs: 450, respond: createOpportunity },
+  { method: 'POST', pattern: '/v1/professional/opportunities/{id}/close', status: 204, fixture: null, latencyMs: 300,
+    respond: (_body, path) => {
+      const id = pathIdOf(path, 3)
+      const found = panel.opportunities.some((item) => item.id === id)
+      if (!found) return { status: 404, body: loadFixture('error_404') }
+      panel.opportunities = panel.opportunities.map((item) =>
+        item.id === id ? { ...item, status: 'ENCERRADA' } : item,
+      )
+      return { status: 204, body: null }
+    } },
+  { method: 'DELETE', pattern: '/v1/professional/opportunities/{id}', status: 204, fixture: null, latencyMs: 300,
+    respond: (_body, path) => {
+      const id = pathIdOf(path, 3)
+      const found = panel.opportunities.some((item) => item.id === id)
+      if (!found) return { status: 404, body: loadFixture('error_404') }
+      panel.opportunities = panel.opportunities.filter((item) => item.id !== id)
+      return { status: 204, body: null }
+    } },
+  { method: 'GET', pattern: '/v1/professional/requests', status: 200, fixture: 'received_requests', latencyMs: 300, respond: listRequests },
+  { method: 'GET', pattern: '/v1/professional/requests/{id}', status: 200, fixture: 'request_detail', latencyMs: 250,
+    respond: (_body, path) => {
+      const id = pathIdOf(path, 3)
+      const listed = panel.requests.find((item) => item.id === id)
+      if (!listed) return { status: 404, body: loadFixture('error_404') }
+      const base = panel.detail ?? loadFixture<Record<string, unknown>>('request_detail')
+      return {
+        status: 200,
+        body: {
+          ...base,
+          id,
+          patientName: listed.patientName,
+          opportunityId: listed.opportunityId,
+          opportunityTitle: listed.opportunityTitle,
+          receivedAt: listed.receivedAt,
+          status: listed.status,
+        },
+      }
+    } },
+  { method: 'POST', pattern: '/v1/professional/requests/{id}/decision', status: 200, fixture: null, latencyMs: 350,
+    respond: (body, path) => {
+      const id = pathIdOf(path, 3)
+      const request = body as { status?: string } | null
+      const status = request?.status
+      if (status !== 'EM_ANALISE' && status !== 'APROVADA' && status !== 'RECUSADA') {
+        return errorPayload('Unprocessable Entity: unknown status', 422, 'Unprocessable Entity')
+      }
+      const listed = panel.requests.find((item) => item.id === id)
+      if (!listed) return { status: 404, body: loadFixture('error_404') }
+      panel.requests = panel.requests.map((item) =>
+        item.id === id
+          ? { ...item, status, canMessage: status === 'APROVADA' }
+          : item,
+      )
+      const base = panel.detail ?? loadFixture<Record<string, unknown>>('request_detail')
+      return {
+        status: 200,
+        body: {
+          ...base,
+          id,
+          patientName: listed.patientName,
+          opportunityId: listed.opportunityId,
+          opportunityTitle: listed.opportunityTitle,
+          receivedAt: listed.receivedAt,
+          status,
+        },
+      }
+    } },
+  { method: 'POST', pattern: '/v1/professional/requests/{id}/messages', status: 201, fixture: null, latencyMs: 250,
+    respond: (body) => {
+      const request = body as { text?: string } | null
+      const text = (request?.text ?? '').trim()
+      if (text === '') {
+        return errorPayload('Unprocessable Entity: empty message', 422, 'Unprocessable Entity')
+      }
+      sequence += 1
+      return {
+        status: 201,
+        body: {
+          id: `msg-${sequence + 10}`,
+          author: 'PROFISSIONAL',
+          text,
+          sentAt: new Date().toISOString(),
+        },
+      }
+    } },
+  { method: 'GET', pattern: '/v1/professional/triage-template', status: 200, fixture: 'triage_template', latencyMs: 200 },
 
   // Rotas so para exercitar o tratamento de erro da camada de rede.
   { method: 'GET', pattern: '/v1/debug/no-content', status: 204, fixture: null, latencyMs: 50 },
@@ -236,7 +413,7 @@ export function createMockFetch(options: { latency?: boolean } = {}): typeof fet
           parsed = null
         }
       }
-      return json(route.respond(parsed))
+      return json(route.respond(parsed, url.pathname))
     }
 
     return json({

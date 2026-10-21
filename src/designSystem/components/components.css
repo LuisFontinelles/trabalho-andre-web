@@ -128,3 +128,8 @@
 .cb-code-field__box--filled { color: var(--cb-text-primary); }
 .cb-code-field__box--active { border-color: var(--cb-border-focus); border-width: var(--cb-border-width-strong); }
 .cb-code-field__box--error { border-color: var(--cb-danger); border-width: var(--cb-border-width-strong); }
+
+.cb-visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}

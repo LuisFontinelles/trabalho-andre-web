@@ -5,6 +5,7 @@ import {
   createAuthRepository,
   createOpportunityRepository,
 } from '@/data/repositories'
+import { createProfessionalRepository } from '@/data/professionalRepository'
 import {
   makeLoadApplicationStatus,
   makeLoadFilters,
@@ -23,11 +24,13 @@ export function createDependencies(fetchImpl: typeof fetch = createMockFetch()) 
   const authRepository = createAuthRepository(client)
   const opportunityRepository = createOpportunityRepository(client)
   const applicationRepository = createApplicationRepository(client)
+  const professionalRepository = createProfessionalRepository(client)
 
   return {
     authRepository,
     opportunityRepository,
     applicationRepository,
+    professionalRepository,
     login: makeLogin(authRepository),
     signUp: makeSignUp(authRepository),
     verifyCode: makeVerifyCode(authRepository),

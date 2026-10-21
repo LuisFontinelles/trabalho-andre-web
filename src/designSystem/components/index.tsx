@@ -72,6 +72,28 @@ export function LinkButton({
   )
 }
 
+/** O asterisco de campo obrigatorio, como no prototipo. */
+export function FieldLabel({
+  text,
+  isRequired = false,
+  htmlFor,
+}: {
+  text: string
+  isRequired?: boolean
+  htmlFor?: string
+}) {
+  return (
+    <label className="cb-field__label" htmlFor={htmlFor}>
+      {isRequired && (
+        <span className="cb-required" aria-hidden="true">
+          *{' '}
+        </span>
+      )}
+      {text}
+    </label>
+  )
+}
+
 export function FieldError({ message }: { message: string }) {
   return (
     <span className="cb-field__error" role="alert">
@@ -90,6 +112,7 @@ interface TextFieldProps {
   autoComplete?: string
   errorMessage?: string | null
   isEnabled?: boolean
+  isRequired?: boolean
 }
 
 export function TextField({
@@ -101,6 +124,7 @@ export function TextField({
   autoComplete,
   errorMessage,
   isEnabled = true,
+  isRequired = false,
 }: TextFieldProps) {
   const id = useId()
   const [revealed, setRevealed] = useState(false)
@@ -110,9 +134,7 @@ export function TextField({
 
   return (
     <div className="cb-field">
-      <label className="cb-field__label" htmlFor={id}>
-        {label}
-      </label>
+      <FieldLabel text={label} isRequired={isRequired} htmlFor={id} />
       <div
         className={[
           'cb-field__control',
@@ -157,6 +179,7 @@ interface SelectFieldProps {
   onChange: (value: string | null) => void
   errorMessage?: string | null
   isEnabled?: boolean
+  isRequired?: boolean
 }
 
 export function SelectField({
@@ -167,15 +190,14 @@ export function SelectField({
   onChange,
   errorMessage,
   isEnabled = true,
+  isRequired = false,
 }: SelectFieldProps) {
   const id = useId()
   const hasError = Boolean(errorMessage)
 
   return (
     <div className="cb-field">
-      <label className="cb-field__label" htmlFor={id}>
-        {label}
-      </label>
+      <FieldLabel text={label} isRequired={isRequired} htmlFor={id} />
       <div
         className={[
           'cb-field__control',

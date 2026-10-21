@@ -1,8 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useSession } from '@/app/session'
-import { Button, DisabledTag } from '@/designSystem/components'
 import { CbIcon } from '@/designSystem/tokens/icons'
-import { firstName } from '@/domain/entities'
 import { strings } from '@/resources/strings'
 
 export function AppShell() {
@@ -16,43 +14,45 @@ export function AppShell() {
   return (
     <div className="cb-shell">
       <aside className="cb-sidebar">
-        <div className="cb-sidebar__brand">
-          <CbIcon.opportunity size={24} />
-          {strings.app.name}
+        <div className="cb-sidebar__logo" aria-hidden="true">
+          LOGO
         </div>
 
         <nav className="cb-sidebar__nav" aria-label={strings.app.tagline}>
-          <NavLink to="/painel" className={linkClass}>
-            <CbIcon.dashboard size={18} />
-            {strings.nav.dashboard}
-          </NavLink>
           <NavLink to="/oportunidades" className={linkClass}>
-            <CbIcon.opportunity size={18} />
-            {strings.nav.opportunities}
+            {strings.nav.myOpportunities}
           </NavLink>
-          <NavLink to="/candidaturas" className={linkClass}>
-            <CbIcon.inbox size={18} />
-            {strings.nav.applications}
+          <NavLink to="/solicitacoes" className={linkClass}>
+            {strings.nav.requests}
+          </NavLink>
+          <NavLink to="/oportunidades/nova" className={linkClass}>
+            {strings.nav.newOpportunity}
           </NavLink>
         </nav>
 
         <div className="cb-sidebar__footer">
+          <hr className="cb-divider" />
           {user && (
-            <span className="cb-sidebar__user">
-              {firstName(user)} · {user.email}
-            </span>
+            <>
+              <p className="cb-sidebar__name">{user.name}</p>
+              <p className="cb-sidebar__credential">
+                CRM/DF 123456 ·{' '}
+                <span className="cb-sidebar__verified">
+                  <CbIcon.verified size={12} /> {strings.nav.verified}
+                </span>
+              </p>
+            </>
           )}
-          <DisabledTag text={strings.publish.unavailable} />
-          <Button
-            title={strings.nav.signOut}
-            kind="tertiary"
-            size="compact"
-            icon={<CbIcon.logout size={16} />}
+          <button
+            type="button"
+            className="cb-sidebar__signout"
             onClick={() => {
               session.signOut()
               navigate('/', { replace: true })
             }}
-          />
+          >
+            {strings.nav.signOut}
+          </button>
         </div>
       </aside>
 

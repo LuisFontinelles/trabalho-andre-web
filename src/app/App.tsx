@@ -1,10 +1,11 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/app/AppShell'
 import { useSession } from '@/app/session'
-import { ApplicationsPage } from '@/presentation/Applications/ApplicationsPage'
-import { DashboardPage } from '@/presentation/Dashboard/DashboardPage'
 import { LoginPage } from '@/presentation/Login/LoginPage'
-import { OpportunitiesPage } from '@/presentation/Opportunities/OpportunitiesPage'
+import { MyOpportunitiesPage } from '@/presentation/MyOpportunities/MyOpportunitiesPage'
+import { NewOpportunityPage } from '@/presentation/NewOpportunity/NewOpportunityPage'
+import { RequestDetailPage } from '@/presentation/Requests/RequestDetailPage'
+import { RequestsPage } from '@/presentation/Requests/RequestsPage'
 import { SignUpPage } from '@/presentation/SignUp/SignUpPage'
 import { VerificationPage } from '@/presentation/Verification/VerificationPage'
 import type { ReactNode } from 'react'
@@ -29,9 +30,10 @@ export function App() {
           </RequireSession>
         }
       >
-        <Route path="/painel" element={<DashboardPage />} />
-        <Route path="/oportunidades" element={<OpportunitiesPage />} />
-        <Route path="/candidaturas" element={<ApplicationsPage />} />
+        <Route path="/oportunidades" element={<MyOpportunitiesPage />} />
+        <Route path="/oportunidades/nova" element={<NewOpportunityPage />} />
+        <Route path="/solicitacoes" element={<RequestsPage />} />
+        <Route path="/solicitacoes/:id" element={<RequestDetailPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

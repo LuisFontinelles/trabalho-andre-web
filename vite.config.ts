@@ -13,7 +13,11 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     coverage: {
       provider: 'v8',
+      // Cobrimos dominio e dados. Componente de tela fica de fora por ora.
       include: ['src/domain/**', 'src/data/**'],
+      exclude: ['**/__tests__/**', 'src/data/dto/**', 'src/data/professionalDto.ts'],
+      reporter: ['text-summary', 'json-summary', 'lcov'],
+      reportsDirectory: './coverage',
     },
   },
 })
