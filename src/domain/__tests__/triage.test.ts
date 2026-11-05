@@ -103,7 +103,7 @@ describe('Documentos exigidos', () => {
     expect(DOCUMENT_CATALOG.map((item) => item.label)).toEqual([
       'RG',
       'CPF',
-      'Encaminhamento medico',
+      'Encaminhamento médico',
       'Comprovante de renda',
       'Exames anteriores',
     ])

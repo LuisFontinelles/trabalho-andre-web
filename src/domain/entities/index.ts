@@ -104,7 +104,7 @@ export const MODALITY_LABEL: Record<Modality, string> = {
 export const OFFER_TYPE_LABEL: Record<OfferType, string> = {
   gratuita: 'Gratuita',
   social: 'Social',
-  convenio: 'Convenio',
+  convenio: 'Convênio',
 }
 
 export interface Provider {
@@ -231,7 +231,7 @@ export type Urgency = 'low' | 'medium' | 'high'
 
 export const URGENCY_LABEL: Record<Urgency, string> = {
   low: 'Baixa',
-  medium: 'Media',
+  medium: 'Média',
   high: 'Alta',
 }
 
