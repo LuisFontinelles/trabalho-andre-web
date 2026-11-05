@@ -90,14 +90,41 @@ interface PanelState {
 let panel: PanelState = { opportunities: [], requests: [], detail: null }
 let sequence = 0
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * As datas das fixtures sao fixas, entao com o passar dos dias a lista do
+ * demo mostrava "15 dias", "16 dias" em vez de "Hoje" e "Ontem" como no
+ * prototipo. Aqui as datas andam em dias inteiros para que a mais recente
+ * caia no dia de hoje, mantendo a distancia entre elas e o horario.
+ */
+export function rebaseToToday(
+  items: Record<string, unknown>[],
+  field: string,
+  now: Date = new Date(),
+): Record<string, unknown>[] {
+  const times = items
+    .map((item) => new Date(String(item[field])).getTime())
+    .filter((time) => !Number.isNaN(time))
+  if (times.length === 0) return items
+  const startOf = (time: number) => Math.floor(time / DAY_MS) * DAY_MS
+  const shift = startOf(now.getTime()) - startOf(Math.max(...times))
+  return items.map((item) => {
+    const time = new Date(String(item[field])).getTime()
+    if (Number.isNaN(time)) return item
+    return { ...item, [field]: new Date(time + shift).toISOString() }
+  })
+}
+
 function resetPanel(): void {
   panel = {
     opportunities: loadFixture<{ items: Record<string, unknown>[] }>(
       'my_opportunities',
     ).items,
-    requests: loadFixture<{ items: Record<string, unknown>[] }>(
-      'received_requests',
-    ).items,
+    requests: rebaseToToday(
+      loadFixture<{ items: Record<string, unknown>[] }>('received_requests').items,
+      'receivedAt',
+    ),
     detail: loadFixture<Record<string, unknown>>('request_detail'),
   }
   sequence = 0
