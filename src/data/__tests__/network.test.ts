@@ -7,7 +7,9 @@ import {
   matchTestAccount,
   matchesPattern,
   mockRoutes,
+  rebaseToToday,
 } from '@/data/network/mockBackend'
+import { relativeDay } from '@/domain/professional'
 
 const client = () => createHttpClient(BASE_URL, createMockFetch({ latency: false }))
 
@@ -169,5 +171,38 @@ describe('Fixtures e contas de teste', () => {
   it('nao reconhece outras contas', () => {
     expect(matchTestAccount('alguem@outro.com')).toBeNull()
     expect(matchTestAccount(null)).toBeNull()
+  })
+})
+
+describe('Datas do demo', () => {
+  const now = new Date('2026-11-05T16:00:00Z')
+  const items = [
+    { id: 'a', receivedAt: '2026-10-21T09:12:00Z' },
+    { id: 'b', receivedAt: '2026-10-20T15:40:00Z' },
+    { id: 'c', receivedAt: '2026-10-18T16:20:00Z' },
+  ]
+
+  it('a solicitacao mais recente aparece como de hoje', () => {
+    const rebased = rebaseToToday(items, 'receivedAt', now)
+    expect(relativeDay(String(rebased[0].receivedAt), now)).toBe('Hoje')
+  })
+
+  it('a distancia entre as datas continua a mesma', () => {
+    const rebased = rebaseToToday(items, 'receivedAt', now)
+    expect(rebased.map((item) => relativeDay(String(item.receivedAt), now))).toEqual([
+      'Hoje',
+      'Ontem',
+      '3 dias',
+    ])
+  })
+
+  it('o horario do dia nao muda', () => {
+    const rebased = rebaseToToday(items, 'receivedAt', now)
+    expect(rebased[1].receivedAt).toBe('2026-11-04T15:40:00.000Z')
+  })
+
+  it('data invalida fica como estava', () => {
+    const rebased = rebaseToToday([{ id: 'x', receivedAt: 'sem data' }, ...items], 'receivedAt', now)
+    expect(rebased[0].receivedAt).toBe('sem data')
   })
 })

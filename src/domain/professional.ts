@@ -26,14 +26,14 @@ export function accessModeFrom(raw: string): AccessMode {
 
 export const ACCESS_MODE_LABEL: Record<AccessMode, string> = {
   gratuito: 'Gratuito',
-  'preco-social': 'Preco social',
+  'preco-social': 'Preço social',
   pesquisa: 'Pesquisa',
 }
 
 export const ACCESS_MODE_HINT: Record<AccessMode, string> = {
   gratuito: 'Sem custo ao paciente',
   'preco-social': 'Valor reduzido',
-  pesquisa: 'Participacao em estudo',
+  pesquisa: 'Participação em estudo',
 }
 
 /** So a modalidade de preco social admite valor. Sem escolha, nao admite. */
@@ -113,7 +113,7 @@ export function requestStatusFrom(raw: string): RequestStatus {
 
 export const REQUEST_STATUS_LABEL: Record<RequestStatus, string> = {
   NOVA: 'Nova',
-  EM_ANALISE: 'Em analise',
+  EM_ANALISE: 'Em análise',
   APROVADA: 'Aprovada',
   RECUSADA: 'Recusada',
 }
@@ -153,7 +153,7 @@ export const REQUEST_FILTERS: readonly RequestFilter[] = [
 export const REQUEST_FILTER_LABEL: Record<RequestFilter, string> = {
   TODAS: 'Todas',
   NOVA: 'Novas',
-  EM_ANALISE: 'Em analise',
+  EM_ANALISE: 'Em análise',
   APROVADA: 'Aprovada',
   RECUSADA: 'Recusada',
 }

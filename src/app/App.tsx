@@ -17,12 +17,40 @@ function RequireSession({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
+/** Quem ja entrou nao volta para login e cadastro: vai direto para o painel. */
+function GuestOnly({ children }: { children: ReactNode }) {
+  const session = useSession()
+  if (session.isAuthenticated) return <Navigate to="/oportunidades" replace />
+  return <>{children}</>
+}
+
 export function App() {
   return (
     <Routes>
-      <Route path="/" element={<LoginPage />} />
-      <Route path="/cadastro" element={<SignUpPage />} />
-      <Route path="/verificacao" element={<VerificationPage />} />
+      <Route
+        path="/"
+        element={
+          <GuestOnly>
+            <LoginPage />
+          </GuestOnly>
+        }
+      />
+      <Route
+        path="/cadastro"
+        element={
+          <GuestOnly>
+            <SignUpPage />
+          </GuestOnly>
+        }
+      />
+      <Route
+        path="/verificacao"
+        element={
+          <GuestOnly>
+            <VerificationPage />
+          </GuestOnly>
+        }
+      />
       <Route
         element={
           <RequireSession>

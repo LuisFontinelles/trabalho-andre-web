@@ -53,7 +53,7 @@
 .cb-field__input::placeholder { color: var(--cb-text-tertiary); }
 .cb-field__reveal { display: inline-flex; align-items: center; justify-content: center; width: var(--cb-tap-target); height: var(--cb-tap-target); background: none; border: none; color: var(--cb-text-secondary); cursor: pointer; }
 .cb-field__error { display: inline-flex; align-items: center; gap: var(--cb-space-xs); color: var(--cb-danger); font: var(--cb-font-caption); }
-.cb-textarea { min-height: 112px; padding: var(--cb-space-md) var(--cb-space-lg); resize: vertical; }
+.cb-textarea { align-self: stretch; min-height: 112px; padding: var(--cb-space-md) 0; resize: vertical; }
 .cb-select {
   flex: 1; min-width: 0; background: none; border: none; outline: none;
   font: var(--cb-font-body); cursor: pointer;

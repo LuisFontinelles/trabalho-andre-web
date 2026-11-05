@@ -7,8 +7,8 @@ export type DraftStep = 'DADOS' | 'ACESSO' | 'TRIAGEM'
 export const DRAFT_STEPS: readonly DraftStep[] = ['DADOS', 'ACESSO', 'TRIAGEM']
 
 export const DRAFT_STEP_LABEL: Record<DraftStep, string> = {
-  DADOS: 'Dados basicos',
-  ACESSO: 'Condicoes de acesso',
+  DADOS: 'Dados básicos',
+  ACESSO: 'Condições de acesso',
   TRIAGEM: 'Triagem e documentos',
 }
 
@@ -30,7 +30,7 @@ export interface RequiredDocument {
 export const DOCUMENT_CATALOG: readonly RequiredDocument[] = [
   { id: 'rg', label: 'RG', isCustom: false },
   { id: 'cpf', label: 'CPF', isCustom: false },
-  { id: 'encaminhamento', label: 'Encaminhamento medico', isCustom: false },
+  { id: 'encaminhamento', label: 'Encaminhamento médico', isCustom: false },
   { id: 'renda', label: 'Comprovante de renda', isCustom: false },
   { id: 'exames', label: 'Exames anteriores', isCustom: false },
 ]
@@ -55,9 +55,9 @@ export interface OpportunityDraft {
 
 export const DEFAULT_QUESTIONS: readonly TriageQuestion[] = [
   { id: 'q1', label: 'Qual o motivo principal?' },
-  { id: 'q2', label: 'Ja possui diagnostico?' },
-  { id: 'q3', label: 'Usa medicacao continua?' },
-  { id: 'q4', label: 'Qual a urgencia percebida?' },
+  { id: 'q2', label: 'Já possui diagnóstico?' },
+  { id: 'q3', label: 'Usa medicação contínua?' },
+  { id: 'q4', label: 'Qual a urgência percebida?' },
 ]
 
 export function emptyOpportunityDraft(): OpportunityDraft {
@@ -99,17 +99,17 @@ export type DraftErrorCode =
 
 const DRAFT_ERROR_MESSAGE: Record<DraftErrorCode, string> = {
   accessModeRequired: 'Escolha a modalidade de acesso.',
-  descriptionRequired: 'Descreva o que sera oferecido.',
+  descriptionRequired: 'Descreva o que será oferecido.',
   specialtyRequired: 'Selecione a especialidade.',
-  audienceRequired: 'Informe o publico-alvo.',
-  addressRequired: 'Informe o endereco do atendimento presencial.',
-  vacanciesRequired: 'Informe o numero de vagas.',
-  vacanciesInvalid: 'O numero de vagas precisa ser maior que zero.',
-  priceRequired: 'Informe o preco da modalidade preco social.',
-  priceInvalid: 'O preco precisa ser maior que zero.',
-  opensAtRequired: 'Informe o inicio das inscricoes.',
+  audienceRequired: 'Informe o público-alvo.',
+  addressRequired: 'Informe o endereço do atendimento presencial.',
+  vacanciesRequired: 'Informe o número de vagas.',
+  vacanciesInvalid: 'O número de vagas precisa ser maior que zero.',
+  priceRequired: 'Informe o preço da modalidade preço social.',
+  priceInvalid: 'O preço precisa ser maior que zero.',
+  opensAtRequired: 'Informe o início das inscrições.',
   closesAtRequired: 'Informe o encerramento.',
-  closesBeforeOpens: 'O encerramento precisa ser depois do inicio.',
+  closesBeforeOpens: 'O encerramento precisa ser depois do início.',
   questionsRequired: 'Inclua ao menos uma pergunta na triagem.',
   documentsRequired: 'Selecione ao menos um documento exigido.',
 }
