@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useSession } from '@/app/session'
 import { CbIcon } from '@/designSystem/tokens/icons'
 import { strings } from '@/resources/strings'
@@ -6,7 +6,12 @@ import { strings } from '@/resources/strings'
 export function AppShell() {
   const session = useSession()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const user = session.session?.user
+
+  // "/oportunidades/nova" tambem casa com "/oportunidades" pelo prefixo, e os dois
+  // itens ficavam ativos juntos. Minhas oportunidades cobre a lista e a edicao.
+  const isCreating = pathname === '/oportunidades/nova'
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     ['cb-sidebar__link', isActive ? 'cb-sidebar__link--active' : ''].filter(Boolean).join(' ')
@@ -19,7 +24,10 @@ export function AppShell() {
         </div>
 
         <nav className="cb-sidebar__nav" aria-label={strings.app.tagline}>
-          <NavLink to="/oportunidades" className={linkClass}>
+          <NavLink
+            to="/oportunidades"
+            className={({ isActive }) => linkClass({ isActive: isActive && !isCreating })}
+          >
             {strings.nav.myOpportunities}
           </NavLink>
           <NavLink to="/solicitacoes" className={linkClass}>
