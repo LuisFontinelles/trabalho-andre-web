@@ -167,7 +167,7 @@ describe('Solicitacoes recebidas', () => {
     const detail = await repo().requestDetail('req-002')
     expect(detail.id).toBe('req-002')
     expect(detail.patientName).toBe('Carlos Lima')
-    expect(detail.opportunityTitle).toBe('Fisioterapia ortopedica')
+    expect(detail.opportunityTitle).toBe('Fisioterapia ortopédica')
   })
 
   it('solicitacao inexistente responde 404', async () => {

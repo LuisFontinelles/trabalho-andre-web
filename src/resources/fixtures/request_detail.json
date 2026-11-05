@@ -6,10 +6,10 @@
   "receivedAt": "2026-10-21T09:12:00Z",
   "status": "EM_ANALISE",
   "triage": [
-    { "question": "Motivo", "answer": "Dor no peito ao esforco" },
-    { "question": "Diagnostico previo", "answer": "Hipertensao" },
-    { "question": "Medicacao continua", "answer": "Losartana" },
-    { "question": "Urgencia", "answer": "Media" }
+    { "question": "Motivo", "answer": "Dor no peito ao esforço" },
+    { "question": "Diagnóstico prévio", "answer": "Hipertensão" },
+    { "question": "Medicação contínua", "answer": "Losartana" },
+    { "question": "Urgência", "answer": "Média" }
   ],
   "documents": [
     { "id": "doc-1", "name": "RG_frente.jpg", "sizeKb": 420 },
@@ -19,7 +19,7 @@
     {
       "id": "msg-1",
       "author": "PACIENTE",
-      "text": "Ola, posso levar os exames antigos?",
+      "text": "Olá, posso levar os exames antigos?",
       "sentAt": "2026-10-21T12:45:00Z"
     },
     {
