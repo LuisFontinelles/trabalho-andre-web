@@ -60,6 +60,8 @@
   /* A seta vem do token de icone, nao do controle nativo. */
   appearance: none; -webkit-appearance: none;
 }
+.cb-select option { background-color: #ffffff; color: #000000;
+}
 
 /* Seletor de opcao em pilula */
 .cb-option-selector { display: flex; flex-direction: column; gap: var(--cb-space-sm); }
