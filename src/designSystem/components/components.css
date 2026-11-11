@@ -60,8 +60,7 @@
   /* A seta vem do token de icone, nao do controle nativo. */
   appearance: none; -webkit-appearance: none;
 }
-.cb-select option { background-color: #ffffff; color: #000000;
-}
+.cb-select option { background-color: var(--cb-surface-field); color: var(--cb-text-primary);; }
 
 /* Seletor de opcao em pilula */
 .cb-option-selector { display: flex; flex-direction: column; gap: var(--cb-space-sm); }
@@ -82,6 +81,11 @@
 .cb-checkbox__box { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex: none; margin-top: 1px; border: var(--cb-border-width-strong) solid var(--cb-border); border-radius: 6px; color: var(--cb-text-on-brand); }
 .cb-checkbox__box--on { background: var(--cb-brand); border-color: var(--cb-brand); }
 .cb-checkbox__box--error { border-color: var(--cb-danger); }
+
+/* Status */
+.cb-status--active { color: var(--cb-success); background: var(--cb-success-surface); }
+.cb-status--closed { color: var(--cb-danger);  background: var(--cb-danger-surface); }
+.cb-status--draft { color: var(--cb-text-secondary); background: var(--cb-surface-raised); }
 
 /* Chip e badge */
 .cb-chip { display: inline-flex; align-items: center; min-height: var(--cb-chip-height); padding: 0 var(--cb-space-lg); background: var(--cb-surface); color: var(--cb-text-primary); border: var(--cb-border-width) solid var(--cb-border); border-radius: var(--cb-radius-pill); font: var(--cb-font-label); cursor: pointer; }
@@ -180,3 +184,4 @@
   background: var(--cb-disabled-background); color: var(--cb-disabled-content);
   border-color: transparent; cursor: not-allowed;
 }
+
