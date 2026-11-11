@@ -253,6 +253,7 @@
 }
 .cb-field__input::placeholder { color: var(--cb-text-tertiary); opacity: 1; }
 .cb-field__input:disabled { color: var(--cb-disabled-content); -webkit-text-fill-color: var(--cb-disabled-content); }
+.cb-field__input--file { padding: 10px 0; }
 .cb-field__help { font: var(--cb-font-caption); color: var(--cb-danger); }
 
 .cb-select { position: relative; }

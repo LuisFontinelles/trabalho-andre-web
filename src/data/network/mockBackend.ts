@@ -183,7 +183,16 @@ const loginResponder: Handler = (body) => {
   if (account === null || !request.password) {
     return { status: 401, body: loadFixture('error_401') }
   }
-  return { status: 200, body: loadFixture(TEST_ACCOUNTS[account]) }
+  const session = loadFixture<AuthResponseDTO>(TEST_ACCOUNTS[account])
+  return {
+    status: 200,
+    body: {
+      token: session.token,
+      autenticado: true,
+      tipoPerfil: account === 'paciente@teste.com' ? 'PACIENTE' : 'PROFISSIONAL_SAUDE',
+      validadoInstitucionalmente: account !== 'paciente@teste.com',
+    },
+  }
 }
 
 const signUpResponder: Handler = (body) => {
@@ -316,9 +325,10 @@ const listRequests: Handler = () => ({
 })
 
 const ROUTES: Route[] = [
-  { method: 'POST', pattern: '/v1/auth/login', status: 200, fixture: 'auth_login', latencyMs: 400, respond: loginResponder },
+  { method: 'POST', pattern: '/user/login', status: 200, fixture: null, latencyMs: 400, respond: loginResponder },
   { method: 'POST', pattern: '/v1/auth/google', status: 200, fixture: 'auth_login', latencyMs: 500 },
   { method: 'POST', pattern: '/v1/auth/signup', status: 201, fixture: 'auth_signup', latencyMs: 450, respond: signUpResponder },
+  { method: 'POST', pattern: '/profissional-saude/cadastro', status: 201, fixture: null, latencyMs: 450 },
   { method: 'POST', pattern: '/v1/auth/verify', status: 200, fixture: 'auth_login', latencyMs: 400, respond: verifyResponder },
   { method: 'POST', pattern: '/v1/auth/resend-code', status: 204, fixture: null, latencyMs: 350 },
   // Responde igual exista ou nao a conta, para nao revelar quem tem cadastro.

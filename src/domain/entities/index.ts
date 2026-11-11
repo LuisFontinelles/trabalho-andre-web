@@ -1,9 +1,20 @@
 /** Entidades de dominio. Nao conhecem React, rede nem DTO. */
 
 export type UserProfile = 'PACIENTE' | 'PROFISSIONAL' | 'DESCONHECIDO'
+export type AuthProfile =
+  | 'PACIENTE'
+  | 'PROFISSIONAL_SAUDE'
+  | 'ADMIN'
+  | 'DESCONHECIDO'
+
+export function authProfileFrom(raw: string): AuthProfile {
+  if (raw === 'PACIENTE' || raw === 'PROFISSIONAL_SAUDE' || raw === 'ADMIN') return raw
+  return 'DESCONHECIDO'
+}
 
 export function userProfileFrom(raw: string): UserProfile {
   if (raw === 'PACIENTE' || raw === 'PROFISSIONAL') return raw
+  if (raw === 'PROFISSIONAL_SAUDE') return 'PROFISSIONAL'
   return 'DESCONHECIDO'
 }
 
@@ -22,6 +33,18 @@ export function firstName(user: User): string {
 export interface Session {
   readonly token: string
   readonly user: User
+  readonly tipoPerfil: AuthProfile
+  readonly validadoInstitucionalmente: boolean
+}
+
+export interface LoginResult {
+  readonly status: number
+  readonly data: {
+    readonly autenticado?: boolean
+    readonly token?: string
+    readonly tipoPerfil?: string
+    readonly validadoInstitucionalmente?: boolean
+  }
 }
 
 /** Cadastro aceito pelo servidor, aguardando o codigo enviado por e-mail. */

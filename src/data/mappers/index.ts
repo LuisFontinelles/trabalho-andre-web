@@ -1,9 +1,11 @@
 import {
   modalityFrom,
   offerTypeFrom,
+  authProfileFrom,
   userProfileFrom,
   type Application,
   type FilterCatalog,
+  type LoginResult,
   type FilterOption,
   type Opportunity,
   type OpportunityPage,
@@ -19,9 +21,11 @@ import type {
   AuthResponseDTO,
   FilterCatalogDTO,
   FilterOptionDTO,
+  LoginResponseDTO,
   OpportunityDTO,
   PageDTO,
   ProfessionalCatalogDTO,
+  ProfessionalHealthSignupDTO,
   ProviderDTO,
   SignUpRequestDTO,
   UserDTO,
@@ -39,7 +43,23 @@ export function userFromDTO(dto: UserDTO): User {
 }
 
 export function sessionFromDTO(dto: AuthResponseDTO): Session {
-  return { token: dto.token, user: userFromDTO(dto.user) }
+  const tipoPerfil =
+    dto.user.profile === 'PROFISSIONAL'
+      ? 'PROFISSIONAL_SAUDE'
+      : authProfileFrom(dto.user.profile)
+  return {
+    token: dto.token,
+    user: userFromDTO(dto.user),
+    tipoPerfil,
+    validadoInstitucionalmente: tipoPerfil === 'PROFISSIONAL_SAUDE',
+  }
+}
+
+export function loginResultFromDTO(
+  dto: LoginResponseDTO,
+  status: number,
+): LoginResult {
+  return { status, data: dto }
 }
 
 export function providerFromDTO(dto: ProviderDTO): Provider {
@@ -136,5 +156,22 @@ export function signUpDraftToDTO(draft: SignUpDraft): SignUpRequestDTO {
           number: draft.professional.number,
         }
       : null,
+  }
+}
+
+export function professionalHealthSignupToDTO(
+  draft: SignUpDraft,
+  biographyOrDescription: string,
+): ProfessionalHealthSignupDTO {
+  const { councilId, stateId, number } = draft.professional
+  return {
+    usuarioDto: {
+      email: draft.email,
+      senha: draft.password,
+      tipoPerfil: 'PROFISSIONAL_SAUDE',
+    },
+    nome: draft.name,
+    documentosRegistro: [`${councilId ?? ''}/${stateId ?? ''} ${number}`.trim()],
+    biografiaOuDescricao: biographyOrDescription,
   }
 }

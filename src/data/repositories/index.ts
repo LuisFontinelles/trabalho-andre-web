@@ -2,6 +2,7 @@ import type {
   ApplicationDTO,
   AuthResponseDTO,
   FilterCatalogDTO,
+  LoginResponseDTO,
   OpportunityDTO,
   PageDTO,
   ProfessionalCatalogDTO,
@@ -10,10 +11,12 @@ import type {
 import {
   applicationFromDTO,
   filterCatalogFromDTO,
+  loginResultFromDTO,
   opportunityFromDTO,
   opportunityPageFromDTO,
   pendingVerificationFromDTO,
   professionalCatalogFromDTO,
+  professionalHealthSignupToDTO,
   sessionFromDTO,
   signUpDraftToDTO,
 } from '@/data/mappers'
@@ -22,6 +25,7 @@ import {
   queryItems,
   type Application,
   type FilterCatalog,
+  type LoginResult,
   type Opportunity,
   type OpportunityPage,
   type PendingVerification,
@@ -36,15 +40,19 @@ import type {
   OpportunityRepository,
 } from '@/domain/repositories'
 
+export const PROFESSIONAL_SIGNUP_URL =
+  'http://localhost:8080/profissional-saude/cadastro'
+export const USER_LOGIN_URL = 'http://localhost:8080/user/login'
+
 export function createAuthRepository(client: HttpClient): AuthRepository {
   return {
-    async login(email, password): Promise<Session> {
-      const dto = await client.send<AuthResponseDTO>({
-        path: 'auth/login',
+    async login(email, password): Promise<LoginResult> {
+      const { data, status } = await client.sendWithStatus<LoginResponseDTO>({
+        path: USER_LOGIN_URL,
         method: 'POST',
         body: { email, password },
       })
-      return sessionFromDTO(dto)
+      return loginResultFromDTO(data, status)
     },
 
     async loginWithGoogle(): Promise<Session> {
@@ -63,6 +71,27 @@ export function createAuthRepository(client: HttpClient): AuthRepository {
         body: signUpDraftToDTO(draft),
       })
       return pendingVerificationFromDTO(dto)
+    },
+
+    async registerProfessional(
+      draft: SignUpDraft,
+      biographyOrDescription: string,
+      documents: readonly File[],
+    ): Promise<void> {
+      const body = new FormData()
+      body.append(
+        'dados',
+        new Blob(
+          [JSON.stringify(professionalHealthSignupToDTO(draft, biographyOrDescription))],
+          { type: 'application/json' },
+        ),
+      )
+      for (const document of documents) body.append('documentos', document)
+      await client.sendVoid({
+        path: PROFESSIONAL_SIGNUP_URL,
+        method: 'POST',
+        body,
+      })
     },
 
     async verify(email, code): Promise<Session> {

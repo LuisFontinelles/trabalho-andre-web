@@ -50,6 +50,7 @@ export function createProfessionalRepository(
     async myOpportunities() {
       const dto = await client.send<PageDTO<ManagedOpportunityDTO>>({
         path: 'professional/opportunities',
+        requiresAuth: true,
       })
       return dto.items.map(managedOpportunityFromDTO)
     },
@@ -57,6 +58,7 @@ export function createProfessionalRepository(
     async opportunity(id) {
       const dto = await client.send<ManagedOpportunityDTO>({
         path: `professional/opportunities/${id}`,
+        requiresAuth: true,
       })
       return managedOpportunityFromDTO(dto)
     },
@@ -66,6 +68,7 @@ export function createProfessionalRepository(
         path: 'professional/opportunities',
         method: 'POST',
         body: draftToDTO(draft, asDraft ? 'RASCUNHO' : 'ATIVA'),
+        requiresAuth: true,
       })
       return managedOpportunityFromDTO(dto)
     },
@@ -75,6 +78,7 @@ export function createProfessionalRepository(
         path: `professional/opportunities/${id}`,
         method: 'PUT',
         body: draftToDTO(draft, asDraft ? 'RASCUNHO' : 'ATIVA'),
+        requiresAuth: true,
       })
       return managedOpportunityFromDTO(dto)
     },
@@ -83,6 +87,7 @@ export function createProfessionalRepository(
       await client.sendVoid({
         path: `professional/opportunities/${id}/close`,
         method: 'POST',
+        requiresAuth: true,
       })
     },
 
@@ -90,12 +95,14 @@ export function createProfessionalRepository(
       await client.sendVoid({
         path: `professional/opportunities/${id}`,
         method: 'DELETE',
+        requiresAuth: true,
       })
     },
 
     async receivedRequests() {
       const dto = await client.send<PageDTO<ReceivedRequestDTO>>({
         path: 'professional/requests',
+        requiresAuth: true,
       })
       return dto.items.map(receivedRequestFromDTO)
     },
@@ -103,6 +110,7 @@ export function createProfessionalRepository(
     async requestDetail(id) {
       const dto = await client.send<RequestDetailDTO>({
         path: `professional/requests/${id}`,
+        requiresAuth: true,
       })
       return requestDetailFromDTO(dto)
     },
@@ -112,6 +120,7 @@ export function createProfessionalRepository(
         path: `professional/requests/${id}/decision`,
         method: 'POST',
         body: reason === undefined ? { status } : { status, reason: reason.trim() },
+        requiresAuth: true,
       })
       return requestDetailFromDTO(dto)
     },
@@ -121,6 +130,7 @@ export function createProfessionalRepository(
         path: `professional/requests/${id}/info-request`,
         method: 'POST',
         body: { text: text.trim() },
+        requiresAuth: true,
       })
       return requestDetailFromDTO(dto)
     },
@@ -130,6 +140,7 @@ export function createProfessionalRepository(
         path: `professional/requests/${id}/messages`,
         method: 'POST',
         body: { text },
+        requiresAuth: true,
       })
       return requestMessageFromDTO(dto)
     },

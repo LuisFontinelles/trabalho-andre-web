@@ -35,6 +35,13 @@ export interface LoginRequestDTO {
   password: string
 }
 
+export interface LoginResponseDTO {
+  token?: string
+  autenticado?: boolean
+  tipoPerfil?: string
+  validadoInstitucionalmente?: boolean
+}
+
 export interface ProfessionalRegistrationDTO {
   council: string
   state: string
@@ -48,6 +55,17 @@ export interface SignUpRequestDTO {
   profile: string
   acceptedTerms: boolean
   professional: ProfessionalRegistrationDTO | null
+}
+
+export interface ProfessionalHealthSignupDTO {
+  usuarioDto: {
+    email: string
+    senha: string
+    tipoPerfil: 'PROFISSIONAL_SAUDE'
+  }
+  nome: string
+  documentosRegistro: string[]
+  biografiaOuDescricao: string
 }
 
 export interface VerificationChallengeDTO {

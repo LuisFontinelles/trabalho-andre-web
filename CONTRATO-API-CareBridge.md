@@ -57,18 +57,34 @@ Todo erro responde com este mesmo formato, em qualquer rota. O app já trata ass
 
 ## 2. Autenticação
 
-### POST /v1/auth/login
+### POST http://localhost:8080/user/login
 
 Requisição:
 
 ```json
 {
-  "email": "paciente@teste.com",
-  "password": "Paciente@2026"
+  "email": "usuario@email.com",
+  "password": "senha-do-usuario"
 }
 ```
 
-Resposta 200: o objeto de sessão da seção 2.5. Resposta 401 quando a credencial não confere.
+Resposta 200:
+
+```json
+{
+  "token": "token-jwt",
+  "autenticado": true,
+  "tipoPerfil": "PROFISSIONAL_SAUDE",
+  "validadoInstitucionalmente": true
+}
+```
+
+O cliente só abre a área de oportunidades se o status for 200, `autenticado`
+for `true`, houver token não vazio e `tipoPerfil` for exatamente
+`PROFISSIONAL_SAUDE`. Um profissional com `validadoInstitucionalmente: false`
+continua autenticado, mas tem as ações restritas controladas pela interface.
+Outros perfis com token são mantidos na sessão, sem acesso ao painel profissional.
+Resposta 401 quando a credencial não confere.
 
 O app normaliza o e-mail antes de enviar: remove espaços nas pontas e converte para minúsculas. O servidor pode assumir que chega normalizado, mas é mais seguro normalizar de novo.
 
@@ -121,6 +137,30 @@ Requisição de profissional de saúde:
 Respostas de erro esperadas: 409 se o e-mail já existe, 422 se `acceptedTerms` vier `false`.
 
 O campo `profile` aceita `PACIENTE` ou `PROFISSIONAL`. O bloco `professional` só vem preenchido quando o perfil é profissional, e nesse caso os três campos são obrigatórios.
+
+### POST http://localhost:8080/profissional-saude/cadastro
+
+Cadastro de profissional de saúde usando `multipart/form-data`. O campo obrigatório
+`dados` é uma parte JSON com `Content-Type: application/json`:
+
+```json
+{
+  "usuarioDto": {
+    "email": "ana.souza@example.com",
+    "senha": "SenhaSegura123!",
+    "tipoPerfil": "PROFISSIONAL_SAUDE"
+  },
+  "nome": "Dra. Ana Souza",
+  "documentosRegistro": ["CRM/DF 123456"],
+  "biografiaOuDescricao": "Médica clínica geral com experiência em atenção primária."
+}
+```
+
+O cliente envia cada arquivo selecionado como uma parte `documentos` separada.
+Os arquivos são opcionais na API, embora a especificação OpenAPI indique um
+arquivo obrigatório. São aceitos até 2 arquivos, com limite documentado de 10 MB
+por arquivo e 22 MB por requisição. O navegador deve gerar o `Content-Type` do
+multipart, incluindo o boundary; o cliente não deve defini-lo manualmente.
 
 ### POST /v1/auth/verify
 

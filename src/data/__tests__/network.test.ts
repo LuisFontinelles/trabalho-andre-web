@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { createDependencies } from '@/app/dependencies'
 import { NetworkError, buildUrl, createHttpClient } from '@/data/network/httpClient'
 import {
   BASE_URL,
@@ -10,6 +11,7 @@ import {
   rebaseToToday,
 } from '@/data/network/mockBackend'
 import { relativeDay } from '@/domain/professional'
+import { validProfessionalDraft } from '@/test/factories'
 
 const client = () => createHttpClient(BASE_URL, createMockFetch({ latency: false }))
 
@@ -28,6 +30,149 @@ describe('Montagem da requisicao', () => {
     expect(url).toBe(
       'https://api.carebridge.local/v1/opportunities?modality=online&page=2&q=psico',
     )
+  })
+
+  it('login envia o JSON para o endpoint novo e preserva o status HTTP', async () => {
+    let capturedUrl = ''
+    let capturedInit: RequestInit | undefined
+    const fetchImpl: typeof fetch = async (input, init) => {
+      capturedUrl = String(input)
+      capturedInit = init
+      return Response.json({
+        token: 'jwt-test',
+        autenticado: true,
+        tipoPerfil: 'PROFISSIONAL_SAUDE',
+        validadoInstitucionalmente: false,
+      })
+    }
+
+    const result = await createDependencies(fetchImpl).login(
+      '  Profissional@Teste.com ',
+      'SenhaSegura123!',
+    )
+
+    expect(capturedUrl).toBe('http://localhost:8080/user/login')
+    expect(capturedInit?.method).toBe('POST')
+    expect(new Headers(capturedInit?.headers).get('Content-Type')).toBe('application/json')
+    expect(capturedInit?.body).toBe(
+      JSON.stringify({ email: 'profissional@teste.com', password: 'SenhaSegura123!' }),
+    )
+    expect(result).toMatchObject({
+      status: 200,
+      data: {
+        autenticado: true,
+        token: 'jwt-test',
+        tipoPerfil: 'PROFISSIONAL_SAUDE',
+        validadoInstitucionalmente: false,
+      },
+    })
+  })
+
+  it('cadastro profissional envia JSON e arquivos como partes multipart distintas', async () => {
+    let capturedUrl = ''
+    let capturedInit: RequestInit | undefined
+    const fetchImpl: typeof fetch = async (input, init) => {
+      capturedUrl = String(input)
+      capturedInit = init
+      return new Response(null, { status: 201 })
+    }
+    const documents = [
+      new File(['conteudo pdf'], 'registro.pdf', { type: 'application/pdf' }),
+      new File(['conteudo imagem'], 'identidade.jpg', { type: 'image/jpeg' }),
+    ]
+
+    await createDependencies(fetchImpl).registerProfessional(
+      validProfessionalDraft(),
+      'Médico clínico geral.',
+      documents,
+    )
+
+    expect(capturedUrl).toBe('http://localhost:8080/profissional-saude/cadastro')
+    expect(capturedInit?.method).toBe('POST')
+    expect(new Headers(capturedInit?.headers).has('Content-Type')).toBe(false)
+    const requestBody = capturedInit?.body
+    expect(requestBody).toBeInstanceOf(FormData)
+    if (!(requestBody instanceof FormData)) throw new Error('O corpo deveria ser FormData')
+    const body = requestBody
+    const dataPart = body.get('dados')
+    expect(dataPart).toBeInstanceOf(Blob)
+    if (!(dataPart instanceof Blob)) throw new Error('A parte dados deveria ser JSON')
+    expect(dataPart.type).toBe('application/json')
+    const dataText = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = () => reject(reader.error)
+      reader.readAsText(dataPart)
+    })
+    expect(dataText).toBe(
+      JSON.stringify({
+        usuarioDto: {
+          email: 'profissional@teste.com',
+          senha: 'Profissa@2026',
+          tipoPerfil: 'PROFISSIONAL_SAUDE',
+        },
+        nome: 'Marcos Vieira',
+        documentosRegistro: ['CRM/DF 123456'],
+        biografiaOuDescricao: 'Médico clínico geral.',
+      }),
+    )
+    expect(body.getAll('documentos')).toEqual(documents)
+  })
+
+  it('permite cadastro sem anexar arquivos', async () => {
+    let capturedBody: BodyInit | null | undefined
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      capturedBody = init?.body
+      return new Response(null, { status: 201 })
+    }
+
+    await createDependencies(fetchImpl).registerProfessional(
+      validProfessionalDraft(),
+      '',
+      [],
+    )
+
+    expect(capturedBody).toBeInstanceOf(FormData)
+    if (!(capturedBody instanceof FormData)) throw new Error('O corpo deveria ser FormData')
+    expect(capturedBody.getAll('documentos')).toHaveLength(0)
+    expect(capturedBody.get('dados')).toBeInstanceOf(Blob)
+  })
+
+  it('adiciona Bearer token somente em chamadas marcadas como protegidas', async () => {
+    const capturedHeaders: Headers[] = []
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      capturedHeaders.push(new Headers(init?.headers))
+      return Response.json({})
+    }
+    const authenticatedClient = createHttpClient(BASE_URL, fetchImpl, {
+      getToken: () => 'jwt-protected',
+    })
+
+    await authenticatedClient.send({
+      path: 'professional/opportunities',
+      requiresAuth: true,
+    })
+    await authenticatedClient.send({ path: 'opportunities' })
+
+    expect(capturedHeaders[0]?.get('Authorization')).toBe('Bearer jwt-protected')
+    expect(capturedHeaders[1]?.has('Authorization')).toBe(false)
+  })
+
+  it('notifica expiração ao receber 401 numa chamada protegida autenticada', async () => {
+    const onSessionExpired = vi.fn()
+    const protectedClient = createHttpClient(
+      BASE_URL,
+      async () => new Response(null, { status: 401 }),
+      { getToken: () => 'jwt-expirado', onSessionExpired },
+    )
+
+    await expect(
+      protectedClient.send({
+        path: 'professional/opportunities',
+        requiresAuth: true,
+      }),
+    ).rejects.toMatchObject({ kind: 'unauthorized', status: 401 })
+    expect(onSessionExpired).toHaveBeenCalledOnce()
   })
 })
 

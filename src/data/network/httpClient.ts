@@ -1,4 +1,5 @@
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+export const SESSION_EXPIRED_EVENT = 'carebridge:session-expired'
 
 export interface Endpoint {
   path: string
@@ -6,6 +7,7 @@ export interface Endpoint {
   query?: Record<string, string>
   body?: unknown
   headers?: Record<string, string>
+  requiresAuth?: boolean
 }
 
 /**
@@ -58,6 +60,13 @@ export class NetworkError extends Error {
 }
 
 export function buildUrl(baseUrl: string, endpoint: Endpoint): string {
+  if (/^https?:\/\//i.test(endpoint.path)) {
+    const url = new URL(endpoint.path)
+    for (const key of Object.keys(endpoint.query ?? {}).sort()) {
+      url.searchParams.set(key, endpoint.query![key]!)
+    }
+    return url.toString()
+  }
   const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
   const path = endpoint.path.startsWith('/') ? endpoint.path : `/${endpoint.path}`
   const query = endpoint.query ?? {}
@@ -71,27 +80,47 @@ export function buildUrl(baseUrl: string, endpoint: Endpoint): string {
 
 export interface HttpClient {
   send<Response>(endpoint: Endpoint): Promise<Response>
+  sendWithStatus<Response>(
+    endpoint: Endpoint,
+  ): Promise<{ data: Response; status: number }>
   sendVoid(endpoint: Endpoint): Promise<void>
+}
+
+export interface HttpClientOptions {
+  getToken?: () => string | null
+  onSessionExpired?: () => void
 }
 
 export function createHttpClient(
   baseUrl: string,
   fetchImpl: typeof fetch = fetch,
+  options: HttpClientOptions = {},
 ): HttpClient {
   async function perform(endpoint: Endpoint): Promise<{ body: string; status: number }> {
     const url = buildUrl(baseUrl, endpoint)
+    const token = endpoint.requiresAuth ? options.getToken?.()?.trim() : undefined
     const headers: Record<string, string> = {
       Accept: 'application/json',
       ...endpoint.headers,
     }
-    if (endpoint.body !== undefined) headers['Content-Type'] = 'application/json'
+    if (token) headers.Authorization = `Bearer ${token}`
+    const requestBody: BodyInit | undefined =
+      endpoint.body === undefined
+        ? undefined
+        : endpoint.body instanceof FormData
+          ? endpoint.body
+          : JSON.stringify(endpoint.body)
+    const isFormData = requestBody instanceof FormData
+    if (endpoint.body !== undefined && !isFormData) {
+      headers['Content-Type'] = 'application/json'
+    }
 
     let response: Response
     try {
       response = await fetchImpl(url, {
         method: endpoint.method ?? 'GET',
         headers,
-        body: endpoint.body === undefined ? undefined : JSON.stringify(endpoint.body),
+        body: requestBody,
       })
     } catch (cause) {
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false
@@ -113,6 +142,7 @@ export function createHttpClient(
 
     const message = api?.message ?? `HTTP ${response.status}`
     if (response.status === 401 || response.status === 403) {
+      if (response.status === 401 && token) options.onSessionExpired?.()
       throw new NetworkError('unauthorized', message, response.status, api)
     }
     if (response.status === 404) {
@@ -121,21 +151,32 @@ export function createHttpClient(
     throw new NetworkError('server', message, response.status, api)
   }
 
+  async function decode<Response>(
+    endpoint: Endpoint,
+  ): Promise<{ data: Response; status: number }> {
+    const { body, status } = await perform(endpoint)
+    if (status === 204 || body === '') {
+      throw new NetworkError('noContent', 'Resposta sem corpo', status)
+    }
+    try {
+      return { data: JSON.parse(body) as Response, status }
+    } catch (cause) {
+      throw new NetworkError(
+        'decoding',
+        cause instanceof Error ? cause.message : 'Falha ao decodificar',
+        status,
+      )
+    }
+  }
+
   return {
     async send<Response>(endpoint: Endpoint): Promise<Response> {
-      const { body, status } = await perform(endpoint)
-      if (status === 204 || body === '') {
-        throw new NetworkError('noContent', 'Resposta sem corpo', status)
-      }
-      try {
-        return JSON.parse(body) as Response
-      } catch (cause) {
-        throw new NetworkError(
-          'decoding',
-          cause instanceof Error ? cause.message : 'Falha ao decodificar',
-          status,
-        )
-      }
+      const { data } = await decode<Response>(endpoint)
+      return data
+    },
+
+    async sendWithStatus<Response>(endpoint: Endpoint) {
+      return decode<Response>(endpoint)
     },
 
     async sendVoid(endpoint: Endpoint): Promise<void> {

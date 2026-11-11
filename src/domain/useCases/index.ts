@@ -3,6 +3,7 @@ import {
   requiresProfessionalData,
   type Application,
   type FilterCatalog,
+  type LoginResult,
   type Opportunity,
   type OpportunityPage,
   type PendingVerification,
@@ -97,7 +98,7 @@ export function validateSignUp(draft: SignUpDraft): void {
 }
 
 export function makeLogin(repository: AuthRepository) {
-  return async (email: string, password: string): Promise<Session> => {
+  return async (email: string, password: string): Promise<LoginResult> => {
     validateEmail(email)
     validatePassword(password, false)
     return repository.login(email.trim().toLowerCase(), password)
@@ -116,6 +117,29 @@ export function makeSignUp(repository: AuthRepository) {
         number: draft.professional.number.trim(),
       },
     })
+  }
+}
+
+export function makeRegisterProfessional(repository: AuthRepository) {
+  return async (
+    draft: SignUpDraft,
+    biographyOrDescription: string,
+    documents: readonly File[],
+  ): Promise<void> => {
+    validateSignUp(draft)
+    return repository.registerProfessional(
+      {
+        ...draft,
+        name: draft.name.trim(),
+        email: draft.email.trim().toLowerCase(),
+        professional: {
+          ...draft.professional,
+          number: draft.professional.number.trim(),
+        },
+      },
+      biographyOrDescription.trim(),
+      documents,
+    )
   }
 }
 

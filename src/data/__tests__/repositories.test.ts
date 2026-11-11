@@ -7,19 +7,25 @@ import { testDependencies, validPatientDraft, validProfessionalDraft } from '@/t
 describe('Login', () => {
   it('conta de teste do paciente entra', async () => {
     const session = await testDependencies().login('paciente@teste.com', 'Paciente@2026')
-    expect(session.user.profile).toBe('PACIENTE')
-    expect(session.user.email).toBe('paciente@teste.com')
-    expect(session.token).not.toBe('')
+    expect(session).toMatchObject({
+      status: 200,
+      data: {
+        autenticado: true,
+        tipoPerfil: 'PACIENTE',
+        token: expect.any(String),
+      },
+    })
   })
 
   it('conta de teste do profissional entra', async () => {
     const session = await testDependencies().login('profissional@teste.com', 'Profissa@2026')
-    expect(session.user.profile).toBe('PROFISSIONAL')
+    expect(session.data.tipoPerfil).toBe('PROFISSIONAL_SAUDE')
+    expect(session.data.validadoInstitucionalmente).toBe(true)
   })
 
   it('e-mail e normalizado antes de bater no servidor', async () => {
     const session = await testDependencies().login('  PACIENTE@TESTE.COM ', 'qualquer')
-    expect(session.user.profile).toBe('PACIENTE')
+    expect(session.data.tipoPerfil).toBe('PACIENTE')
   })
 
   it('conta fora da lista e recusada com 401', async () => {

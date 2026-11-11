@@ -16,14 +16,14 @@ import '@/app/layout.css'
 
 function RequireSession({ children }: { children: ReactNode }) {
   const session = useSession()
-  if (!session.isAuthenticated) return <Navigate to="/" replace />
+  if (!session.canAccessOpportunities) return <Navigate to="/" replace />
   return <>{children}</>
 }
 
-/** Quem ja entrou nao volta para login e cadastro: vai direto para o painel. */
+/** Apenas profissionais autenticados seguem do login para o painel. */
 function GuestOnly({ children }: { children: ReactNode }) {
   const session = useSession()
-  if (session.isAuthenticated) return <Navigate to="/oportunidades" replace />
+  if (session.canAccessOpportunities) return <Navigate to="/oportunidades" replace />
   return <>{children}</>
 }
 
