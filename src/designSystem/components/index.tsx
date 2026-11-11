@@ -3,24 +3,49 @@ import {
   useId,
   useRef,
   useState,
-  type ChangeEvent,
+  type ClipboardEvent,
+  type KeyboardEvent,
   type ReactNode,
 } from 'react'
-import { CbIcon } from '@/designSystem/tokens/icons'
+import { Link } from 'react-router-dom'
+import { Icon, type IconName } from '@/designSystem/tokens/icons'
 import { strings } from '@/resources/strings'
+import logo from '@/assets/logo.svg'
 import './components.css'
 
-type ButtonKind = 'primary' | 'secondary' | 'tertiary' | 'destructive'
+function cx(...parts: (string | false | null | undefined)[]): string {
+  return parts.filter(Boolean).join(' ')
+}
+
+/* ------------------------------------------------------------------ marca */
+
+/** Web / Logo: simbolo com o nome. `compact` mostra so o simbolo. */
+export function Logo({ compact = false }: { compact?: boolean }) {
+  return (
+    <span className="cb-logo">
+      <img className="cb-logo__symbol" src={logo} alt="" />
+      {compact ? (
+        <span className="cb-visually-hidden">{strings.app.name}</span>
+      ) : (
+        <span className="cb-logo__name">{strings.app.name}</span>
+      )}
+    </span>
+  )
+}
+
+/* ------------------------------------------------------------------ botao */
+
+export type ButtonKind = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'dangerSoft'
 
 interface ButtonProps {
   title: string
+  /** Primario, Secundario, Contorno, Fantasma, Perigo e Perigo suave. */
   kind?: ButtonKind
-  size?: 'regular' | 'compact'
-  icon?: ReactNode
-  isLoading?: boolean
-  isEnabled?: boolean
+  /** M (48) ou P (32). */
+  size?: 'md' | 'sm'
   fillsWidth?: boolean
-  disabledHint?: string
+  isEnabled?: boolean
+  isLoading?: boolean
   type?: 'button' | 'submit'
   onClick?: () => void
 }
@@ -28,593 +53,855 @@ interface ButtonProps {
 export function Button({
   title,
   kind = 'primary',
-  size = 'regular',
-  icon,
-  isLoading = false,
+  size = 'md',
+  fillsWidth = false,
   isEnabled = true,
-  fillsWidth = true,
-  disabledHint,
+  isLoading = false,
   type = 'button',
   onClick,
 }: ButtonProps) {
-  const active = isEnabled && !isLoading
-  const classes = [
-    'cb-button',
-    `cb-button--${kind}`,
-    size === 'compact' ? 'cb-button--compact' : '',
-    fillsWidth ? 'cb-button--fill' : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
-
   return (
-    <div>
-      <button type={type} className={classes} disabled={!active} onClick={onClick}>
-        {isLoading ? <span aria-hidden="true">...</span> : icon}
-        {isLoading ? strings.common.loading : title}
-      </button>
-      {disabledHint && !active && (
-        <p className="cb-hint">
-          <CbIcon.locked size={14} />
-          {disabledHint}
-        </p>
+    <button
+      type={type}
+      className={cx(
+        'cb-button',
+        `cb-button--${kind}`,
+        `cb-button--${size}`,
+        fillsWidth && 'cb-button--fill',
       )}
-    </div>
-  )
-}
-
-export function LinkButton({
-  title,
-  isEnabled = true,
-  onClick,
-}: {
-  title: string
-  isEnabled?: boolean
-  onClick?: () => void
-}) {
-  return (
-    <button type="button" className="cb-link-button" disabled={!isEnabled} onClick={onClick}>
-      {title}
+      disabled={!isEnabled || isLoading}
+      aria-busy={isLoading || undefined}
+      onClick={onClick}
+    >
+      {isLoading ? strings.common.loading : title}
     </button>
   )
 }
 
-/** O asterisco de campo obrigatorio, como no prototipo. */
-export function FieldLabel({
-  text,
-  isRequired = false,
-  htmlFor,
+export function IconButton({
+  icon,
+  label,
+  size = 24,
+  onClick,
+  expanded,
 }: {
-  text: string
-  isRequired?: boolean
-  htmlFor?: string
+  icon: IconName
+  label: string
+  size?: number
+  onClick?: () => void
+  expanded?: boolean
 }) {
   return (
-    <label className="cb-field__label" htmlFor={htmlFor}>
-      {isRequired && (
-        <span className="cb-required" aria-hidden="true">
-          *{' '}
-        </span>
-      )}
-      {text}
-    </label>
+    <button
+      type="button"
+      className="cb-icon-button"
+      aria-label={label}
+      aria-expanded={expanded}
+      onClick={onClick}
+    >
+      <Icon name={icon} size={size} />
+    </button>
   )
 }
 
-export function FieldError({ message }: { message: string }) {
+/* ------------------------------------------------------------------- selo */
+
+export type BadgeTone = 'neutral' | 'success' | 'warning' | 'danger'
+
+/** Web / Selo: ponto colorido com o rotulo do status. */
+export function Badge({ text, tone = 'neutral' }: { text: string; tone?: BadgeTone }) {
   return (
-    <span className="cb-field__error" role="alert">
-      <CbIcon.error size={14} />
-      {message}
+    <span className={`cb-badge cb-badge--${tone}`}>
+      <span className="cb-badge__dot" aria-hidden="true" />
+      {text}
     </span>
+  )
+}
+
+/* ------------------------------------------------------------------- chip */
+
+export function Chip({
+  label,
+  isSelected = false,
+  onClick,
+}: {
+  label: string
+  isSelected?: boolean
+  onClick?: () => void
+}) {
+  if (!onClick) {
+    return <span className={cx('cb-chip', isSelected && 'cb-chip--selected')}>{label}</span>
+  }
+  return (
+    <button
+      type="button"
+      className={cx('cb-chip', isSelected && 'cb-chip--selected')}
+      aria-pressed={isSelected}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  )
+}
+
+/* ------------------------------------------------------------------ passo */
+
+/** Web / Passo: concluido, atual ou pendente. */
+export function Stepper({ labels, current }: { labels: readonly string[]; current: number }) {
+  return (
+    <ol className="cb-steps">
+      {labels.map((label, index) => {
+        const state = index < current ? 'done' : index === current ? 'current' : 'pending'
+        return (
+          <li
+            key={label}
+            className={`cb-step cb-step--${state}`}
+            aria-current={state === 'current' ? 'step' : undefined}
+          >
+            <span className="cb-step__marker">
+              {state === 'done' ? <Icon name="check" size={18} /> : index + 1}
+            </span>
+            {label}
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+/* --------------------------------------------------------- card de opcao */
+
+export function OptionCard({
+  title,
+  description,
+  isSelected,
+  onSelect,
+}: {
+  title: string
+  description: string
+  isSelected: boolean
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={isSelected}
+      className={cx('cb-option', isSelected && 'cb-option--selected')}
+      onClick={onSelect}
+    >
+      <span className="cb-option__title">{title}</span>
+      <span className="cb-option__description">{description}</span>
+    </button>
+  )
+}
+
+/* ------------------------------------------------------------------ campo */
+
+interface FieldShellProps {
+  label: string
+  htmlFor: string
+  errorMessage?: string | null
+  isEnabled?: boolean
+  children: ReactNode
+}
+
+function FieldShell({ label, htmlFor, errorMessage, isEnabled = true, children }: FieldShellProps) {
+  return (
+    <div className={cx('cb-field', !isEnabled && 'cb-field--disabled')}>
+      <label className="cb-field__label" htmlFor={htmlFor}>
+        {label}
+      </label>
+      {children}
+      {errorMessage && (
+        <span className="cb-field__help" role="alert">
+          {errorMessage}
+        </span>
+      )}
+    </div>
   )
 }
 
 interface TextFieldProps {
   label: string
-  placeholder?: string
   value: string
   onChange: (value: string) => void
-  type?: 'text' | 'email' | 'password' | 'tel'
+  placeholder?: string
+  type?: 'text' | 'email' | 'password' | 'tel' | 'date'
+  inputMode?: 'text' | 'numeric' | 'decimal' | 'email'
   autoComplete?: string
   errorMessage?: string | null
   isEnabled?: boolean
-  isRequired?: boolean
+  /** Mostra o valor preenchido sem deixar editar. */
+  isReadOnly?: boolean
+  maxLength?: number
 }
 
 export function TextField({
   label,
-  placeholder,
   value,
   onChange,
+  placeholder,
   type = 'text',
+  inputMode,
   autoComplete,
   errorMessage,
   isEnabled = true,
-  isRequired = false,
+  isReadOnly = false,
+  maxLength,
 }: TextFieldProps) {
   const id = useId()
-  const [revealed, setRevealed] = useState(false)
-  const isSecure = type === 'password'
-  const hasError = Boolean(errorMessage)
-  const inputType = isSecure && !revealed ? 'password' : isSecure ? 'text' : type
-
   return (
-    <div className="cb-field">
-      <FieldLabel text={label} isRequired={isRequired} htmlFor={id} />
-      <div
-        className={[
-          'cb-field__control',
-          hasError ? 'cb-field__control--error' : '',
-          isEnabled ? '' : 'cb-field__control--disabled',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
+    <FieldShell label={label} htmlFor={id} errorMessage={errorMessage} isEnabled={isEnabled}>
+      <div className={cx('cb-field__box', errorMessage && 'cb-field__box--error')}>
         <input
           id={id}
           className="cb-field__input"
-          type={inputType}
+          type={type}
+          inputMode={inputMode}
           value={value}
           placeholder={placeholder}
           autoComplete={autoComplete}
+          maxLength={maxLength}
           disabled={!isEnabled}
-          aria-invalid={hasError}
-          onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)}
+          readOnly={isReadOnly}
+          aria-invalid={errorMessage ? true : undefined}
+          onChange={(event) => onChange(event.target.value)}
         />
-        {isSecure && (
-          <button
-            type="button"
-            className="cb-field__reveal"
-            aria-label={revealed ? strings.login.hidePassword : strings.login.showPassword}
-            onClick={() => setRevealed((current) => !current)}
-          >
-            {revealed ? <CbIcon.passwordVisible /> : <CbIcon.passwordHidden />}
-          </button>
-        )}
       </div>
-      {errorMessage && <FieldError message={errorMessage} />}
-    </div>
+    </FieldShell>
   )
 }
 
-interface SelectFieldProps {
-  label: string
-  placeholder: string
-  options: readonly { id: string; label: string }[]
-  value: string | null
-  onChange: (value: string | null) => void
-  errorMessage?: string | null
-  isEnabled?: boolean
-  isRequired?: boolean
-}
-
-export function SelectField({
+export function TextAreaField({
   label,
-  placeholder,
-  options,
   value,
   onChange,
+  placeholder,
   errorMessage,
   isEnabled = true,
-  isRequired = false,
-}: SelectFieldProps) {
+  maxLength,
+}: Omit<TextFieldProps, 'type' | 'inputMode' | 'autoComplete' | 'isReadOnly'>) {
   const id = useId()
-  const hasError = Boolean(errorMessage)
-
   return (
-    <div className="cb-field">
-      <FieldLabel text={label} isRequired={isRequired} htmlFor={id} />
-      <div
-        className={[
-          'cb-field__control',
-          hasError ? 'cb-field__control--error' : '',
-          isEnabled ? '' : 'cb-field__control--disabled',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
-        <select
+    <FieldShell label={label} htmlFor={id} errorMessage={errorMessage} isEnabled={isEnabled}>
+      <div className={cx('cb-field__box cb-field__box--area', errorMessage && 'cb-field__box--error')}>
+        <textarea
           id={id}
-          className="cb-select"
-          value={value ?? ''}
+          className="cb-field__input"
+          value={value}
+          placeholder={placeholder}
+          maxLength={maxLength}
           disabled={!isEnabled}
-          aria-invalid={hasError}
-          onChange={(event) => onChange(event.target.value === '' ? null : event.target.value)}
-        >
-          <option value="">{placeholder}</option>
-          {options.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <CbIcon.expand size={16} />
+          aria-invalid={errorMessage ? true : undefined}
+          onChange={(event) => onChange(event.target.value)}
+        />
       </div>
-      {errorMessage && <FieldError message={errorMessage} />}
-    </div>
+    </FieldShell>
   )
 }
 
-interface OptionSelectorProps<T extends string> {
-  label?: string
-  options: readonly { id: T; title: string; isEnabled?: boolean }[]
-  value: T
-  onChange: (value: T) => void
-  disabledHint?: string
+export interface SelectOption {
+  value: string
+  label: string
 }
 
-export function OptionSelector<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-  disabledHint,
-}: OptionSelectorProps<T>) {
-  const hasDisabled = options.some((option) => option.isEnabled === false)
+interface SelectFieldBase {
+  label: string
+  placeholder: string
+  options: readonly SelectOption[]
+  errorMessage?: string | null
+  isEnabled?: boolean
+}
+
+type SelectFieldProps = SelectFieldBase &
+  (
+    | { multiple?: false; value: string | null; onChange: (value: string) => void }
+    | { multiple: true; value: readonly string[]; onChange: (value: readonly string[]) => void }
+  )
+
+/**
+ * Campo Select com o menu suspenso rolavel do Figma. Aceita uma escolha ou
+ * varias (`multiple`), caso em que o menu fica aberto e o valor lista as
+ * escolhas separadas por virgula.
+ */
+export function SelectField(props: SelectFieldProps) {
+  const { label, placeholder, options, errorMessage, isEnabled = true } = props
+  const id = useId()
+  const [isOpen, setOpen] = useState(false)
+  const [active, setActive] = useState(0)
+  const root = useRef<HTMLDivElement>(null)
+
+  const selected: readonly string[] = props.multiple
+    ? props.value
+    : props.value === null
+      ? []
+      : [props.value]
+  const text = options
+    .filter((option) => selected.includes(option.value))
+    .map((option) => option.label)
+    .join(', ')
+
+  useEffect(() => {
+    if (!isOpen) return
+    function onPointerDown(event: PointerEvent) {
+      if (root.current && !root.current.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [isOpen])
+
+  function choose(value: string) {
+    if (props.multiple) {
+      props.onChange(
+        selected.includes(value)
+          ? selected.filter((item) => item !== value)
+          : [...selected, value],
+      )
+      return
+    }
+    props.onChange(value)
+    setOpen(false)
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === 'Escape') {
+      setOpen(false)
+      return
+    }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      if (!isOpen) {
+        setOpen(true)
+        return
+      }
+      const step = event.key === 'ArrowDown' ? 1 : -1
+      setActive((current) => (current + step + options.length) % options.length)
+      return
+    }
+    if (isOpen && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault()
+      const option = options[active]
+      if (option) choose(option.value)
+    }
+  }
 
   return (
-    <div className="cb-option-selector">
-      {label && <span className="cb-field__label">{label}</span>}
-      <div className="cb-option-selector__options" role="group" aria-label={label}>
-        {options.map((option) => {
-          const enabled = option.isEnabled !== false
-          const selected = option.id === value
-          return (
-            <button
-              key={option.id}
-              type="button"
-              className={['cb-option', selected ? 'cb-option--selected' : ''].filter(Boolean).join(' ')}
-              disabled={!enabled}
-              aria-pressed={selected}
-              onClick={() => enabled && onChange(option.id)}
-            >
-              {!enabled && <CbIcon.locked size={13} />}
-              {option.title}
-            </button>
-          )
-        })}
+    <FieldShell label={label} htmlFor={id} errorMessage={errorMessage} isEnabled={isEnabled}>
+      <div className="cb-select" ref={root}>
+        <button
+          id={id}
+          type="button"
+          className={cx(
+            'cb-field__box cb-select__trigger',
+            errorMessage && 'cb-field__box--error',
+            isOpen && 'cb-field__box--focus',
+          )}
+          role="combobox"
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-controls={`${id}-list`}
+          aria-invalid={errorMessage ? true : undefined}
+          disabled={!isEnabled}
+          onClick={() => setOpen((current) => !current)}
+          onKeyDown={onKeyDown}
+        >
+          <span className={cx('cb-select__value', text === '' && 'cb-select__value--empty')}>
+            {text === '' ? placeholder : text}
+          </span>
+          <Icon name="expand_more" size={22} tone="secondary" />
+        </button>
+        {isOpen && (
+          <ul
+            id={`${id}-list`}
+            className="cb-menu cb-select__menu"
+            role="listbox"
+            aria-multiselectable={props.multiple || undefined}
+          >
+            {options.map((option, index) => {
+              const isSelected = selected.includes(option.value)
+              return (
+                <li
+                  key={option.value}
+                  role="option"
+                  aria-selected={isSelected}
+                  className={cx(
+                    'cb-menu__item',
+                    isSelected && 'cb-menu__item--selected',
+                    index === active && 'cb-menu__item--active',
+                  )}
+                  onPointerEnter={() => setActive(index)}
+                  onClick={() => choose(option.value)}
+                >
+                  {option.label}
+                  {isSelected && <Icon name="check" size={18} tone="brand" />}
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </div>
-      {disabledHint && hasDisabled && (
-        <span className="cb-hint">
-          <CbIcon.underConstruction size={14} />
-          {disabledHint}
-        </span>
-      )}
-    </div>
+    </FieldShell>
   )
 }
 
 export function Checkbox({
-  title,
-  checked,
+  label,
+  isChecked,
   onChange,
-  errorMessage,
 }: {
-  title: string
-  checked: boolean
-  onChange: (value: boolean) => void
-  errorMessage?: string | null
+  label: string
+  isChecked: boolean
+  onChange: (isChecked: boolean) => void
 }) {
-  const hasError = Boolean(errorMessage)
   return (
-    <div className="cb-checkbox">
-      <button
-        type="button"
-        className="cb-checkbox__row"
-        role="checkbox"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-      >
-        <span
-          className={[
-            'cb-checkbox__box',
-            checked ? 'cb-checkbox__box--on' : '',
-            hasError ? 'cb-checkbox__box--error' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-        >
-          {checked && <CbIcon.check size={14} />}
-        </span>
-        {title}
-      </button>
-      {errorMessage && <FieldError message={errorMessage} />}
-    </div>
+    <label className="cb-checkbox">
+      <input
+        className="cb-visually-hidden"
+        type="checkbox"
+        checked={isChecked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <Icon
+        name={isChecked ? 'check_box' : 'check_box_outline_blank'}
+        size={22}
+        tone={isChecked ? 'brand' : 'secondary'}
+      />
+      <span>{label}</span>
+    </label>
   )
 }
 
+/** Codigo de verificacao: uma caixa por digito, como na tela do Figma. */
 export function CodeField({
-  code,
+  length,
+  value,
   onChange,
-  length = 4,
-  errorMessage,
   label,
 }: {
-  code: string
+  length: number
+  value: string
   onChange: (value: string) => void
-  length?: number
-  errorMessage?: string | null
   label: string
 }) {
-  const id = useId()
-  const digits = [...code]
-  const hasError = Boolean(errorMessage)
+  const inputs = useRef<(HTMLInputElement | null)[]>([])
+  const digits = Array.from({ length }, (_, index) => value[index] ?? '')
+
+  function setDigit(index: number, raw: string) {
+    const digit = raw.replace(/\D/g, '').slice(-1)
+    const next = digits.slice()
+    next[index] = digit
+    onChange(next.join(''))
+    if (digit !== '') inputs.current[index + 1]?.focus()
+  }
+
+  function onKeyDown(index: number, event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Backspace' && digits[index] === '') inputs.current[index - 1]?.focus()
+  }
+
+  function onPaste(event: ClipboardEvent<HTMLInputElement>) {
+    const pasted = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, length)
+    if (pasted === '') return
+    event.preventDefault()
+    onChange(pasted)
+    inputs.current[Math.min(pasted.length, length - 1)]?.focus()
+  }
 
   return (
-    <div className="cb-code-field">
-      <label className="cb-field__label" htmlFor={id}>
-        {label}
-      </label>
-      <input
-        id={id}
-        className="cb-field__input"
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        maxLength={length}
-        value={code}
-        aria-invalid={hasError}
-        style={{ position: 'absolute', opacity: 0, width: 1, height: 1 }}
-        onChange={(event) => onChange(event.target.value.replace(/\D/g, '').slice(0, length))}
-      />
-      <div className="cb-code-field__boxes" aria-hidden="true">
-        {Array.from({ length }, (_, index) => (
-          <span
-            key={index}
-            className={[
-              'cb-code-field__box',
-              index < digits.length ? 'cb-code-field__box--filled' : '',
-              hasError ? 'cb-code-field__box--error' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-          >
-            {digits[index] ?? '-'}
-          </span>
-        ))}
-      </div>
-      {errorMessage && <FieldError message={errorMessage} />}
+    <div className="cb-code" role="group" aria-label={label}>
+      {digits.map((digit, index) => (
+        <input
+          key={index}
+          ref={(element) => {
+            inputs.current[index] = element
+          }}
+          className={cx('cb-code__digit', digit !== '' && 'cb-code__digit--filled')}
+          inputMode="numeric"
+          autoComplete={index === 0 ? 'one-time-code' : 'off'}
+          maxLength={1}
+          value={digit}
+          aria-label={`${index + 1}`}
+          onChange={(event) => setDigit(index, event.target.value)}
+          onKeyDown={(event) => onKeyDown(index, event)}
+          onPaste={onPaste}
+        />
+      ))}
     </div>
   )
 }
 
-export type BadgeTone = 'success' | 'warning' | 'danger' | 'neutral' | 'info'
+/* ------------------------------------------------------------------ aviso */
 
-export function Badge({ text, tone = 'success' }: { text: string; tone?: BadgeTone }) {
-  return <span className={`cb-badge cb-badge--${tone}`}>{text}</span>
+export type BannerTone = 'danger' | 'warning' | 'success' | 'info'
+
+const BANNER_ICON: Record<BannerTone, IconName> = {
+  danger: 'error',
+  warning: 'info',
+  success: 'check_circle',
+  info: 'info',
 }
 
-export function Chip({
-  title,
-  isSelected,
-  onClick,
+export function Banner({
+  message,
+  tone = 'danger',
+  icon,
 }: {
-  title: string
-  isSelected: boolean
-  onClick: () => void
+  message: string
+  tone?: BannerTone
+  icon?: IconName
 }) {
   return (
-    <button
-      type="button"
-      className={['cb-chip', isSelected ? 'cb-chip--selected' : ''].filter(Boolean).join(' ')}
-      aria-pressed={isSelected}
-      onClick={onClick}
+    <div
+      className={`cb-banner cb-banner--${tone}`}
+      role={tone === 'danger' ? 'alert' : 'status'}
     >
-      {title}
-    </button>
-  )
-}
-
-export function Card({ children }: { children: ReactNode }) {
-  return <div className="cb-card">{children}</div>
-}
-
-export function KeyValueRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="cb-key-value">
-      <span className="cb-key-value__key">{label}</span>
-      <span className="cb-key-value__value">{value}</span>
-    </div>
-  )
-}
-
-export type BannerTone = 'error' | 'warning' | 'info' | 'success'
-
-export function Banner({ message, tone = 'error' }: { message: string; tone?: BannerTone }) {
-  const Icon =
-    tone === 'error'
-      ? CbIcon.error
-      : tone === 'warning'
-        ? CbIcon.warning
-        : tone === 'success'
-          ? CbIcon.success
-          : CbIcon.info
-
-  return (
-    <div className={`cb-banner cb-banner--${tone}`} role={tone === 'error' ? 'alert' : 'status'}>
-      <Icon size={16} />
+      <Icon name={icon ?? BANNER_ICON[tone]} size={20} />
       <span>{message}</span>
     </div>
   )
 }
 
-export function EmptyState({
-  icon,
+/* ----------------------------------------------------------------- painel */
+
+export function Panel({
   title,
-  message,
-  actionTitle,
-  onAction,
+  gap = 'lg',
+  children,
 }: {
-  icon: ReactNode
-  title: string
-  message: string
-  actionTitle?: string
-  onAction?: () => void
+  title?: string
+  gap?: 'none' | 'md' | 'lg'
+  children: ReactNode
 }) {
   return (
-    <div className="cb-empty-state">
-      <span className="cb-empty-state__icon">{icon}</span>
-      <h3 className="cb-empty-state__title">{title}</h3>
-      <p className="cb-empty-state__message">{message}</p>
-      {actionTitle && onAction && (
-        <Button title={actionTitle} kind="secondary" size="compact" fillsWidth={false} onClick={onAction} />
-      )}
+    <section className={`cb-panel cb-panel--gap-${gap}`}>
+      {title && <h2 className="cb-panel__title">{title}</h2>}
+      {children}
+    </section>
+  )
+}
+
+/** Web / Card de indicador. */
+export function StatCard({
+  tone,
+  value,
+  label,
+}: {
+  tone: 'brand' | 'warning' | 'neutral'
+  value: number | string
+  label: string
+}) {
+  return (
+    <div className={`cb-stat cb-stat--${tone}`}>
+      <p className="cb-stat__value">{value}</p>
+      <p className="cb-stat__label">{label}</p>
     </div>
   )
 }
 
-export function Skeleton({ height = 16, width }: { height?: number; width?: number | string }) {
-  return <div className="cb-skeleton" style={{ height, width: width ?? '100%' }} aria-hidden="true" />
+/* --------------------------------------------------- cabecalho da pagina */
+
+export interface Crumb {
+  label: string
+  to?: string
 }
 
-export function DisabledTag({ text = strings.common.soon }: { text?: string }) {
+export function Breadcrumbs({ items }: { items: readonly Crumb[] }) {
   return (
-    <span className="cb-disabled-tag">
-      <CbIcon.underConstruction size={12} />
-      {text}
-    </span>
+    <nav className="cb-crumbs" aria-label={strings.common.breadcrumbs}>
+      {items.map((item, index) => {
+        const isLast = index === items.length - 1
+        return (
+          <span key={`${item.label}-${index}`} className="cb-crumbs__item">
+            {isLast || !item.to ? (
+              <span
+                className={cx('cb-crumbs__label', isLast && 'cb-crumbs__label--current')}
+                aria-current={isLast ? 'page' : undefined}
+              >
+                {item.label}
+              </span>
+            ) : (
+              <Link className="cb-crumbs__label" to={item.to}>
+                {item.label}
+              </Link>
+            )}
+            {!isLast && <Icon name="chevron_right" size={16} tone="tertiary" />}
+          </span>
+        )
+      })}
+    </nav>
   )
 }
 
-export function BrandMark() {
-  return <span className="cb-brand-mark">{strings.app.name}</span>
+export function PageHeader({
+  crumbs,
+  title,
+  subtitle,
+  action,
+}: {
+  crumbs: readonly Crumb[]
+  title: string
+  subtitle?: string
+  action?: ReactNode
+}) {
+  return (
+    <>
+      <Breadcrumbs items={crumbs} />
+      <header className="cb-page-header">
+        <div className="cb-page-header__text">
+          <h1 className="cb-page-header__title">{title}</h1>
+          {subtitle && <p className="cb-page-header__subtitle">{subtitle}</p>}
+        </div>
+        {action && <div className="cb-page-header__action">{action}</div>}
+      </header>
+    </>
+  )
 }
 
-/**
- * Dialogo de confirmacao. Fecha com Escape e por clique fora, devolve o foco
- * para quem o abriu e prende o Tab dentro dele enquanto estiver aberto.
- */
-export function ConfirmDialog({
-  isOpen,
+/* ----------------------------------------------------------------- estado */
+
+/** Caixa de estado da lista: vazio, erro de rede e afins. */
+export function StateBox({
+  icon,
+  iconTone = 'tertiary',
+  iconSize = 48,
+  title,
+  titleSize = 'headline',
+  message,
+  children,
+}: {
+  icon: IconName
+  iconTone?: 'tertiary' | 'brand'
+  iconSize?: number
+  title: string
+  titleSize?: 'headline' | 'title'
+  message: string
+  children?: ReactNode
+}) {
+  return (
+    <div className="cb-state">
+      <Icon name={icon} size={iconSize} tone={iconTone} />
+      <h2 className={`cb-state__title cb-state__title--${titleSize}`}>{title}</h2>
+      <p className="cb-state__message">{message}</p>
+      {children && <div className="cb-state__actions">{children}</div>}
+    </div>
+  )
+}
+
+/** Estado de carregamento da lista: cinco linhas de barras. */
+export function SkeletonRows() {
+  return (
+    <div className="cb-state cb-state--loading" role="status" aria-label={strings.common.loading}>
+      {Array.from({ length: 5 }, (_, row) => (
+        <div key={row} className="cb-skeleton-row">
+          {[280, 120, 80, 100].map((width) => (
+            <span key={width} className="cb-skeleton" style={{ width }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ modal */
+
+export function Modal({
   title,
   message,
-  confirmTitle,
-  cancelTitle,
-  isDestructive = false,
-  isBusy = false,
-  onConfirm,
-  onCancel,
+  children,
+  actions,
+  onDismiss,
 }: {
-  isOpen: boolean
   title: string
-  message: string
-  confirmTitle: string
-  cancelTitle: string
-  isDestructive?: boolean
-  isBusy?: boolean
-  onConfirm: () => void
-  onCancel: () => void
+  message?: string
+  children?: ReactNode
+  /** Na ordem do desktop: a acao principal por ultimo. */
+  actions: ReactNode
+  onDismiss: () => void
 }) {
-  const panel = useRef<HTMLDivElement>(null)
   const titleId = useId()
-  const messageId = useId()
+  const panel = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!isOpen) return
-    const opener = document.activeElement as HTMLElement | null
-    panel.current?.querySelector<HTMLElement>('button')?.focus()
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onCancel()
-        return
-      }
-      if (event.key !== 'Tab' || panel.current === null) return
-      const targets = panel.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled])',
-      )
-      if (targets.length === 0) return
-      const first = targets[0]!
-      const last = targets[targets.length - 1]!
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault()
-        first.focus()
-      }
+    const previous = document.activeElement as HTMLElement | null
+    panel.current?.focus()
+    function onKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === 'Escape') onDismiss()
     }
-
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('keydown', onKeyDown)
-      opener?.focus()
+      previous?.focus()
     }
-  }, [isOpen, onCancel])
-
-  if (!isOpen) return null
+  }, [onDismiss])
 
   return (
-    <div
-      className="cb-overlay"
-      role="presentation"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onCancel()
-      }}
-    >
+    <div className="cb-overlay">
       <div
-        ref={panel}
-        className="cb-dialog"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={messageId}
+        className="cb-overlay__stage"
+        onPointerDown={(event) => {
+          if (event.target === event.currentTarget) onDismiss()
+        }}
       >
-        <h2 id={titleId} className="cb-dialog__title">
-          {title}
-        </h2>
-        <p id={messageId} className="cb-dialog__message">
-          {message}
-        </p>
-        <div className="cb-dialog__actions">
-          <button
-            type="button"
-            className="cb-dialog__cancel"
-            disabled={isBusy}
-            onClick={onCancel}
-          >
-            {cancelTitle}
-          </button>
-          <button
-            type="button"
-            className={
-              isDestructive ? 'cb-dialog__destructive' : 'cb-dialog__confirm'
-            }
-            disabled={isBusy}
-            onClick={onConfirm}
-          >
-            {isBusy ? strings.common.loading : confirmTitle}
-          </button>
+        <div
+          ref={panel}
+          className="cb-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          tabIndex={-1}
+        >
+          <h2 id={titleId} className="cb-modal__title">
+            {title}
+          </h2>
+          {message && <p className="cb-modal__message">{message}</p>}
+          {children}
+          <div className="cb-modal__actions">{actions}</div>
         </div>
       </div>
     </div>
   )
 }
 
-/** Chip que liga e desliga, usado nos documentos exigidos. */
-export function ToggleChip({
-  title,
-  isSelected,
-  isEnabled = true,
-  onClick,
-}: {
-  title: string
-  isSelected: boolean
+/* ------------------------------------------------------------------- menu */
+
+export interface MenuAction {
+  label: string
   isEnabled?: boolean
-  onClick: () => void
-}) {
+  isDanger?: boolean
+  onSelect: () => void
+}
+
+/** Menu de mais acoes (more_vert) das linhas da tabela no tablet. */
+export function ActionMenu({ label, actions }: { label: string; actions: readonly MenuAction[] }) {
+  const [isOpen, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    function onPointerDown(event: PointerEvent) {
+      if (root.current && !root.current.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [isOpen])
+
   return (
-    <button
-      type="button"
-      className={['cb-chip', isSelected ? 'cb-chip--selected' : '']
-        .filter(Boolean)
-        .join(' ')}
-      aria-pressed={isSelected}
-      disabled={!isEnabled}
-      onClick={onClick}
-    >
-      {title}
-    </button>
+    <div className="cb-action-menu" ref={root}>
+      <IconButton
+        icon="more_vert"
+        label={label}
+        expanded={isOpen}
+        onClick={() => setOpen((current) => !current)}
+      />
+      {isOpen && (
+        <ul className="cb-menu cb-action-menu__list" role="menu">
+          {actions.map((action) => (
+            <li key={action.label} role="none">
+              <button
+                type="button"
+                role="menuitem"
+                className={cx('cb-menu__item', action.isDanger && 'cb-menu__item--danger')}
+                disabled={action.isEnabled === false}
+                onClick={() => {
+                  setOpen(false)
+                  action.onSelect()
+                }}
+              >
+                {action.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
+}
+
+/* ----------------------------------------------------------------- tabela */
+
+export interface TableColumn<T> {
+  title: string
+  /** Largura fixa em px; sem ela a coluna ocupa o que sobra. */
+  width?: number
+  cell: (item: T) => ReactNode
+}
+
+/**
+ * Tabela do painel. As colunas mudam por largura (quem chama decide quais
+ * passar) e a ultima coluna, sem titulo, guarda as acoes da linha.
+ */
+export function DataTable<T>({
+  columns,
+  items,
+  rowKey,
+  actions,
+  actionsWidth,
+}: {
+  columns: readonly TableColumn<T>[]
+  items: readonly T[]
+  rowKey: (item: T) => string
+  actions: (item: T) => ReactNode
+  actionsWidth: number
+}) {
+  const template = [
+    ...columns.map((column) => (column.width ? `${column.width}px` : 'minmax(0, 1fr)')),
+    `${actionsWidth}px`,
+  ].join(' ')
+  return (
+    <div className="cb-table" role="table">
+      <div className="cb-table__row cb-table__row--head" role="row" style={{ gridTemplateColumns: template }}>
+        {columns.map((column) => (
+          <span key={column.title} role="columnheader">
+            {column.title}
+          </span>
+        ))}
+        <span role="columnheader">
+          <span className="cb-visually-hidden">{strings.common.actions}</span>
+        </span>
+      </div>
+      {items.map((item) => (
+        <div
+          key={rowKey(item)}
+          className="cb-table__row"
+          role="row"
+          style={{ gridTemplateColumns: template }}
+        >
+          {columns.map((column, index) => (
+            <span
+              key={column.title}
+              role="cell"
+              className={cx('cb-table__cell', index === 0 && 'cb-table__cell--strong')}
+            >
+              {column.cell(item)}
+            </span>
+          ))}
+          <span role="cell" className="cb-table__cell cb-table__cell--actions">
+            {actions(item)}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* ---------------------------------------------------------------- largura */
+
+export type Viewport = 'desktop' | 'tablet' | 'mobile'
+
+function readViewport(): Viewport {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return 'desktop'
+  if (window.matchMedia('(max-width: 767px)').matches) return 'mobile'
+  if (window.matchMedia('(max-width: 1199px)').matches) return 'tablet'
+  return 'desktop'
+}
+
+/** As tres larguras do Figma: desktop (1440), tablet (834) e mobile (390). */
+export function useViewport(): Viewport {
+  const [viewport, setViewport] = useState<Viewport>(readViewport)
+  useEffect(() => {
+    const update = () => setViewport(readViewport())
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+  return viewport
 }

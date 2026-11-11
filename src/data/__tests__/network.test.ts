@@ -192,7 +192,7 @@ describe('Datas do demo', () => {
     expect(rebased.map((item) => relativeDay(String(item.receivedAt), now))).toEqual([
       'Hoje',
       'Ontem',
-      '3 dias',
+      'Há 3 dias',
     ])
   })
 

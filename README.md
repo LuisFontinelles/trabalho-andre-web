@@ -25,18 +25,24 @@ O backend ainda não existe. A aplicação roda inteira sobre um servidor simula
 |---|---|
 | Login | Pronto, sobre fixture |
 | Cadastro de profissional, com conselho e registro | Pronto, com validação completa |
-| Verificação por código de 4 dígitos | Pronto |
-| Minhas oportunidades, com indicadores e tabela | Pronto |
-| Encerrar e excluir oportunidade | Pronto |
+| Verificação por código de 4 dígitos, com reenvio cronometrado | Pronto |
+| Cadastro em verificação, com aviso no painel | Pronto |
+| Recuperação de senha | Pronto, sobre fixture |
+| Minhas oportunidades: indicadores, tabela e estados vazio, carregando e erro | Pronto |
+| Encerrar oportunidade e excluir rascunho, com confirmação | Pronto |
 | Nova oportunidade, nos três passos do protótipo | Pronto |
+| Salvar rascunho e tela de oportunidade publicada | Pronto |
 | Editar oportunidade | Pronto |
-| Triagem: perguntas editáveis e documentos exigidos | Pronto |
+| Triagem: perguntas com tipo de resposta e documentos exigidos | Pronto |
 | Solicitações recebidas, com filtro por status | Pronto |
 | Detalhe da solicitação: triagem, documentos, decisão e mensagens | Pronto |
-| Abrir documento anexado | **Desativado e marcado** |
-| Recuperação de senha | **Desativada e marcada** |
+| Aprovar, recusar com motivo e pedir informações | Pronto |
+| Abrir documento anexado | Pronto, com a pré-visualização do protótipo |
+| Baixar documento anexado | **Desativado e marcado** |
+| Configurações: perfil, tema claro e escuro, avisos e dados da conta | Pronto |
+| Ver a oportunidade como paciente | **Desativado e marcado** |
 
-As telas seguem o protótipo do profissional entregue pelo grupo: tabela de oportunidades com status e ações por linha, solicitações com chips de contagem, e o formulário em três passos.
+As telas seguem o protótipo do Figma nas três larguras: **desktop** (1440, menu lateral completo), **tablet** (834, trilho de ícones) e **mobile** (390, barra superior e menu recolhido). No mobile as tabelas viram cartões e as linhas de campos viram colunas. Os tokens de cor, espaço e raio, a escala de texto em Inter e os ícones Material Symbols Rounded são os do arquivo de design, com tema claro e escuro.
 
 Recursos ainda não construídos ficam visíveis e explicitamente desabilitados, em vez de escondidos. É a mesma regra adotada no aplicativo iOS: dá para enxergar o que falta usando a aplicação, sem abrir o código.
 
@@ -76,7 +82,7 @@ O cadastro aceita e-mails novos: o registro fica guardado em memória e a verifi
 
 ## Testes
 
-271 testes em Vitest, com **95,8% de cobertura de linhas** em domínio e camada de dados.
+332 testes em Vitest, com **97,6% de cobertura de linhas** em domínio e camada de dados.
 
 | Suíte | O que cobre |
 |---|---|

@@ -3,7 +3,10 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { App } from '@/app/App'
 import { DependenciesProvider, SessionProvider } from '@/app/session'
+import { applyTheme, readTheme } from '@/app/theme'
 import '@/designSystem/tokens/tokens.css'
+
+applyTheme(readTheme())
 
 const container = document.getElementById('root')
 if (container === null) throw new Error('Elemento #root nao encontrado')

@@ -18,6 +18,8 @@ export interface AuthRepository {
   signUp(draft: SignUpDraft): Promise<PendingVerification>
   verify(email: string, code: string): Promise<Session>
   resendCode(email: string): Promise<void>
+  /** Envia o link de nova senha. Nao diz se o e-mail tem conta. */
+  requestPasswordReset(email: string): Promise<void>
   professionalCatalog(): Promise<ProfessionalCatalog>
 }
 

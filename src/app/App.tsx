@@ -1,13 +1,16 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/app/AppShell'
 import { useSession } from '@/app/session'
-import { LoginPage } from '@/presentation/Login/LoginPage'
+import { LoginPage } from '@/presentation/Auth/LoginPage'
+import { RecoverPasswordPage } from '@/presentation/Auth/RecoverPasswordPage'
+import { SignUpPage } from '@/presentation/Auth/SignUpPage'
+import { UnderReviewPage } from '@/presentation/Auth/UnderReviewPage'
+import { VerificationPage } from '@/presentation/Auth/VerificationPage'
 import { MyOpportunitiesPage } from '@/presentation/MyOpportunities/MyOpportunitiesPage'
 import { NewOpportunityPage } from '@/presentation/NewOpportunity/NewOpportunityPage'
 import { RequestDetailPage } from '@/presentation/Requests/RequestDetailPage'
 import { RequestsPage } from '@/presentation/Requests/RequestsPage'
-import { SignUpPage } from '@/presentation/SignUp/SignUpPage'
-import { VerificationPage } from '@/presentation/Verification/VerificationPage'
+import { SettingsPage } from '@/presentation/Settings/SettingsPage'
 import type { ReactNode } from 'react'
 import '@/app/layout.css'
 
@@ -52,6 +55,22 @@ export function App() {
         }
       />
       <Route
+        path="/recuperar-senha"
+        element={
+          <GuestOnly>
+            <RecoverPasswordPage />
+          </GuestOnly>
+        }
+      />
+      <Route
+        path="/cadastro-em-verificacao"
+        element={
+          <RequireSession>
+            <UnderReviewPage />
+          </RequireSession>
+        }
+      />
+      <Route
         element={
           <RequireSession>
             <AppShell />
@@ -63,6 +82,7 @@ export function App() {
         <Route path="/oportunidades/:id/editar" element={<NewOpportunityPage />} />
         <Route path="/solicitacoes" element={<RequestsPage />} />
         <Route path="/solicitacoes/:id" element={<RequestDetailPage />} />
+        <Route path="/configuracoes" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

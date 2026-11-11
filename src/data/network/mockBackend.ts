@@ -251,6 +251,19 @@ const listMyOpportunities: Handler = () => ({
   },
 })
 
+/** Campos do formulario que o servidor guarda como vieram. */
+function formFieldsOf(request: Record<string, unknown>): Record<string, unknown> {
+  return {
+    description: request.description ?? null,
+    serviceType: request.serviceType ?? null,
+    audiences: Array.isArray(request.audiences) ? request.audiences : [],
+    cep: request.cep ?? null,
+    eligibility: request.eligibility ?? null,
+    noRestrictions: request.noRestrictions === true,
+    contactMethod: request.contactMethod ?? null,
+  }
+}
+
 const createOpportunity: Handler = (body) => {
   const request = body as Record<string, unknown> | null
   if (!request) return errorPayload('Bad Request: malformed body', 400, 'Bad Request')
@@ -264,15 +277,32 @@ const createOpportunity: Handler = (body) => {
     filledVacancies: 0,
     totalVacancies: Number(request.totalVacancies ?? 0),
     applicationCount: 0,
-    status: 'ATIVA',
+    status: request.status === 'RASCUNHO' ? 'RASCUNHO' : 'ATIVA',
     modality: String(request.modality ?? 'presencial'),
     address: request.address ?? null,
-    opensAt: request.opensAt ?? null,
-    closesAt: request.closesAt ?? null,
+    opensAt: request.opensAt || null,
+    closesAt: request.closesAt || null,
+    ...formFieldsOf(request),
     updatedAt: new Date().toISOString(),
   }
   panel.opportunities = [created, ...panel.opportunities]
   return { status: 201, body: created }
+}
+
+/** O detalhe de um pedido: a base da fixture com os dados da linha da lista. */
+function requestDetailOf(listed: Record<string, unknown>): Record<string, unknown> {
+  const base = panel.detail ?? loadFixture<Record<string, unknown>>('request_detail')
+  return {
+    ...base,
+    id: listed.id,
+    patientName: listed.patientName,
+    opportunityId: listed.opportunityId,
+    opportunityTitle: listed.opportunityTitle,
+    receivedAt: listed.receivedAt,
+    status: listed.status,
+    protocol: listed.protocol ?? null,
+    decidedAt: listed.decidedAt ?? null,
+  }
 }
 
 const listRequests: Handler = () => ({
@@ -291,6 +321,8 @@ const ROUTES: Route[] = [
   { method: 'POST', pattern: '/v1/auth/signup', status: 201, fixture: 'auth_signup', latencyMs: 450, respond: signUpResponder },
   { method: 'POST', pattern: '/v1/auth/verify', status: 200, fixture: 'auth_login', latencyMs: 400, respond: verifyResponder },
   { method: 'POST', pattern: '/v1/auth/resend-code', status: 204, fixture: null, latencyMs: 350 },
+  // Responde igual exista ou nao a conta, para nao revelar quem tem cadastro.
+  { method: 'POST', pattern: '/v1/auth/password-reset', status: 204, fixture: null, latencyMs: 400 },
   { method: 'GET', pattern: '/v1/auth/professional-catalog', status: 200, fixture: 'professional_catalog', latencyMs: 200 },
   { method: 'GET', pattern: '/v1/opportunities', status: 200, fixture: 'opportunities', latencyMs: 350 },
   { method: 'GET', pattern: '/v1/opportunities/{id}', status: 200, fixture: 'opportunity_detail', latencyMs: 250 },
@@ -341,8 +373,14 @@ const ROUTES: Route[] = [
         totalVacancies: Number(request.totalVacancies ?? current.totalVacancies),
         modality: String(request.modality ?? current.modality),
         address: request.address ?? null,
-        opensAt: request.opensAt ?? current.opensAt,
-        closesAt: request.closesAt ?? current.closesAt,
+        opensAt: request.opensAt || current.opensAt,
+        closesAt: request.closesAt || current.closesAt,
+        ...formFieldsOf(request),
+        // Publicar um rascunho muda o status; salvar de novo como rascunho, nao.
+        status:
+          current.status === 'RASCUNHO' && request.status !== 'RASCUNHO'
+            ? 'ATIVA'
+            : current.status,
         updatedAt: new Date().toISOString(),
       }
       panel.opportunities = panel.opportunities.map((item) =>
@@ -364,48 +402,40 @@ const ROUTES: Route[] = [
       const id = pathIdOf(path, 3)
       const listed = panel.requests.find((item) => item.id === id)
       if (!listed) return { status: 404, body: loadFixture('error_404') }
-      const base = panel.detail ?? loadFixture<Record<string, unknown>>('request_detail')
-      return {
-        status: 200,
-        body: {
-          ...base,
-          id,
-          patientName: listed.patientName,
-          opportunityId: listed.opportunityId,
-          opportunityTitle: listed.opportunityTitle,
-          receivedAt: listed.receivedAt,
-          status: listed.status,
-        },
-      }
+      return { status: 200, body: requestDetailOf(listed) }
     } },
   { method: 'POST', pattern: '/v1/professional/requests/{id}/decision', status: 200, fixture: null, latencyMs: 350,
     respond: (body, path) => {
       const id = pathIdOf(path, 3)
-      const request = body as { status?: string } | null
+      const request = body as { status?: string; reason?: string } | null
       const status = request?.status
       if (status !== 'EM_ANALISE' && status !== 'APROVADA' && status !== 'RECUSADA') {
         return errorPayload('Unprocessable Entity: unknown status', 422, 'Unprocessable Entity')
       }
       const listed = panel.requests.find((item) => item.id === id)
       if (!listed) return { status: 404, body: loadFixture('error_404') }
-      panel.requests = panel.requests.map((item) =>
-        item.id === id
-          ? { ...item, status, canMessage: status === 'APROVADA' }
-          : item,
-      )
-      const base = panel.detail ?? loadFixture<Record<string, unknown>>('request_detail')
-      return {
-        status: 200,
-        body: {
-          ...base,
-          id,
-          patientName: listed.patientName,
-          opportunityId: listed.opportunityId,
-          opportunityTitle: listed.opportunityTitle,
-          receivedAt: listed.receivedAt,
-          status,
-        },
+      const decided = {
+        ...listed,
+        status,
+        canMessage: status === 'APROVADA',
+        decidedAt: status === 'EM_ANALISE' ? null : new Date().toISOString(),
+        decisionReason: status === 'RECUSADA' ? (request?.reason ?? null) : null,
       }
+      panel.requests = panel.requests.map((item) => (item.id === id ? decided : item))
+      return { status: 200, body: requestDetailOf(decided) }
+    } },
+  { method: 'POST', pattern: '/v1/professional/requests/{id}/info-request', status: 200, fixture: null, latencyMs: 350,
+    respond: (body, path) => {
+      const id = pathIdOf(path, 3)
+      const request = body as { text?: string } | null
+      if ((request?.text ?? '').trim() === '') {
+        return errorPayload('Unprocessable Entity: empty request', 422, 'Unprocessable Entity')
+      }
+      const listed = panel.requests.find((item) => item.id === id)
+      if (!listed) return { status: 404, body: loadFixture('error_404') }
+      const waiting = { ...listed, status: 'AGUARDANDO_INFO' }
+      panel.requests = panel.requests.map((item) => (item.id === id ? waiting : item))
+      return { status: 200, body: requestDetailOf(waiting) }
     } },
   { method: 'POST', pattern: '/v1/professional/requests/{id}/messages', status: 201, fixture: null, latencyMs: 250,
     respond: (body) => {

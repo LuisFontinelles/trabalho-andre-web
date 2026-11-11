@@ -135,6 +135,13 @@ export function makeResendCode(repository: AuthRepository) {
   return (email: string): Promise<void> => repository.resendCode(email)
 }
 
+export function makeRequestPasswordReset(repository: AuthRepository) {
+  return async (email: string): Promise<void> => {
+    validateEmail(email)
+    await repository.requestPasswordReset(email.trim().toLowerCase())
+  }
+}
+
 export function makeLoadProfessionalCatalog(repository: AuthRepository) {
   return (): Promise<ProfessionalCatalog> => repository.professionalCatalog()
 }

@@ -143,6 +143,10 @@ A sessão devolvida precisa refletir **quem se cadastrou**, não uma conta fixa:
 
 Requisição `{ "email": "joana.lima@teste.com" }`. Resposta 204, sem corpo.
 
+### POST /v1/auth/password-reset
+
+Requisição `{ "email": "joana.lima@teste.com" }`. Resposta 204, sem corpo, exista ou não uma conta com esse e-mail: a resposta não pode revelar quem tem cadastro. O link enviado vale por 30 minutos.
+
 ### POST /v1/auth/refresh
 
 Requisição `{ "refreshToken": "..." }`.

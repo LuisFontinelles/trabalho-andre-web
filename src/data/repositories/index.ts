@@ -82,6 +82,14 @@ export function createAuthRepository(client: HttpClient): AuthRepository {
       })
     },
 
+    async requestPasswordReset(email): Promise<void> {
+      await client.sendVoid({
+        path: 'auth/password-reset',
+        method: 'POST',
+        body: { email },
+      })
+    },
+
     async professionalCatalog(): Promise<ProfessionalCatalog> {
       const dto = await client.send<ProfessionalCatalogDTO>({
         path: 'auth/professional-catalog',

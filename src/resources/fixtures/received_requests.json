@@ -8,7 +8,8 @@
       "receivedAt": "2026-10-21T09:12:00Z",
       "status": "APROVADA",
       "hasUnreadMessage": true,
-      "canMessage": true
+      "canMessage": true,
+      "protocol": "20418"
     },
     {
       "id": "req-002",
@@ -18,7 +19,8 @@
       "receivedAt": "2026-10-20T15:40:00Z",
       "status": "EM_ANALISE",
       "hasUnreadMessage": true,
-      "canMessage": true
+      "canMessage": true,
+      "protocol": "20419"
     },
     {
       "id": "req-003",
@@ -28,7 +30,8 @@
       "receivedAt": "2026-10-19T11:05:00Z",
       "status": "APROVADA",
       "hasUnreadMessage": false,
-      "canMessage": false
+      "canMessage": false,
+      "protocol": "20420"
     },
     {
       "id": "req-004",
@@ -38,7 +41,8 @@
       "receivedAt": "2026-10-18T16:20:00Z",
       "status": "RECUSADA",
       "hasUnreadMessage": false,
-      "canMessage": false
+      "canMessage": false,
+      "protocol": "20421"
     }
   ],
   "page": 1,

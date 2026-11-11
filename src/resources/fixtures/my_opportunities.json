@@ -14,6 +14,16 @@
       "address": "Rua das Flores, 120, Brasília",
       "opensAt": "2026-09-01",
       "closesAt": "2026-10-15",
+      "description": "Avaliação cardiológica com ECG, voltada a pacientes sem convênio. Requer triagem prévia.",
+      "serviceType": "consulta",
+      "audiences": [
+        "adultos",
+        "idosos"
+      ],
+      "cep": "70000-000",
+      "eligibility": "Adultos sem convênio, moradores do DF.",
+      "noRestrictions": false,
+      "contactMethod": "plataforma",
       "updatedAt": "2026-10-05T14:00:00Z"
     },
     {
@@ -30,6 +40,15 @@
       "address": "Quadra 302, Brasília",
       "opensAt": "2026-08-20",
       "closesAt": "2026-10-10",
+      "description": "Sessões de fisioterapia para recuperação de lesões ortopédicas, com avaliação inicial.",
+      "serviceType": "terapia",
+      "audiences": [
+        "adultos"
+      ],
+      "cep": "70000-000",
+      "eligibility": null,
+      "noRestrictions": true,
+      "contactMethod": "plataforma",
       "updatedAt": "2026-10-04T10:30:00Z"
     },
     {
@@ -46,6 +65,13 @@
       "address": "Hospital Universitário, Brasília",
       "opensAt": null,
       "closesAt": null,
+      "description": "",
+      "serviceType": null,
+      "audiences": [],
+      "cep": null,
+      "eligibility": null,
+      "noRestrictions": false,
+      "contactMethod": null,
       "updatedAt": "2026-10-18T09:00:00Z"
     },
     {
@@ -62,6 +88,16 @@
       "address": null,
       "opensAt": "2026-07-10",
       "closesAt": "2026-09-30",
+      "description": "Orientação nutricional para praticantes de esporte amador, com plano alimentar.",
+      "serviceType": "consulta",
+      "audiences": [
+        "adolescentes",
+        "adultos"
+      ],
+      "cep": null,
+      "eligibility": "Praticantes de esporte amador.",
+      "noRestrictions": false,
+      "contactMethod": "telefone",
       "updatedAt": "2026-09-30T18:00:00Z"
     },
     {
@@ -78,6 +114,15 @@
       "address": null,
       "opensAt": "2026-10-01",
       "closesAt": "2026-12-20",
+      "description": "Atendimento psicológico individual para adultos, com encontros semanais de 50 minutos.",
+      "serviceType": "terapia",
+      "audiences": [
+        "adultos"
+      ],
+      "cep": null,
+      "eligibility": null,
+      "noRestrictions": true,
+      "contactMethod": "plataforma",
       "updatedAt": "2026-10-20T11:15:00Z"
     },
     {
@@ -94,6 +139,17 @@
       "address": "Espaço Cuidar, Brasília",
       "opensAt": "2026-10-05",
       "closesAt": "2026-11-30",
+      "description": "Avaliação odontológica completa com orientação de higiene e encaminhamento quando preciso.",
+      "serviceType": "exame",
+      "audiences": [
+        "criancas",
+        "adolescentes",
+        "adultos"
+      ],
+      "cep": "70000-000",
+      "eligibility": null,
+      "noRestrictions": true,
+      "contactMethod": "email",
       "updatedAt": "2026-10-21T08:40:00Z"
     }
   ],

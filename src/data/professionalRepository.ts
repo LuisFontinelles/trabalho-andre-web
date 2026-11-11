@@ -25,13 +25,21 @@ import type {
 export interface ProfessionalRepository {
   myOpportunities(): Promise<readonly ManagedOpportunity[]>
   opportunity(id: string): Promise<ManagedOpportunity>
-  createOpportunity(draft: OpportunityDraft): Promise<ManagedOpportunity>
-  updateOpportunity(id: string, draft: OpportunityDraft): Promise<ManagedOpportunity>
+  /** `asDraft` guarda como rascunho em vez de publicar. */
+  createOpportunity(draft: OpportunityDraft, asDraft?: boolean): Promise<ManagedOpportunity>
+  updateOpportunity(
+    id: string,
+    draft: OpportunityDraft,
+    asDraft?: boolean,
+  ): Promise<ManagedOpportunity>
   closeOpportunity(id: string): Promise<void>
   deleteOpportunity(id: string): Promise<void>
   receivedRequests(): Promise<readonly ReceivedRequest[]>
   requestDetail(id: string): Promise<RequestDetail>
-  decideRequest(id: string, status: RequestStatus): Promise<RequestDetail>
+  /** A recusa leva o motivo, que o paciente le. */
+  decideRequest(id: string, status: RequestStatus, reason?: string): Promise<RequestDetail>
+  /** Pede uma informacao que falta; o pedido fica aguardando a resposta. */
+  requestInfo(id: string, text: string): Promise<RequestDetail>
   sendMessage(id: string, text: string): Promise<RequestMessage>
 }
 
@@ -53,20 +61,20 @@ export function createProfessionalRepository(
       return managedOpportunityFromDTO(dto)
     },
 
-    async createOpportunity(draft) {
+    async createOpportunity(draft, asDraft = false) {
       const dto = await client.send<ManagedOpportunityDTO>({
         path: 'professional/opportunities',
         method: 'POST',
-        body: draftToDTO(draft),
+        body: draftToDTO(draft, asDraft ? 'RASCUNHO' : 'ATIVA'),
       })
       return managedOpportunityFromDTO(dto)
     },
 
-    async updateOpportunity(id, draft) {
+    async updateOpportunity(id, draft, asDraft = false) {
       const dto = await client.send<ManagedOpportunityDTO>({
         path: `professional/opportunities/${id}`,
         method: 'PUT',
-        body: draftToDTO(draft),
+        body: draftToDTO(draft, asDraft ? 'RASCUNHO' : 'ATIVA'),
       })
       return managedOpportunityFromDTO(dto)
     },
@@ -99,11 +107,20 @@ export function createProfessionalRepository(
       return requestDetailFromDTO(dto)
     },
 
-    async decideRequest(id, status) {
+    async decideRequest(id, status, reason) {
       const dto = await client.send<RequestDetailDTO>({
         path: `professional/requests/${id}/decision`,
         method: 'POST',
-        body: { status },
+        body: reason === undefined ? { status } : { status, reason: reason.trim() },
+      })
+      return requestDetailFromDTO(dto)
+    },
+
+    async requestInfo(id, text) {
+      const dto = await client.send<RequestDetailDTO>({
+        path: `professional/requests/${id}/info-request`,
+        method: 'POST',
+        body: { text: text.trim() },
       })
       return requestDetailFromDTO(dto)
     },
