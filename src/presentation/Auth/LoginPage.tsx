@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useDependencies, useSession } from '@/app/session'
+import { rememberedRegistration, useDependencies, useSession } from '@/app/session'
 import { Banner, Button, TextField } from '@/designSystem/components'
 import { NetworkError } from '@/data/network/httpClient'
+import { WrongProfileError } from '@/domain/entities'
 import { ValidationError } from '@/domain/useCases'
 import { AuthCard } from '@/presentation/Auth/AuthCard'
 import { strings } from '@/resources/strings'
@@ -20,6 +21,7 @@ export function LoginPage() {
   const [isSubmitting, setSubmitting] = useState(false)
 
   function messageFor(error: unknown): string {
+    if (error instanceof WrongProfileError) return strings.login.notProfessional
     if (error instanceof NetworkError) {
       if (error.kind === 'unauthorized' || error.kind === 'notFound') {
         return strings.login.invalidCredentials
@@ -37,8 +39,17 @@ export function LoginPage() {
     setSubmitting(true)
     try {
       const result = await dependencies.login(email, password)
-      session.signIn(result)
-      navigate('/oportunidades', { replace: true })
+      if (result.isVerified === undefined) {
+        // Backend de fixtures: nao informa a conferencia do registro.
+        session.signIn(result)
+        navigate('/oportunidades', { replace: true })
+        return
+      }
+      session.signIn(result, {
+        registration: rememberedRegistration(result.user.email),
+        isVerified: result.isVerified,
+      })
+      navigate(result.isVerified ? '/oportunidades' : '/cadastro-em-verificacao', { replace: true })
     } catch (error) {
       if (error instanceof ValidationError) {
         if (error.code === 'emailRequired' || error.code === 'emailInvalid') {

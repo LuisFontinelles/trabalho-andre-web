@@ -44,6 +44,7 @@ export const strings = {
     emailRequired: 'Informe seu e-mail.',
     emailInvalid: 'E-mail inválido.',
     passwordRequired: 'Informe sua senha.',
+    notProfessional: 'Esta conta não é de profissional de saúde. Use o app CareBridge para pacientes.',
   },
   signUp: {
     title: 'Criar conta de profissional',

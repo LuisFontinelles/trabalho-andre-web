@@ -104,6 +104,7 @@ export function pendingVerificationFromDTO(
     email: dto.email,
     profile: userProfileFrom(dto.profile),
     codeLength: dto.codeLength,
+    requiresCode: true,
   }
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useDependencies } from '@/app/session'
+import { rememberRegistration, useDependencies, useSession } from '@/app/session'
 import { Banner, Button, SelectField, TextField } from '@/designSystem/components'
 import { NetworkError } from '@/data/network/httpClient'
 import {
@@ -25,6 +25,7 @@ export interface SignUpHandoff {
 
 export function SignUpPage() {
   const dependencies = useDependencies()
+  const session = useSession()
   const navigate = useNavigate()
 
   const [draft, setDraft] = useState<SignUpDraft>(emptySignUpDraft)
@@ -69,10 +70,20 @@ export function SignUpPage() {
       })
       const council = catalog.councils.find((item) => item.id === draft.professional.councilId)
       const state = catalog.states.find((item) => item.id === draft.professional.stateId)
+      const registration = `${council?.label ?? ''}/${state?.label ?? ''} ${draft.professional.number.trim()}`
+      if (!pending.requiresCode) {
+        // API real: a conta ja existe e o registro aguarda conferencia.
+        // Entramos com a senha recem-criada para nao pedir login de novo.
+        rememberRegistration(pending.email, registration)
+        const result = await dependencies.login(pending.email, draft.password)
+        session.signIn(result, { registration, isVerified: result.isVerified ?? false })
+        navigate('/cadastro-em-verificacao', { replace: true })
+        return
+      }
       const handoff: SignUpHandoff = {
         email: pending.email,
         codeLength: pending.codeLength,
-        registration: `${council?.label ?? ''}/${state?.label ?? ''} ${draft.professional.number.trim()}`,
+        registration,
       }
       navigate('/verificacao', { state: handoff })
     } catch (error) {

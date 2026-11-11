@@ -22,6 +22,22 @@ export function firstName(user: User): string {
 export interface Session {
   readonly token: string
   readonly user: User
+  /**
+   * Se o registro profissional ja foi conferido. A API real informa no login;
+   * o backend de fixtures nao, e ai fica indefinido.
+   */
+  readonly isVerified?: boolean
+}
+
+/** A conta existe, mas nao e do perfil que este app atende. */
+export class WrongProfileError extends Error {
+  readonly profile: UserProfile
+
+  constructor(profile: UserProfile) {
+    super(`Perfil ${profile} nao acessa o painel`)
+    this.name = 'WrongProfileError'
+    this.profile = profile
+  }
 }
 
 /** Cadastro aceito pelo servidor, aguardando o codigo enviado por e-mail. */
@@ -29,6 +45,11 @@ export interface PendingVerification {
   readonly email: string
   readonly profile: UserProfile
   readonly codeLength: number
+  /**
+   * A API real cria a conta direto, sem codigo por e-mail. Quando e falso, o
+   * app entra com a senha recem-criada em vez de abrir a tela do codigo.
+   */
+  readonly requiresCode: boolean
 }
 
 export const DEFAULT_CODE_LENGTH = 4

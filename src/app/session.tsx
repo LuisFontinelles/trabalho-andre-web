@@ -41,6 +41,32 @@ const VERIFIED_PROFILE: ProfessionalProfile = {
   isVerified: true,
 }
 
+const REGISTRATIONS_KEY = 'carebridge.registrations'
+
+/**
+ * O login da API real nao devolve o registro profissional. Guardamos o que a
+ * pessoa digitou no cadastro, por e-mail, para o painel poder mostra-lo nas
+ * proximas entradas neste navegador.
+ */
+export function rememberRegistration(email: string, registration: string): void {
+  try {
+    const all = JSON.parse(localStorage.getItem(REGISTRATIONS_KEY) ?? '{}') as Record<string, string>
+    all[email] = registration
+    localStorage.setItem(REGISTRATIONS_KEY, JSON.stringify(all))
+  } catch {
+    // Sem armazenamento o painel so nao mostra o numero do registro.
+  }
+}
+
+export function rememberedRegistration(email: string): string {
+  try {
+    const all = JSON.parse(localStorage.getItem(REGISTRATIONS_KEY) ?? '{}') as Record<string, string>
+    return all[email] ?? ''
+  } catch {
+    return ''
+  }
+}
+
 interface StoredSession {
   session: Session
   profile: ProfessionalProfile

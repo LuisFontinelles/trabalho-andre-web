@@ -70,6 +70,24 @@ Qualquer outro e-mail é recusado com 401, de propósito, para exercitar o estad
 
 O cadastro aceita e-mails novos: o registro fica guardado em memória e a verificação devolve o perfil e o nome cadastrados.
 
+### Login e cadastro com a API real
+
+Login e cadastro do profissional já falam com a [carebridge-api](https://github.com/Joao-Victor-Medeiros/carebridge-api) (Swagger em <https://carebridge-api-2.onrender.com/swagger-ui/index.html>). O restante do painel continua no backend de fixtures.
+
+```bash
+cp .env.example .env.local   # VITE_API_URL=/api
+npm run dev
+```
+
+A API ainda não libera CORS, então o navegador não chama o Render direto: o `npm run dev` repassa `/api/*` para lá. Para apontar para a API rodando na sua máquina, defina `API_PROXY_TARGET=http://localhost:8080` no `.env.local`. Sem `VITE_API_URL` (e no GitHub Pages) tudo segue no mock.
+
+| Tela | Rota da API | Observação |
+|---|---|---|
+| Login | `POST /user/login` | A resposta não traz nome; o painel usa o e-mail até a API devolver `nome`. Conta de paciente é recusada. |
+| Cadastro | `POST /profissional-saude/cadastro` (multipart, parte `dados`) | Conselho, UF e número vão como texto em `documentosRegistro` (`CRM-DF 123456`). Não há código por e-mail: a conta entra direto e cai em "Cadastro em verificação" até um ADMIN aprovar. |
+
+Recuperar senha, código por e-mail e o catálogo de conselhos ainda não existem na API e continuam no mock.
+
 ## Scripts
 
 | Comando | O que faz |

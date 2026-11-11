@@ -84,14 +84,22 @@ export function createHttpClient(
       Accept: 'application/json',
       ...endpoint.headers,
     }
-    if (endpoint.body !== undefined) headers['Content-Type'] = 'application/json'
+    // FormData vai como esta: o navegador monta o multipart e o boundary.
+    const isForm = typeof FormData !== 'undefined' && endpoint.body instanceof FormData
+    if (endpoint.body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
+    const payload: BodyInit | undefined =
+      endpoint.body === undefined
+        ? undefined
+        : isForm
+          ? (endpoint.body as FormData)
+          : JSON.stringify(endpoint.body)
 
     let response: Response
     try {
       response = await fetchImpl(url, {
         method: endpoint.method ?? 'GET',
         headers,
-        body: endpoint.body === undefined ? undefined : JSON.stringify(endpoint.body),
+        body: payload,
       })
     } catch (cause) {
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false
@@ -110,8 +118,12 @@ export function createHttpClient(
     } catch {
       api = null
     }
+    // A API real so manda `message` em parte dos erros e o Spring, quando
+    // nao manda, devolve `error` com a frase padrao do status.
+    if (typeof api !== 'object' || api === null) api = null
+    else if (typeof api.message !== 'string') api = { ...api, message: '' }
 
-    const message = api?.message ?? `HTTP ${response.status}`
+    const message = api?.message || `HTTP ${response.status}`
     if (response.status === 401 || response.status === 403) {
       throw new NetworkError('unauthorized', message, response.status, api)
     }
