@@ -11,8 +11,11 @@ import {
   signUpForm,
 } from '@/data/mappers'
 import { bearer, NetworkError, type HttpClient } from '@/data/network/httpClient'
-import { WrongProfileError, type Session } from '@/domain/entities'
+import type { Session } from '@/domain/entities'
 import type { AuthRepository } from '@/domain/repositories'
+
+export const PROFESSIONAL_SIGNUP_URL = 'http://localhost:8080/profissional-saude/cadastro'
+export const USER_LOGIN_URL = 'http://localhost:8080/user/login'
 
 /**
  * GET /user/me logo depois do login, para ter o nome. A rota e nova no
@@ -28,17 +31,11 @@ async function fetchMe(client: HttpClient, token: string): Promise<MeDTO | null>
   }
 }
 
-/** O painel e so do profissional; paciente e admin usam outros apps. */
-function professionalOnly(session: Session): Session {
-  if (session.user.profile !== 'PROFISSIONAL') throw new WrongProfileError(session.user.profile)
-  return session
-}
-
 /** Acesso (/auth/*) e catalogo da carebridge-api. */
 export function createAuthRepository(client: HttpClient): AuthRepository {
   async function sessionFor(login: LoginResponseDTO, email: string): Promise<Session> {
     const me = await fetchMe(client, login.token)
-    return professionalOnly(sessionFromDTO(login, me, email))
+    return sessionFromDTO(login, me, email)
   }
 
   // /auth/verify so confirma o e-mail e nao devolve token. A senha do cadastro
@@ -46,22 +43,30 @@ export function createAuthRepository(client: HttpClient): AuthRepository {
   const pendingPasswords = new Map<string, string>()
 
   async function login(email: string, password: string): Promise<Session> {
-    const dto = await client.send<LoginResponseDTO>({
-      path: 'auth/login',
+    const { data: dto, status } = await client.sendWithStatus<LoginResponseDTO>({
+      path: USER_LOGIN_URL,
       method: 'POST',
       body: { email, password },
     })
+    if (
+      status !== 200 ||
+      dto.autenticado !== true ||
+      typeof dto.token !== 'string' ||
+      dto.token.trim() === ''
+    ) {
+      throw new NetworkError('decoding', 'Não foi possível iniciar a sessão.', status)
+    }
     return sessionFor(dto, email)
   }
 
   return {
     login,
 
-    async signUp(draft) {
+    async signUp(draft, biographyOrDescription = '', documents = []) {
       const dto = await client.sendOptional<CadastroResponseDTO>({
-        path: 'auth/register',
+        path: PROFESSIONAL_SIGNUP_URL,
         method: 'POST',
-        body: signUpForm(draft),
+        body: signUpForm(draft, biographyOrDescription, documents),
       })
       const pending = pendingVerificationFromDTO(dto, draft.email)
       if (pending.requiresCode) pendingPasswords.set(pending.email, draft.password)

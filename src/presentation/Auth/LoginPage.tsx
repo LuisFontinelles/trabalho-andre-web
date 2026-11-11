@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { rememberedRegistration, useDependencies, useSession } from '@/app/session'
 import { Banner, Button, PasswordField, TextField } from '@/designSystem/components'
 import { NetworkError } from '@/data/network/httpClient'
-import { WrongProfileError } from '@/domain/entities'
 import { ValidationError } from '@/domain/useCases'
 import { AuthCard } from '@/presentation/Auth/AuthCard'
 import { strings } from '@/resources/strings'
@@ -28,7 +27,6 @@ export function LoginPage() {
   const [isSubmitting, setSubmitting] = useState(false)
 
   function messageFor(error: unknown): string {
-    if (error instanceof WrongProfileError) return strings.login.notProfessional
     if (error instanceof NetworkError) {
       // O contrato v2 responde 401 para senha errada; a API de hoje ainda
       // responde 403 nessa rota publica, que so pode querer dizer o mesmo.
@@ -36,6 +34,8 @@ export function LoginPage() {
         return strings.login.invalidCredentials
       }
       if (error.kind === 'tooManyAttempts') return strings.login.tooManyAttempts
+      if (error.kind === 'transport' || error.kind === 'offline') return strings.login.connectionFailed
+      if (error.kind === 'decoding') return strings.login.sessionStartFailed
       return strings.common.failed
     }
     return strings.login.invalidCredentials
@@ -54,7 +54,11 @@ export function LoginPage() {
         registration: result.registration ?? rememberedRegistration(result.user.email),
         isVerified: result.isVerified,
       })
-      navigate(result.isVerified ? '/oportunidades' : '/cadastro-em-verificacao', { replace: true })
+      if (result.authProfile === 'PROFISSIONAL_SAUDE') {
+        navigate('/oportunidades', { replace: true })
+      } else {
+        setFormError(strings.login.notProfessional)
+      }
     } catch (error) {
       if (error instanceof ValidationError) {
         if (error.code === 'emailRequired' || error.code === 'emailInvalid') {

@@ -98,6 +98,13 @@ export function kindForStatus(status: number): NetworkErrorKind {
 }
 
 export function buildUrl(baseUrl: string, endpoint: Endpoint): string {
+  if (/^https?:\/\//i.test(endpoint.path)) {
+    const url = new URL(endpoint.path)
+    for (const key of Object.keys(endpoint.query ?? {}).sort()) {
+      url.searchParams.set(key, endpoint.query![key]!)
+    }
+    return url.toString()
+  }
   const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
   const path = endpoint.path.startsWith('/') ? endpoint.path : `/${endpoint.path}`
   const query = endpoint.query ?? {}
@@ -115,6 +122,7 @@ export function bearer(token: string): Record<string, string> {
 
 export interface HttpClient {
   send<Response>(endpoint: Endpoint): Promise<Response>
+  sendWithStatus<Response>(endpoint: Endpoint): Promise<{ data: Response; status: number }>
   /** Para rotas que podem responder 201 sem corpo: devolve null nesse caso. */
   sendOptional<Response>(endpoint: Endpoint): Promise<Response | null>
   sendVoid(endpoint: Endpoint): Promise<void>
@@ -214,6 +222,14 @@ export function createHttpClient(
         throw new NetworkError('noContent', 'Resposta sem corpo', status)
       }
       return decode<Response>(body, status)
+    },
+
+    async sendWithStatus<Response>(endpoint: Endpoint): Promise<{ data: Response; status: number }> {
+      const { body, status } = await perform(endpoint)
+      if (status === 204 || body === '') {
+        throw new NetworkError('noContent', 'Resposta sem corpo', status)
+      }
+      return { data: decode<Response>(body, status), status }
     },
 
     async sendOptional<Response>(endpoint: Endpoint): Promise<Response | null> {

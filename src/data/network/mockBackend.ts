@@ -741,6 +741,7 @@ const sendMessage = withRequest((request, item, account) => {
 const ROUTES: Route[] = [
   // Acesso
   { method: 'POST', pattern: '/auth/login', latencyMs: 400, handler: login },
+  { method: 'POST', pattern: '/user/login', latencyMs: 400, handler: login },
   {
     method: 'GET',
     pattern: '/user/me',
@@ -748,6 +749,7 @@ const ROUTES: Route[] = [
     handler: authenticated((_request, _params, account) => ok(account.me)),
   },
   { method: 'POST', pattern: '/auth/register', latencyMs: 600, handler: signUp },
+  { method: 'POST', pattern: '/profissional-saude/cadastro', latencyMs: 600, handler: signUp },
   { method: 'POST', pattern: '/auth/verify', latencyMs: 400, handler: verify },
   { method: 'POST', pattern: '/auth/resend-code', latencyMs: 350, handler: emailOnly },
   // Responde igual exista ou nao a conta, para nao revelar quem tem cadastro.

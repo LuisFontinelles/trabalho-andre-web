@@ -18,6 +18,7 @@ function NewPasswordForm({ email, onResend }: { email: string; onResend: () => P
   const [secondsLeft, restartCountdown] = useCountdown(RESEND_SECONDS)
   const [code, setCode] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -30,7 +31,7 @@ function NewPasswordForm({ email, onResend }: { email: string; onResend: () => P
     setNotice(null)
     setBusy(true)
     try {
-      await dependencies.resetPassword(email, code, password)
+      await dependencies.resetPassword(email, code, password, confirmPassword)
       const handoff: LoginHandoff = { notice: strings.recover.done, email }
       navigate('/', { replace: true, state: handoff })
     } catch (caught) {
@@ -78,24 +79,31 @@ function NewPasswordForm({ email, onResend }: { email: string; onResend: () => P
           onChange={setCode}
           label={strings.recover.codeLabel}
         />
-        <PasswordField
-          label={strings.recover.passwordLabel}
-          placeholder={strings.recover.passwordPlaceholder}
-          autoComplete="new-password"
-          value={password}
-          onChange={setPassword}
-          errorMessage={passwordError}
-          rules={ruleList(password)}
-        />
+        {code.length === RESET_CODE_LENGTH && (
+          <>
+            <PasswordField
+              label={strings.recover.passwordLabel}
+              placeholder={strings.recover.passwordPlaceholder}
+              autoComplete="new-password"
+              value={password}
+              onChange={setPassword}
+              rules={ruleList(password)}
+            />
+            <PasswordField
+              label={strings.recover.confirmPasswordLabel}
+              placeholder={strings.recover.confirmPasswordPlaceholder}
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              errorMessage={passwordError}
+            />
+          </>
+        )}
         {error && <Banner message={error} tone="danger" />}
         {notice && <Banner message={notice} tone="success" />}
-        <Button
-          title={strings.recover.save}
-          type="submit"
-          fillsWidth
-          isEnabled={code.length === RESET_CODE_LENGTH}
-          isLoading={isBusy}
-        />
+        {code.length === RESET_CODE_LENGTH && (
+          <Button title={strings.recover.save} type="submit" fillsWidth isLoading={isBusy} />
+        )}
       </form>
       <Button
         title={secondsLeft > 0 ? strings.recover.resendIn(secondsLeft) : strings.recover.resend}

@@ -4,7 +4,11 @@ import type { Catalog, PendingVerification, Session, SignUpDraft } from '@/domai
 
 export interface AuthRepository {
   login(email: string, password: string): Promise<Session>
-  signUp(draft: SignUpDraft): Promise<PendingVerification>
+  signUp(
+    draft: SignUpDraft,
+    biographyOrDescription?: string,
+    documents?: readonly File[],
+  ): Promise<PendingVerification>
   /** Nulo quando o e-mail foi confirmado mas a senha nao esta mais na memoria. */
   verify(email: string, code: string): Promise<Session | null>
   resendCode(email: string): Promise<void>

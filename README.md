@@ -38,7 +38,7 @@ O painel fala o [contrato da API, versão 2](CONTRATO-API-CareBridge.md): caminh
 | Solicitações recebidas, com os 6 estados e filtro por estado | Pronto |
 | Detalhe da solicitação: triagem, documentos, decisão e mensagens | Pronto |
 | Aprovar, recusar com motivo e pedir informações | Pronto |
-| Combinado da aprovação (quando, onde, levar) | **Automático**: a tela ainda não pergunta; vai "A combinar", o endereço (ou a modalidade, se online) e os documentos exigidos |
+| Combinado da aprovação (quando, onde, levar) | Pronto, com campos opcionais; vazios usam "A combinar" |
 | Abrir documento anexado | Pronto, com a pré-visualização do protótipo |
 | Baixar documento anexado | **Desativado e marcado** |
 | Configurações: perfil, tema claro e escuro, avisos e dados da conta | Pronto |
@@ -87,8 +87,8 @@ A API ainda não libera CORS, então o navegador não chama o Render direto: o `
 
 | Tela | Rota da API | Observação |
 |---|---|---|
-| Login | `POST /user/login` e, logo depois, `GET /user/me` | O nome vem do `/user/me`. Enquanto a API não tem essa rota (404, 401, 403, 5xx ou erro de rede), o nome sai do e-mail. Conta de paciente é recusada. |
-| Cadastro | `POST /profissional-saude/cadastro` (multipart, parte `dados`) | `conselho`, `uf`, `numeroRegistro`, `especialidade`, `ondeAtende` e `aceitouTermos`, como no contrato. 201 sem corpo ou `exigeVerificacao: false` entra direto e cai em "Cadastro em verificação". |
+| Login | `POST http://localhost:8080/user/login` e, logo depois, `GET /user/me` | O nome vem do `/user/me`. Perfis não profissionais mantêm a sessão, mas o guard bloqueia o painel. |
+| Cadastro | `POST http://localhost:8080/profissional-saude/cadastro` (multipart, partes `dados` e `documentos`) | Envia registro, especialidade, local de atendimento, biografia e até 2 documentos. |
 
 Recuperar senha, código por e-mail, catálogo, oportunidades e solicitações ainda não existem na API e continuam no simulado, já no formato do contrato. O token do login real vai junto, então trocar cada rota é só mudar o cliente HTTP do repositório em `src/app/dependencies.ts`.
 

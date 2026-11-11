@@ -6,6 +6,7 @@ import type {
   ProfissionalCadastroDTO,
 } from '@/data/dto'
 import type {
+  AuthProfile,
   Catalog,
   PendingVerification,
   Session,
@@ -56,6 +57,12 @@ export function sessionFromDTO(
   me: MeDTO | null,
   email: string,
 ): Session {
+  const authProfile: AuthProfile =
+    login.tipoPerfil === 'PROFISSIONAL_SAUDE' ||
+    login.tipoPerfil === 'PACIENTE' ||
+    login.tipoPerfil === 'ADMIN'
+      ? login.tipoPerfil
+      : 'DESCONHECIDO'
   const user: User = {
     id: me?.id ?? email,
     name: me?.nome?.trim() ? me.nome.trim() : nameFromEmail(email),
@@ -66,6 +73,7 @@ export function sessionFromDTO(
   return {
     token: login.token,
     user,
+    authProfile,
     isVerified: login.validadoInstitucionalmente,
     ...(registration === undefined ? {} : { registration }),
   }
@@ -81,7 +89,10 @@ export function registrationFromMe(me: MeDTO | null): string | undefined {
 }
 
 /** Parte `dados` do cadastro. A tela nao tem biografia; vai nula. */
-export function signUpDraftToDTO(draft: SignUpDraft): ProfissionalCadastroDTO {
+export function signUpDraftToDTO(
+  draft: SignUpDraft,
+  biographyOrDescription = '',
+): ProfissionalCadastroDTO {
   const { councilId, stateId, number, specialtyId, workplace } = draft.professional
   return {
     tipoPerfil: 'PROFISSIONAL_SAUDE',
@@ -96,19 +107,24 @@ export function signUpDraftToDTO(draft: SignUpDraft): ProfissionalCadastroDTO {
     numeroRegistro: number,
     especialidade: specialtyId,
     ondeAtende: workplace.trim() === '' ? null : workplace.trim(),
-    biografiaOuDescricao: null,
+    biografiaOuDescricao: biographyOrDescription.trim() || null,
     aceitouTermos: draft.acceptedTerms,
     acceptedTerms: draft.acceptedTerms,
   }
 }
 
 /** Monta o multipart: o JSON vai como parte `dados`, com tipo application/json. */
-export function signUpForm(draft: SignUpDraft): FormData {
+export function signUpForm(
+  draft: SignUpDraft,
+  biographyOrDescription = '',
+  documents: readonly File[] = [],
+): FormData {
   const form = new FormData()
   form.append(
     'dados',
-    new Blob([JSON.stringify(signUpDraftToDTO(draft))], { type: 'application/json' }),
+    new Blob([JSON.stringify(signUpDraftToDTO(draft, biographyOrDescription))], { type: 'application/json' }),
   )
+  for (const document of documents) form.append('documentos', document)
   return form
 }
 
