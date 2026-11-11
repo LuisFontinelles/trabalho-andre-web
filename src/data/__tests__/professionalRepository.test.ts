@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { draftFromManagedOpportunity, draftToDTO } from '@/data/professionalMappers'
+import { emptyOpportunityDraft } from '@/domain/opportunityDraft'
 import { isDecided } from '@/domain/professional'
 import { testDependencies, validOpportunityDraft } from '@/test/factories'
 
@@ -341,5 +343,141 @@ describe('Editar oportunidade', () => {
       title: 'Estudo revisado',
     })
     expect(updated.title).toBe('Estudo revisado')
+  })
+})
+
+describe('Rascunho', () => {
+  it('salvar como rascunho nao publica', async () => {
+    const repository = repo()
+    const created = await repository.createOpportunity(
+      { ...emptyOpportunityDraft(), title: 'Nutricao clinica' },
+      true,
+    )
+    expect(created.status).toBe('RASCUNHO')
+    expect(created.title).toBe('Nutricao clinica')
+    expect(created.totalVacancies).toBe(0)
+  })
+
+  it('rascunho pela metade volta para o formulario como foi salvo', async () => {
+    const repository = repo()
+    const created = await repository.createOpportunity(
+      { ...emptyOpportunityDraft(), title: 'Nutricao clinica', serviceType: 'consulta' },
+      true,
+    )
+    const draft = draftFromManagedOpportunity(await repository.opportunity(created.id))
+    expect(draft.title).toBe('Nutricao clinica')
+    expect(draft.serviceType).toBe('consulta')
+    expect(draft.specialtyId).toBeNull()
+    expect(draft.totalVacancies).toBe('')
+    expect(draft.opensAt).toBe('')
+  })
+
+  it('salvar de novo como rascunho continua rascunho', async () => {
+    const repository = repo()
+    const updated = await repository.updateOpportunity('op-103', validOpportunityDraft(), true)
+    expect(updated.status).toBe('RASCUNHO')
+  })
+
+  it('publicar um rascunho o deixa ativo', async () => {
+    const repository = repo()
+    const updated = await repository.updateOpportunity('op-103', validOpportunityDraft())
+    expect(updated.status).toBe('ATIVA')
+  })
+
+  it('salvar alteracoes de uma ativa nao a transforma em rascunho', async () => {
+    const repository = repo()
+    const updated = await repository.updateOpportunity('op-105', validOpportunityDraft(), true)
+    expect(updated.status).toBe('ATIVA')
+  })
+})
+
+describe('Campos novos do formulario', () => {
+  it('a oportunidade criada guarda tipo, publico, CEP, criterios e contato', async () => {
+    const created = await repo().createOpportunity({
+      ...validOpportunityDraft(),
+      modality: 'hibrido',
+      accessMode: 'sus',
+    })
+    expect(created.serviceType).toBe('consulta')
+    expect(created.audiences).toEqual(['adultos', 'idosos'])
+    expect(created.modality).toBe('hibrido')
+    expect(created.accessMode).toBe('sus')
+    expect(created.cep).toBe('70000-000')
+    expect(created.eligibility).toBe('Adultos sem convenio, moradores do DF.')
+    expect(created.contactMethod).toBe('plataforma')
+  })
+
+  it('online nao envia CEP nem endereco', () => {
+    const dto = draftToDTO({ ...validOpportunityDraft(), modality: 'online' })
+    expect(dto.cep).toBeNull()
+    expect(dto.address).toBeNull()
+  })
+
+  it('sem restricoes nao envia o texto dos criterios', () => {
+    const dto = draftToDTO({ ...validOpportunityDraft(), hasNoRestrictions: true })
+    expect(dto.noRestrictions).toBe(true)
+    expect(dto.eligibility).toBeNull()
+  })
+
+  it('as perguntas vao com tipo, obrigatoriedade e opcoes', () => {
+    const dto = draftToDTO(validOpportunityDraft())
+    expect(dto.status).toBe('ATIVA')
+    expect(dto.triage.questions[1]).toEqual({
+      id: 'q2',
+      label: 'Há quanto tempo?',
+      type: 'MULTIPLA',
+      required: true,
+      options: ['Menos de 1 semana', 'De 1 a 4 semanas', 'De 1 a 6 meses', 'Mais de 6 meses'],
+    })
+  })
+
+  it('a fixture traz os campos novos para a edicao', async () => {
+    const item = await repo().opportunity('op-105')
+    const draft = draftFromManagedOpportunity(item)
+    expect(draft.serviceType).toBe('terapia')
+    expect(draft.audiences).toEqual(['adultos'])
+    expect(draft.hasNoRestrictions).toBe(true)
+    expect(draft.contactMethod).toBe('plataforma')
+  })
+})
+
+describe('Recusar e pedir informacoes', () => {
+  it('a recusa envia o motivo junto', async () => {
+    const dependencies = testDependencies()
+    const updated = await dependencies.professionalRepository.decideRequest(
+      'req-002',
+      'RECUSADA',
+      '  Vagas so para moradores de Ceilandia.  ',
+    )
+    expect(updated.status).toBe('RECUSADA')
+    expect(updated.decidedAt).not.toBeNull()
+  })
+
+  it('a aprovacao registra quando foi decidida', async () => {
+    const updated = await repo().decideRequest('req-002', 'APROVADA')
+    expect(updated.decidedAt).not.toBeNull()
+  })
+
+  it('pedir informacoes deixa o pedido aguardando', async () => {
+    const repository = repo()
+    const updated = await repository.requestInfo('req-002', 'Pode enviar o raio X mais recente?')
+    expect(updated.status).toBe('AGUARDANDO_INFO')
+    const listed = (await repository.receivedRequests()).find((i) => i.id === 'req-002')
+    expect(listed?.status).toBe('AGUARDANDO_INFO')
+  })
+
+  it('pedido de informacao vazio e rejeitado', async () => {
+    await expect(repo().requestInfo('req-002', '   ')).rejects.toMatchObject({ status: 422 })
+  })
+
+  it('pedir informacoes de solicitacao inexistente da 404', async () => {
+    await expect(repo().requestInfo('req-999', 'Falta o RG.')).rejects.toMatchObject({
+      kind: 'notFound',
+    })
+  })
+
+  it('o detalhe traz o protocolo do pedido', async () => {
+    expect((await repo().requestDetail('req-001')).protocol).toBe('20418')
+    expect((await repo().requestDetail('req-002')).protocol).toBe('20419')
   })
 })

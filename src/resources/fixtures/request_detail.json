@@ -6,14 +6,36 @@
   "receivedAt": "2026-10-21T09:12:00Z",
   "status": "EM_ANALISE",
   "triage": [
-    { "question": "Motivo", "answer": "Dor no peito ao esforço" },
-    { "question": "Diagnóstico prévio", "answer": "Hipertensão" },
-    { "question": "Medicação contínua", "answer": "Losartana" },
-    { "question": "Urgência", "answer": "Média" }
+    {
+      "question": "Motivo",
+      "answer": "Dor no peito ao esforço"
+    },
+    {
+      "question": "Diagnóstico prévio",
+      "answer": "Hipertensão"
+    },
+    {
+      "question": "Medicação contínua",
+      "answer": "Losartana"
+    },
+    {
+      "question": "Urgência",
+      "answer": "Média"
+    }
   ],
   "documents": [
-    { "id": "doc-1", "name": "RG_frente.jpg", "sizeKb": 420 },
-    { "id": "doc-2", "name": "Encaminhamento.pdf", "sizeKb": 128 }
+    {
+      "id": "doc-1",
+      "name": "RG_frente.jpg",
+      "sizeKb": 420,
+      "sentAt": "2026-10-21T09:12:00Z"
+    },
+    {
+      "id": "doc-2",
+      "name": "Encaminhamento.pdf",
+      "sizeKb": 128,
+      "sentAt": "2026-10-21T09:12:00Z"
+    }
   ],
   "messages": [
     {
@@ -28,5 +50,7 @@
       "text": "Bom dia, pode sim!",
       "sentAt": "2026-10-21T12:46:00Z"
     }
-  ]
+  ],
+  "protocol": "20418",
+  "decidedAt": null
 }

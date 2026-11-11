@@ -1,21 +1,25 @@
 import {
   accessModeFrom,
+  audiencesFrom,
+  careModalityFrom,
+  contactMethodFrom,
   opportunityStatusFrom,
   requestStatusFrom,
+  requiresAddress,
+  serviceTypeFrom,
   type ManagedOpportunity,
   type ReceivedRequest,
   type RequestDetail,
   type RequestMessage,
 } from '@/domain/professional'
-import { modalityFrom } from '@/domain/entities'
 import {
   allowsPrice,
 } from '@/domain/professional'
 import type { OpportunityDraft } from '@/domain/opportunityDraft'
 import {
-  DOCUMENT_CATALOG,
-  DEFAULT_QUESTIONS,
+  digitsOf,
   emptyOpportunityDraft,
+  formatCep,
   parsePrice,
   parseVacancies,
   selectedDocuments,
@@ -34,6 +38,9 @@ export function managedOpportunityFromDTO(
   return {
     id: dto.id,
     title: dto.title,
+    description: dto.description ?? '',
+    serviceType: serviceTypeFrom(dto.serviceType),
+    audiences: audiencesFrom(dto.audiences),
     specialtyId: dto.specialty,
     accessMode: accessModeFrom(dto.accessMode),
     price: dto.price,
@@ -41,10 +48,14 @@ export function managedOpportunityFromDTO(
     totalVacancies: dto.totalVacancies,
     applicationCount: dto.applicationCount,
     status: opportunityStatusFrom(dto.status),
-    modality: modalityFrom(dto.modality),
+    modality: careModalityFrom(dto.modality),
+    cep: dto.cep ?? null,
     address: dto.address,
     opensAt: dto.opensAt,
     closesAt: dto.closesAt,
+    eligibility: dto.eligibility ?? '',
+    hasNoRestrictions: dto.noRestrictions ?? false,
+    contactMethod: contactMethodFrom(dto.contactMethod),
     updatedAt: dto.updatedAt,
   }
 }
@@ -79,6 +90,9 @@ export function requestDetailFromDTO(dto: RequestDetailDTO): RequestDetail {
     opportunityTitle: dto.opportunityTitle,
     receivedAt: dto.receivedAt,
     status: requestStatusFrom(dto.status),
+    // Sem protocolo do servidor, os digitos do id identificam o pedido.
+    protocol: dto.protocol ?? digitsOf(dto.id),
+    decidedAt: dto.decidedAt ?? null,
     triage: dto.triage.map((item) => ({
       question: item.question,
       answer: item.answer,
@@ -87,30 +101,50 @@ export function requestDetailFromDTO(dto: RequestDetailDTO): RequestDetail {
       id: item.id,
       name: item.name,
       sizeKb: item.sizeKb,
+      sentAt: item.sentAt ?? null,
     })),
     messages: dto.messages.map(requestMessageFromDTO),
   }
 }
 
-export function draftToDTO(draft: OpportunityDraft): CreateOpportunityRequestDTO {
+/**
+ * `status` separa publicar de guardar rascunho. No rascunho os campos podem
+ * estar pela metade, entao nada aqui presume que a validacao ja passou.
+ */
+export function draftToDTO(
+  draft: OpportunityDraft,
+  status: 'ATIVA' | 'RASCUNHO' = 'ATIVA',
+): CreateOpportunityRequestDTO {
+  const hasAddress = requiresAddress(draft.modality)
   return {
+    status,
     title: draft.title.trim(),
+    serviceType: draft.serviceType,
+    audiences: [...draft.audiences],
     description: draft.description.trim(),
     specialty: draft.specialtyId ?? '',
-    audience: draft.audience.trim(),
-    modality: draft.modality,
-    address: draft.modality === 'presencial' ? draft.address.trim() : null,
-    // validateAccess ja garantiu a escolha antes de chegar aqui.
+    modality: draft.modality ?? 'presencial',
+    cep: hasAddress ? formatCep(draft.cep) : null,
+    address: hasAddress ? draft.address.trim() : null,
     accessMode: draft.accessMode ?? 'gratuito',
     price: allowsPrice(draft.accessMode) ? parsePrice(draft.price) : null,
     totalVacancies: parseVacancies(draft.totalVacancies) ?? 0,
     opensAt: draft.opensAt,
     closesAt: draft.closesAt,
+    eligibility: draft.hasNoRestrictions ? null : draft.eligibility.trim(),
+    noRestrictions: draft.hasNoRestrictions,
+    contactMethod: draft.contactMethod,
     triage: {
       mode: draft.triageMode,
       questions: draft.questions
         .filter((item) => item.label.trim() !== '')
-        .map((item) => ({ id: item.id, label: item.label.trim() })),
+        .map((item) => ({
+          id: item.id,
+          label: item.label.trim(),
+          type: item.type,
+          required: item.isRequired,
+          options: [...item.options],
+        })),
       documents: selectedDocuments(draft).map((item) => ({
         id: item.id,
         label: item.label.trim(),
@@ -120,9 +154,9 @@ export function draftToDTO(draft: OpportunityDraft): CreateOpportunityRequestDTO
 }
 
 /**
- * Carrega uma oportunidade publicada no formulario de edicao. A API ainda nao
- * devolve triagem junto da oportunidade, entao a edicao parte do formulario
- * padrao ate esse campo existir no contrato.
+ * Carrega uma oportunidade no formulario de edicao. A API ainda nao devolve
+ * a triagem junto da oportunidade, entao a edicao parte do formulario padrao
+ * ate esse campo existir no contrato.
  */
 export function draftFromManagedOpportunity(
   item: ManagedOpportunity,
@@ -130,19 +164,20 @@ export function draftFromManagedOpportunity(
   return {
     ...emptyOpportunityDraft(),
     title: item.title,
-    description: item.title,
-    specialtyId: item.specialtyId,
-    audience: '',
+    serviceType: item.serviceType,
+    audiences: item.audiences,
+    description: item.description,
+    specialtyId: item.specialtyId === '' ? null : item.specialtyId,
     modality: item.modality,
+    cep: item.cep ?? '',
     address: item.address ?? '',
     accessMode: item.accessMode,
     price: item.price === null ? '' : String(item.price).replace('.', ','),
-    totalVacancies: String(item.totalVacancies),
+    totalVacancies: item.totalVacancies > 0 ? String(item.totalVacancies) : '',
     opensAt: item.opensAt ?? '',
     closesAt: item.closesAt ?? '',
-    triageMode: 'PADRAO',
-    questions: DEFAULT_QUESTIONS,
-    documents: DOCUMENT_CATALOG,
-    selectedDocumentIds: ['rg'],
+    eligibility: item.eligibility,
+    hasNoRestrictions: item.hasNoRestrictions,
+    contactMethod: item.contactMethod,
   }
 }

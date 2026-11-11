@@ -1,24 +1,40 @@
 import { describe, expect, it } from 'vitest'
 import {
   ACCESS_MODE_LABEL,
-  DECIDABLE_STATUSES,
-  OPPORTUNITY_STATUS_LABEL,
-  REQUEST_STATUS_LABEL,
+  ACCESS_MODES,
   accessModeFrom,
   allowsPrice,
+  audiencesFrom,
   canClose,
   canDelete,
   canEdit,
+  canExchangeMessages,
+  careModalityFrom,
+  contactMethodFrom,
   countByFilter,
+  DECIDABLE_STATUSES,
+  documentKind,
+  documentSize,
   filterRequests,
   isDecided,
   isFromProfessional,
   isFull,
+  isValidReason,
   messageTime,
+  OPPORTUNITY_STATUS_LABEL,
+  OPPORTUNITY_STATUS_TONE,
   opportunityStatusFrom,
   relativeDay,
   remainingVacancies,
+  REQUEST_FILTERS,
+  REQUEST_STATUS_LABEL,
+  REQUEST_STATUS_TONE,
   requestStatusFrom,
+  requiresAddress,
+  RESPONSE_DEADLINE_DAYS,
+  responseDeadline,
+  serviceTypeFrom,
+  shortDate,
   summarize,
   vacancySummary,
 } from '@/domain/professional'
@@ -92,24 +108,25 @@ describe('Vagas', () => {
 })
 
 describe('Acoes permitidas por status', () => {
-  it('ativa pode editar, encerrar e excluir', () => {
+  it('ativa pode editar e encerrar, mas nao excluir', () => {
     const item = makeManagedOpportunity({ status: 'ATIVA' })
     expect(canEdit(item)).toBe(true)
     expect(canClose(item)).toBe(true)
-    expect(canDelete()).toBe(true)
+    expect(canDelete(item)).toBe(false)
   })
 
   it('rascunho edita e exclui, mas nao encerra', () => {
     const item = makeManagedOpportunity({ status: 'RASCUNHO' })
     expect(canEdit(item)).toBe(true)
     expect(canClose(item)).toBe(false)
+    expect(canDelete(item)).toBe(true)
   })
 
-  it('encerrada so pode ser excluida', () => {
+  it('encerrada nao tem mais acao: fica no historico', () => {
     const item = makeManagedOpportunity({ status: 'ENCERRADA' })
     expect(canEdit(item)).toBe(false)
     expect(canClose(item)).toBe(false)
-    expect(canDelete()).toBe(true)
+    expect(canDelete(item)).toBe(false)
   })
 })
 
@@ -208,9 +225,9 @@ describe('Tempo relativo', () => {
   })
 
   it.each([
-    ['2026-10-19T11:05:00Z', '2 dias'],
-    ['2026-10-18T16:20:00Z', '3 dias'],
-    ['2026-10-01T10:00:00Z', '20 dias'],
+    ['2026-10-19T11:05:00Z', 'Há 2 dias'],
+    ['2026-10-18T16:20:00Z', 'Há 3 dias'],
+    ['2026-10-01T10:00:00Z', 'Há 20 dias'],
   ])('%s vira %s', (iso, expected) => {
     expect(relativeDay(iso, now)).toBe(expected)
   })
@@ -251,5 +268,115 @@ describe('Mensagens', () => {
 
   it('data invalida devolve string vazia', () => {
     expect(messageTime('qualquer coisa')).toBe('')
+  })
+})
+
+describe('Modalidade de acesso e atendimento', () => {
+  it('as quatro modalidades saem na ordem dos cards', () => {
+    expect(ACCESS_MODES).toEqual(['gratuito', 'sus', 'preco-social', 'pesquisa'])
+  })
+
+  it('SUS e reconhecido, e valor desconhecido cai em gratuito', () => {
+    expect(accessModeFrom('sus')).toBe('sus')
+    expect(accessModeFrom('outro')).toBe('gratuito')
+  })
+
+  it('so o preco social admite valor', () => {
+    expect(allowsPrice('preco-social')).toBe(true)
+    expect(allowsPrice('sus')).toBe(false)
+    expect(allowsPrice(null)).toBe(false)
+  })
+
+  it.each([
+    ['presencial', true],
+    ['hibrido', true],
+    ['online', false],
+  ] as const)('atendimento %s pede endereco: %s', (modality, expected) => {
+    expect(requiresAddress(modality)).toBe(expected)
+  })
+
+  it('sem atendimento escolhido ainda nao pede endereco', () => {
+    expect(requiresAddress(null)).toBe(false)
+  })
+
+  it('hibrido e reconhecido, e valor desconhecido cai em presencial', () => {
+    expect(careModalityFrom('hibrido')).toBe('hibrido')
+    expect(careModalityFrom('qualquer')).toBe('presencial')
+  })
+
+  it('tipo de servico, publico e contato desconhecidos sao descartados', () => {
+    expect(serviceTypeFrom('exame')).toBe('exame')
+    expect(serviceTypeFrom('cirurgia')).toBeNull()
+    expect(serviceTypeFrom(null)).toBeNull()
+    expect(audiencesFrom(['idosos', 'marcianos', 'adultos'])).toEqual(['adultos', 'idosos'])
+    expect(audiencesFrom(undefined)).toEqual([])
+    expect(contactMethodFrom('telefone')).toBe('telefone')
+    expect(contactMethodFrom('fax')).toBeNull()
+  })
+})
+
+describe('Status da solicitacao', () => {
+  it('aguardando informacoes e um status proprio', () => {
+    expect(requestStatusFrom('AGUARDANDO_INFO')).toBe('AGUARDANDO_INFO')
+    expect(REQUEST_STATUS_LABEL.AGUARDANDO_INFO).toBe('Aguardando informações')
+  })
+
+  it('aguardando informacoes ainda nao e uma decisao', () => {
+    expect(isDecided('AGUARDANDO_INFO')).toBe(false)
+  })
+
+  it('cada status tem o tom do selo', () => {
+    expect(REQUEST_STATUS_TONE.APROVADA).toBe('success')
+    expect(REQUEST_STATUS_TONE.EM_ANALISE).toBe('warning')
+    expect(REQUEST_STATUS_TONE.RECUSADA).toBe('danger')
+    expect(OPPORTUNITY_STATUS_TONE.RASCUNHO).toBe('warning')
+    expect(OPPORTUNITY_STATUS_TONE.ENCERRADA).toBe('neutral')
+  })
+
+  it('quem aguarda informacoes aparece em Todas, sem filtro proprio', () => {
+    const items = [
+      makeReceivedRequest({ id: '1', status: 'AGUARDANDO_INFO' }),
+      makeReceivedRequest({ id: '2', status: 'APROVADA' }),
+    ]
+    expect(filterRequests(items, 'TODAS')).toHaveLength(2)
+    expect(REQUEST_FILTERS).not.toContain('AGUARDANDO_INFO')
+  })
+
+  it('mensagens so depois da aprovacao', () => {
+    expect(canExchangeMessages('APROVADA')).toBe(true)
+    expect(canExchangeMessages('EM_ANALISE')).toBe(false)
+    expect(canExchangeMessages('RECUSADA')).toBe(false)
+  })
+})
+
+describe('Decisao', () => {
+  it('o motivo da recusa precisa de pelo menos 10 caracteres', () => {
+    expect(isValidReason('   curto   ')).toBe(false)
+    expect(isValidReason('Vagas so para moradores de Ceilandia.')).toBe(true)
+  })
+
+  it('o prazo de resposta e de 15 dias a partir do recebimento', () => {
+    expect(RESPONSE_DEADLINE_DAYS).toBe(15)
+    expect(shortDate(responseDeadline('2026-11-10T09:12:00Z'))).toBe('25/11')
+  })
+
+  it('data invalida nao gera prazo nem texto', () => {
+    expect(responseDeadline('nao e data')).toBeNull()
+    expect(shortDate('nao e data')).toBe('')
+    expect(shortDate(null)).toBe('')
+  })
+})
+
+describe('Documento enviado', () => {
+  const document = { id: 'd1', name: 'RG_frente.jpg', sizeKb: 420, sentAt: null }
+
+  it('o tipo vem da extensao', () => {
+    expect(documentKind(document)).toBe('JPG')
+    expect(documentKind({ ...document, name: 'sem-extensao' })).toBe('')
+  })
+
+  it('o tamanho sai em KB ate 1 MB e em MB dali em diante', () => {
+    expect(documentSize(document)).toBe('420 KB')
+    expect(documentSize({ ...document, sizeKb: 1229 })).toBe('1,2 MB')
   })
 })

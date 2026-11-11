@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DRAFT_STEPS,
-  DraftError,
+  accessErrors,
   applyAccessMode,
   applyModality,
+  applyNoRestrictions,
+  basicsErrors,
+  canSaveAsDraft,
+  DESCRIPTION_MAX,
+  DESCRIPTION_MIN,
+  DRAFT_STEPS,
+  DraftError,
   emptyOpportunityDraft,
+  errorCount,
+  formatCep,
+  newQuestion,
   nextStep,
   parsePrice,
   parseVacancies,
@@ -51,17 +60,51 @@ describe('Passo 1, dados basicos', () => {
     expect(() => validateBasics(validOpportunityDraft())).not.toThrow()
   })
 
-  it('o titulo nao e obrigatorio, como no prototipo', () => {
-    const draft = { ...validOpportunityDraft(), title: '' }
-    expect(() => validateBasics(draft)).not.toThrow()
+  it('o titulo e obrigatorio, como o asterisco da tela avisa', () => {
+    const draft = { ...validOpportunityDraft(), title: '   ' }
+    expect(codeOf(() => validateBasics(draft))).toBe('titleRequired')
   })
 
-  it.each([
-    ['description', 'descriptionRequired'],
-    ['audience', 'audienceRequired'],
-  ] as const)('%s e obrigatorio', (field, expected) => {
-    const draft = { ...validOpportunityDraft(), [field]: '   ' }
-    expect(codeOf(() => validateBasics(draft))).toBe(expected)
+  it('tipo de servico e publico sao obrigatorios', () => {
+    expect(codeOf(() => validateBasics({ ...validOpportunityDraft(), serviceType: null }))).toBe(
+      'serviceTypeRequired',
+    )
+    expect(codeOf(() => validateBasics({ ...validOpportunityDraft(), audiences: [] }))).toBe(
+      'audiencesRequired',
+    )
+  })
+
+  it('descricao e obrigatoria', () => {
+    const draft = { ...validOpportunityDraft(), description: '   ' }
+    expect(codeOf(() => validateBasics(draft))).toBe('descriptionRequired')
+  })
+
+  it('descricao vai de 40 a 600 caracteres', () => {
+    const short = { ...validOpportunityDraft(), description: 'a'.repeat(DESCRIPTION_MIN - 1) }
+    expect(codeOf(() => validateBasics(short))).toBe('descriptionTooShort')
+    const long = { ...validOpportunityDraft(), description: 'a'.repeat(DESCRIPTION_MAX + 1) }
+    expect(codeOf(() => validateBasics(long))).toBe('descriptionTooLong')
+    const edge = { ...validOpportunityDraft(), description: 'a'.repeat(DESCRIPTION_MAX) }
+    expect(() => validateBasics(edge)).not.toThrow()
+  })
+
+  it('o atendimento precisa ser escolhido', () => {
+    const draft = { ...validOpportunityDraft(), modality: null }
+    expect(codeOf(() => validateBasics(draft))).toBe('modalityRequired')
+  })
+
+  it('CEP e obrigatorio e tem 8 digitos no presencial', () => {
+    expect(codeOf(() => validateBasics({ ...validOpportunityDraft(), cep: '' }))).toBe(
+      'cepRequired',
+    )
+    expect(codeOf(() => validateBasics({ ...validOpportunityDraft(), cep: '7000' }))).toBe(
+      'cepInvalid',
+    )
+  })
+
+  it('o hibrido tambem pede CEP e endereco', () => {
+    const draft = { ...validOpportunityDraft(), modality: 'hibrido' as const, cep: '', address: '' }
+    expect(basicsErrors(draft)).toEqual({ cep: 'cepRequired', address: 'addressRequired' })
   })
 
   it('especialidade e obrigatoria', () => {
@@ -75,7 +118,12 @@ describe('Passo 1, dados basicos', () => {
   })
 
   it('endereco nao e exigido no online', () => {
-    const draft = { ...validOpportunityDraft(), modality: 'online' as const, address: '' }
+    const draft = {
+      ...validOpportunityDraft(),
+      modality: 'online' as const,
+      cep: '',
+      address: '',
+    }
     expect(() => validateBasics(draft)).not.toThrow()
   })
 
@@ -84,9 +132,42 @@ describe('Passo 1, dados basicos', () => {
       ...validOpportunityDraft(),
       description: '',
       specialtyId: null,
-      audience: '',
+      audiences: [],
     }
-    expect(codeOf(() => validateBasics(draft))).toBe('descriptionRequired')
+    expect(codeOf(() => validateBasics(draft))).toBe('audiencesRequired')
+  })
+
+  it('basicsErrors junta todos os campos que faltam, para a tela marcar cada um', () => {
+    const draft = { ...validOpportunityDraft(), title: '', specialtyId: null, address: '' }
+    const errors = basicsErrors(draft)
+    expect(errors).toEqual({
+      title: 'titleRequired',
+      specialtyId: 'specialtyRequired',
+      address: 'addressRequired',
+    })
+    expect(errorCount(errors)).toBe(3)
+  })
+
+  it('o rascunho vazio acusa os seis campos sem depender do atendimento', () => {
+    expect(Object.keys(basicsErrors(emptyOpportunityDraft()))).toEqual([
+      'title',
+      'serviceType',
+      'audiences',
+      'description',
+      'specialtyId',
+      'modality',
+    ])
+  })
+
+  it('formatCep poe o hifen e corta o excesso', () => {
+    expect(formatCep('70000000')).toBe('70000-000')
+    expect(formatCep('7000')).toBe('7000')
+    expect(formatCep('70.000-0009')).toBe('70000-000')
+  })
+
+  it('rascunho so precisa de titulo para ser salvo', () => {
+    expect(canSaveAsDraft(emptyOpportunityDraft())).toBe(false)
+    expect(canSaveAsDraft({ ...emptyOpportunityDraft(), title: 'Fisioterapia' })).toBe(true)
   })
 })
 
@@ -206,8 +287,8 @@ describe('Passo 3, triagem', () => {
     const draft = {
       ...validOpportunityDraft(),
       questions: [
-        { id: 'q1', label: '   ' },
-        { id: 'q2', label: '' },
+        { ...newQuestion(), label: '   ' },
+        { ...newQuestion(), label: '' },
       ],
     }
     expect(codeOf(() => validateTriage(draft))).toBe('questionsRequired')
@@ -217,8 +298,8 @@ describe('Passo 3, triagem', () => {
     const draft = {
       ...validOpportunityDraft(),
       questions: [
-        { id: 'q1', label: '' },
-        { id: 'q2', label: 'Ha quanto tempo sente dor?' },
+        { ...newQuestion(), label: '' },
+        { ...newQuestion(), label: 'Ha quanto tempo sente dor?' },
       ],
     }
     expect(() => validateTriage(draft)).not.toThrow()
@@ -249,6 +330,37 @@ describe('Mudancas de campo que limpam outro', () => {
   it('continuar no preco social preserva o preco', () => {
     const draft = { ...validOpportunityDraft(), accessMode: 'gratuito' as const, price: '60' }
     expect(applyAccessMode(draft, 'preco-social').price).toBe('60')
+  })
+
+  it('criterios de elegibilidade sao obrigatorios, a menos que nao haja restricao', () => {
+    const draft = { ...validOpportunityDraft(), eligibility: '  ' }
+    expect(codeOf(() => validateAccess(draft))).toBe('eligibilityRequired')
+    expect(() => validateAccess(applyNoRestrictions(draft, true))).not.toThrow()
+  })
+
+  it('marcar "sem restricoes" apaga o texto dos criterios', () => {
+    const draft = applyNoRestrictions(validOpportunityDraft(), true)
+    expect(draft.hasNoRestrictions).toBe(true)
+    expect(draft.eligibility).toBe('')
+  })
+
+  it('a forma de combinar o atendimento e obrigatoria', () => {
+    const draft = { ...validOpportunityDraft(), contactMethod: null }
+    expect(codeOf(() => validateAccess(draft))).toBe('contactMethodRequired')
+  })
+
+  it('accessErrors marca cada campo do passo', () => {
+    const errors = accessErrors({
+      ...validOpportunityDraft(),
+      accessMode: null,
+      totalVacancies: '',
+      closesAt: '',
+    })
+    expect(errors).toEqual({
+      accessMode: 'accessModeRequired',
+      totalVacancies: 'vacanciesRequired',
+      closesAt: 'closesAtRequired',
+    })
   })
 
   it('trocar para online limpa o endereco', () => {

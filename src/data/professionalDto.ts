@@ -3,6 +3,9 @@
 export interface ManagedOpportunityDTO {
   id: string
   title: string
+  description?: string | null
+  serviceType?: string | null
+  audiences?: string[] | null
   specialty: string
   accessMode: string
   price: number | null
@@ -11,9 +14,13 @@ export interface ManagedOpportunityDTO {
   applicationCount: number
   status: string
   modality: string
+  cep?: string | null
   address: string | null
   opensAt: string | null
   closesAt: string | null
+  eligibility?: string | null
+  noRestrictions?: boolean | null
+  contactMethod?: string | null
   updatedAt: string
 }
 
@@ -37,6 +44,7 @@ export interface RequestDocumentDTO {
   id: string
   name: string
   sizeKb: number
+  sentAt?: string | null
 }
 
 export interface RequestMessageDTO {
@@ -53,26 +61,43 @@ export interface RequestDetailDTO {
   opportunityTitle: string
   receivedAt: string
   status: string
+  protocol?: string | null
+  decidedAt?: string | null
   triage: TriageAnswerDTO[]
   documents: RequestDocumentDTO[]
   messages: RequestMessageDTO[]
 }
 
+export interface TriageQuestionDTO {
+  id: string
+  label: string
+  type: string
+  required: boolean
+  options: string[]
+}
+
 export interface CreateOpportunityRequestDTO {
+  /** ATIVA publica; RASCUNHO so guarda. */
+  status: string
   title: string
+  serviceType: string | null
+  audiences: string[]
   description: string
   specialty: string
-  audience: string
   modality: string
+  cep: string | null
   address: string | null
   accessMode: string
   price: number | null
   totalVacancies: number
   opensAt: string
   closesAt: string
+  eligibility: string | null
+  noRestrictions: boolean
+  contactMethod: string | null
   triage: {
     mode: string
-    questions: { id: string; label: string }[]
+    questions: TriageQuestionDTO[]
     documents: { id: string; label: string }[]
   }
 }

@@ -119,6 +119,30 @@ describe('Cadastro e verificacao', () => {
   })
 })
 
+describe('Recuperar senha', () => {
+  it('envia o pedido com o e-mail normalizado', async () => {
+    const dependencies = testDependencies()
+    await expect(
+      dependencies.requestPasswordReset('  Profissional@Teste.com '),
+    ).resolves.toBeUndefined()
+  })
+
+  it('responde igual para e-mail sem conta, para nao revelar quem tem cadastro', async () => {
+    await expect(
+      testDependencies().requestPasswordReset('ninguem@exemplo.com'),
+    ).resolves.toBeUndefined()
+  })
+
+  it('e-mail invalido nem chega ao servidor', async () => {
+    await expect(testDependencies().requestPasswordReset('sem-arroba')).rejects.toMatchObject({
+      code: 'emailInvalid',
+    })
+    await expect(testDependencies().requestPasswordReset('  ')).rejects.toMatchObject({
+      code: 'emailRequired',
+    })
+  })
+})
+
 describe('Busca de oportunidades', () => {
   it('busca sem filtro traz a primeira pagina', async () => {
     const page = await testDependencies().searchOpportunities(emptyCriteria())
