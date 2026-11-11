@@ -2,6 +2,8 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useSession } from '@/app/session'
 import { CbIcon } from '@/designSystem/tokens/icons'
 import { strings } from '@/resources/strings'
+import logo from '../assets/logo.svg'
+
 
 export function AppShell() {
   const session = useSession()
@@ -19,8 +21,9 @@ export function AppShell() {
   return (
     <div className="cb-shell">
       <aside className="cb-sidebar">
-        <div className="cb-sidebar__logo" aria-hidden="true">
-          LOGO
+        <div className="cb-sidebar__logo">
+          <img src={logo} alt="" />
+          <span className="cb-sidebar__brand">{strings.app.name}</span>
         </div>
 
         <nav className="cb-sidebar__nav" aria-label={strings.app.tagline}>
