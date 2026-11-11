@@ -82,11 +82,20 @@
 /* ---- Painel do profissional, conforme o prototipo ---- */
 
 .cb-sidebar__logo {
-  display: grid; place-items: center;
-  width: 56px; height: 56px; border-radius: 50%;
-  background: var(--cb-brand); color: var(--cb-text-on-brand);
-  font: var(--cb-font-micro); letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: var(--cb-space-sm);
 }
+.cb-sidebar__logo img {
+  display: block;
+  height: var(--cb-space-xxl);
+  width: auto;
+}
+.cb-sidebar__brand {
+  font: var(--cb-font-headline);
+  color: var(--cb-text-primary);
+}
+
 .cb-sidebar__name { font: var(--cb-font-caption-strong); margin: 0; color: var(--cb-text-primary); }
 .cb-sidebar__credential { font: var(--cb-font-caption); margin: 0; color: var(--cb-text-secondary); }
 .cb-sidebar__verified { display: inline-flex; align-items: center; gap: 2px; color: var(--cb-brand-strong); font: var(--cb-font-caption-strong); }
@@ -133,7 +142,7 @@
 .cb-status__dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .cb-status--active { background: var(--cb-success-surface); color: var(--cb-brand-strong); }
 .cb-status--closed { background: var(--cb-surface-raised); color: var(--cb-text-secondary); }
-.cb-status--draft { background: var(--cb-surface-raised); color: var(--cb-text-secondary); }
+.cb-status--draft { background:var(--cb-warning-surface); border-color: transparent }
 .cb-status--review { background: var(--cb-warning-surface); color: var(--cb-text-primary); }
 .cb-status--approved { background: var(--cb-success-surface); color: var(--cb-brand-strong); }
 .cb-status--rejected { background: var(--cb-danger-surface); color: var(--cb-danger); }
