@@ -3,12 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { rememberRegistration, useDependencies, useSession } from '@/app/session'
 import { Banner, Button, SelectField, TextField } from '@/designSystem/components'
 import { NetworkError } from '@/data/network/httpClient'
-import {
-  EMPTY_PROFESSIONAL_CATALOG,
-  emptySignUpDraft,
-  type ProfessionalCatalog,
-  type SignUpDraft,
-} from '@/domain/entities'
+import { EMPTY_CATALOG, emptySignUpDraft, type Catalog, type SignUpDraft } from '@/domain/entities'
 import { ValidationError, type ValidationCode } from '@/domain/useCases'
 import { AuthCard } from '@/presentation/Auth/AuthCard'
 import { strings } from '@/resources/strings'
@@ -29,7 +24,7 @@ export function SignUpPage() {
   const navigate = useNavigate()
 
   const [draft, setDraft] = useState<SignUpDraft>(emptySignUpDraft)
-  const [catalog, setCatalog] = useState<ProfessionalCatalog>(EMPTY_PROFESSIONAL_CATALOG)
+  const [catalog, setCatalog] = useState<Catalog>(EMPTY_CATALOG)
   const [errors, setErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setSubmitting] = useState(false)
@@ -37,12 +32,12 @@ export function SignUpPage() {
   useEffect(() => {
     let active = true
     dependencies
-      .loadProfessionalCatalog()
+      .loadCatalog()
       .then((value) => {
         if (active) setCatalog(value)
       })
       .catch(() => {
-        if (active) setCatalog(EMPTY_PROFESSIONAL_CATALOG)
+        if (active) setCatalog(EMPTY_CATALOG)
       })
     return () => {
       active = false
@@ -89,8 +84,10 @@ export function SignUpPage() {
     } catch (error) {
       if (error instanceof ValidationError) {
         setErrors({ [error.code]: error.message })
-      } else if (error instanceof NetworkError && error.status === 409) {
+      } else if (error instanceof NetworkError && error.kind === 'conflict') {
         setFormError(strings.signUp.emailTaken)
+      } else if (error instanceof NetworkError && error.kind === 'badRequest' && error.apiMessage) {
+        setFormError(error.apiMessage)
       } else {
         setFormError(strings.common.failed)
       }
@@ -145,7 +142,21 @@ export function SignUpPage() {
           inputMode="numeric"
           value={draft.professional.number}
           onChange={(number) => update({ professional: { ...draft.professional, number } })}
-          errorMessage={errors.registrationRequired}
+          errorMessage={errors.registrationRequired ?? errors.registrationInvalid}
+        />
+        <SelectField
+          label={strings.signUp.specialtyLabel}
+          placeholder={strings.common.select}
+          options={catalog.specialties.map((item) => ({ value: item.id, label: item.label }))}
+          value={draft.professional.specialtyId}
+          onChange={(specialtyId) => update({ professional: { ...draft.professional, specialtyId } })}
+        />
+        <TextField
+          label={strings.signUp.workplaceLabel}
+          placeholder={strings.signUp.workplacePlaceholder}
+          autoComplete="organization"
+          value={draft.professional.workplace}
+          onChange={(workplace) => update({ professional: { ...draft.professional, workplace } })}
         />
         <TextField
           label={strings.signUp.passwordLabel}

@@ -1,139 +1,89 @@
-/** Espelham exatamente o formato que a API envia. Ver CONTRATO-API-CareBridge.md */
+/**
+ * Espelham exatamente o que a API envia e recebe nas rotas de acesso e de
+ * catalogo. Ver CONTRATO-API-CareBridge.md (versao 2), secoes 1, 3 e 4.
+ */
 
-export interface AddressDTO {
-  street: string
-  neighborhood: string
-  zipCode: string
-  number: string
-  complement: string | null
-  city: string
-  state: string
-}
+/** `tipoPerfil`. */
+export type TipoPerfil = 'PACIENTE' | 'PROFISSIONAL_SAUDE' | 'ADMIN'
 
-export interface UserDTO {
-  username: string
-  email: string
-  enabled: boolean
-  profile: string
-  address: AddressDTO | null
-  birthday: string | null
-  income: number | null
-  concern: string[] | null
-  accessConditions: string[] | null
-  healthHistory: string | null
-  serviceRequests: string[] | null
-}
+/** `situacaoRegistro`, so do profissional. */
+export type SituacaoRegistro = 'EM_VERIFICACAO' | 'VERIFICADO' | 'RECUSADO'
 
-export interface AuthResponseDTO {
-  token: string
-  expiresIn: number
-  user: UserDTO
-}
-
+/** POST /user/login */
 export interface LoginRequestDTO {
   email: string
   password: string
 }
 
-export interface ProfessionalRegistrationDTO {
-  council: string
-  state: string
-  number: string
+/** Resposta de POST /user/login e de POST /user/verificacao. */
+export interface LoginResponseDTO {
+  token: string
+  autenticado: boolean
+  tipoPerfil: string
+  validadoInstitucionalmente: boolean
+  /** Novo na versao 2; a API real ainda pode nao mandar. */
+  expiraEmSegundos?: number | null
 }
 
-export interface SignUpRequestDTO {
-  username: string
-  email: string
-  password: string
-  profile: string
-  acceptedTerms: boolean
-  professional: ProfessionalRegistrationDTO | null
-}
-
-export interface VerificationChallengeDTO {
-  email: string
-  profile: string
-  codeLength: number
-}
-
-export interface VerifyCodeRequestDTO {
-  email: string
-  code: string
-}
-
-export interface ResendCodeRequestDTO {
-  email: string
-}
-
-export interface FilterOptionDTO {
+/** GET /user/me */
+export interface MeDTO {
   id: string
-  label: string
+  email: string
+  tipoPerfil: string
+  nome: string
+  dataNascimento?: string | null
+  telefone?: string | null
+  situacaoRegistro?: string | null
+  /** Registro profissional; so do profissional. */
+  conselho?: string | null
+  uf?: string | null
+  numeroRegistro?: string | null
+  especialidade?: string | null
+  ondeAtende?: string | null
 }
 
-export interface ProfessionalCatalogDTO {
-  councils: FilterOptionDTO[]
-  states: FilterOptionDTO[]
+export interface UsuarioDTO {
+  email: string
+  senha: string
+  tipoPerfil: TipoPerfil
 }
 
-export interface ProviderDTO {
-  id: string
-  name: string
-  kind: string
-  verified: boolean
+/** Parte `dados` (JSON) do multipart de POST /profissional-saude/cadastro. */
+export interface ProfissionalCadastroDTO {
+  usuarioDto: UsuarioDTO
+  nome: string
+  conselho: string
+  uf: string
+  numeroRegistro: string
+  especialidade: string | null
+  ondeAtende: string | null
+  biografiaOuDescricao: string | null
+  aceitouTermos: boolean
 }
 
-export interface LocationDTO {
-  city: string
-  state: string
-  address: string | null
-  distanceKm: number | null
+/** Resposta 201 do cadastro. Pode vir vazia: os clientes leem como sem codigo. */
+export interface CadastroResponseDTO {
+  email: string
+  tipoPerfil: string
+  exigeVerificacao: boolean
+  tamanhoCodigo?: number | null
 }
 
-export interface OpportunityDTO {
-  id: string
-  title: string
-  specialty: string
-  modality: string
-  offerType: string
-  vacancies: number
-  provider: ProviderDTO
-  location: LocationDTO
-  summary: string | null
-  requiredDocuments: string[] | null
-  updatedAt: string
+/** POST /user/verificacao */
+export interface VerificacaoRequestDTO {
+  email: string
+  codigo: string
 }
 
-export interface PageDTO<Item> {
-  items: Item[]
-  page: number
-  totalPages: number
-  totalItems: number
+/** POST /user/verificacao/reenvio e POST /user/senha/recuperacao */
+export interface EmailRequestDTO {
+  email: string
 }
 
-export interface FilterCatalogDTO {
-  specialties: FilterOptionDTO[]
-  modalities: FilterOptionDTO[]
-  distances: FilterOptionDTO[]
-  offerTypes: FilterOptionDTO[]
-}
-
-export interface TriageAnswersDTO {
-  reason: string
-  hasDiagnosis: boolean
-  usesContinuousMedication: boolean
-  urgency: string
-}
-
-export interface TimelineStepDTO {
-  title: string
-  detail: string
-  done: boolean
-}
-
-export interface ApplicationDTO {
-  id: string
-  protocolNumber: string
-  opportunityId: string
-  status: string
-  timeline: TimelineStepDTO[]
+/** GET /catalogos */
+export interface CatalogosDTO {
+  especialidades: { id: string; nome: string }[]
+  conselhos: { sigla: string; profissao: string }[]
+  ufs: string[]
+  distanciasKm: number[]
 }

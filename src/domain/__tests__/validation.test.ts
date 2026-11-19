@@ -116,7 +116,7 @@ describe('Validacao do cadastro', () => {
   it('paciente nao precisa de dados profissionais', () => {
     const draft = {
       ...validPatientDraft(),
-      professional: { councilId: null, stateId: null, number: '' },
+      professional: { councilId: null, stateId: null, number: '', specialtyId: null, workplace: '' },
     }
     expect(() => validateSignUp(draft)).not.toThrow()
   })
@@ -144,6 +144,35 @@ describe('Validacao do cadastro', () => {
     } catch (error) {
       expect((error as ValidationError).code).toBe('registrationRequired')
     }
+  })
+
+  it.each(['123', '12345678', '12a456', '12.345'])(
+    'numero de registro %s fora de 4 a 7 digitos e recusado',
+    (number) => {
+      const base = validProfessionalDraft()
+      const draft = { ...base, professional: { ...base.professional, number } }
+      try {
+        validateSignUp(draft)
+        expect.unreachable('deveria ter lancado')
+      } catch (error) {
+        expect((error as ValidationError).code).toBe('registrationInvalid')
+      }
+    },
+  )
+
+  it.each(['1234', '1234567', ' 123456 '])('numero de registro %s e aceito', (number) => {
+    const base = validProfessionalDraft()
+    const draft = { ...base, professional: { ...base.professional, number } }
+    expect(() => validateSignUp(draft)).not.toThrow()
+  })
+
+  it('especialidade e local de atendimento sao opcionais', () => {
+    const base = validProfessionalDraft()
+    const draft = {
+      ...base,
+      professional: { ...base.professional, specialtyId: null, workplace: '' },
+    }
+    expect(() => validateSignUp(draft)).not.toThrow()
   })
 
   it('o erro apontado e o do primeiro campo da tela', () => {

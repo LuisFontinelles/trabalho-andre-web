@@ -23,9 +23,12 @@ export function LoginPage() {
   function messageFor(error: unknown): string {
     if (error instanceof WrongProfileError) return strings.login.notProfessional
     if (error instanceof NetworkError) {
-      if (error.kind === 'unauthorized' || error.kind === 'notFound') {
+      // O contrato v2 responde 401 para senha errada; a API de hoje ainda
+      // responde 403 nessa rota publica, que so pode querer dizer o mesmo.
+      if (error.kind === 'unauthorized' || error.kind === 'forbidden' || error.kind === 'notFound') {
         return strings.login.invalidCredentials
       }
+      if (error.kind === 'tooManyAttempts') return strings.login.tooManyAttempts
       return strings.common.failed
     }
     return strings.login.invalidCredentials
@@ -39,14 +42,9 @@ export function LoginPage() {
     setSubmitting(true)
     try {
       const result = await dependencies.login(email, password)
-      if (result.isVerified === undefined) {
-        // Backend de fixtures: nao informa a conferencia do registro.
-        session.signIn(result)
-        navigate('/oportunidades', { replace: true })
-        return
-      }
       session.signIn(result, {
-        registration: rememberedRegistration(result.user.email),
+        // O /user/me traz o registro; o guardado no cadastro cobre a API que ainda nao traz.
+        registration: result.registration ?? rememberedRegistration(result.user.email),
         isVerified: result.isVerified,
       })
       navigate(result.isVerified ? '/oportunidades' : '/cadastro-em-verificacao', { replace: true })
