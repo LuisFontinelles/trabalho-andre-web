@@ -13,9 +13,8 @@ import {
 } from '@/domain/useCases'
 
 /**
- * Endereco da API real. Vazio = tudo no servidor simulado. Em
- * desenvolvimento use `/api`, que o Vite repassa para o Render (a API ainda
- * nao libera CORS para o navegador chamar direto).
+ * Endereco da API real. Vazio = tudo no servidor simulado. Local:
+ * `http://localhost:8080`; o Render libera CORS para o GitHub Pages.
  */
 const API_URL: string = import.meta.env.VITE_API_URL ?? ''
 
@@ -58,16 +57,13 @@ export function createDependencies(
   tokens: TokenStore = createTokenStore(),
 ) {
   const options = { getToken: tokens.get, onUnauthorized: tokens.expire }
-  const client = createHttpClient(BASE_URL, fetchImpl, options)
-  const mockAuthRepository = createAuthRepository(client)
-  // Na API real ja existem login e cadastro; o resto segue no simulado.
-  const authRepository =
-    apiUrl.trim() === ''
-      ? mockAuthRepository
-      : createCareBridgeAuthRepository(
-          createAuthRepository(createHttpClient(apiUrl, apiFetch, options)),
-          mockAuthRepository,
-        )
+  const mockClient = createHttpClient(BASE_URL, fetchImpl, options)
+  const mockAuthRepository = createAuthRepository(mockClient)
+  const usesApi = apiUrl.trim() !== ''
+  const client = usesApi ? createHttpClient(apiUrl, apiFetch, options) : mockClient
+  const authRepository = usesApi
+    ? createCareBridgeAuthRepository(createAuthRepository(client), mockAuthRepository)
+    : mockAuthRepository
   const professionalRepository = createProfessionalRepository(client)
 
   return {

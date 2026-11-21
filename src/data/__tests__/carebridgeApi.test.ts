@@ -167,13 +167,18 @@ describe('Login na API real', () => {
     })
   })
 
-  it('o token do login real vai nas rotas do painel que seguem no simulado', async () => {
-    const { deps } = realApiDependencies({ '/user/login': { status: 200, body: LOGIN_OK } })
+  it('o painel vai para a API real com o token do login', async () => {
+    const { deps, calls } = realApiDependencies({
+      '/user/login': { status: 200, body: LOGIN_OK },
+      '/user/me': { status: 200, body: ME },
+      '/profissional-saude/oportunidades': { status: 200, body: [] },
+    })
     const session = await deps.login('ana@exemplo.com', 'Senha@2026')
     deps.tokens.set(session.token)
-    const items = await deps.professionalRepository.myOpportunities()
-    expect(items.length).toBeGreaterThan(0)
-    expect(requestLog).toEqual(['GET /profissional-saude/oportunidades'])
+    await deps.professionalRepository.myOpportunities()
+    const painel = calls.find((call) => call.url.endsWith('/profissional-saude/oportunidades'))!
+    expect((painel.init.headers as Record<string, string>).Authorization).toBe('Bearer jwt.do.servidor')
+    expect(requestLog).toEqual([])
   })
 })
 
@@ -254,18 +259,19 @@ describe('Cadastro na API real', () => {
     })
   })
 
-  it('codigo, recuperar senha e catalogo continuam no simulado', async () => {
-    const { deps, calls } = realApiDependencies({})
+  it('codigo e recuperar senha continuam no simulado; catalogo vai para a API real', async () => {
+    const { deps, calls } = realApiDependencies({
+      '/catalogos': {
+        status: 200,
+        body: { especialidades: [], conselhos: [{ sigla: 'CRM', profissao: 'Medicina' }], ufs: ['DF'], distanciasKm: [5] },
+      },
+    })
     const catalog = await deps.loadCatalog()
     await deps.requestPasswordReset('ana@exemplo.com')
     await deps.resendCode('ana@exemplo.com')
-    expect(catalog.councils.length).toBeGreaterThan(0)
-    expect(calls).toHaveLength(0)
-    expect(requestLog).toEqual([
-      'GET /catalogos',
-      'POST /user/senha/recuperacao',
-      'POST /user/verificacao/reenvio',
-    ])
+    expect(catalog.councils.length).toBe(1)
+    expect(calls.map((call) => call.url)).toEqual(['https://api.teste/catalogos'])
+    expect(requestLog).toEqual(['POST /user/senha/recuperacao', 'POST /user/verificacao/reenvio'])
   })
 })
 
