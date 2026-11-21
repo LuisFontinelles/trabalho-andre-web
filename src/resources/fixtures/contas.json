@@ -1,0 +1,25 @@
+[
+  {
+    "id": "6f1c2a90-0d4e-4b7a-9a51-2f8e0c1b7d01",
+    "email": "paciente@teste.com",
+    "tipoPerfil": "PACIENTE",
+    "nome": "Ana Souza",
+    "dataNascimento": "1988-03-12",
+    "telefone": "61999990000",
+    "situacaoRegistro": null
+  },
+  {
+    "id": "9b3d7e21-5c8f-4a06-b2d4-71e5a0c9f302",
+    "email": "profissional@teste.com",
+    "tipoPerfil": "PROFISSIONAL_SAUDE",
+    "nome": "Marcos Vieira",
+    "dataNascimento": null,
+    "telefone": null,
+    "situacaoRegistro": "VERIFICADO",
+    "conselho": "CRM",
+    "uf": "DF",
+    "numeroRegistro": "123456",
+    "especialidade": "cardiologia",
+    "ondeAtende": "Espaço Cuidar"
+  }
+]

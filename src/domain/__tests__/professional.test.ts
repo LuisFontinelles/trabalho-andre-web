@@ -13,12 +13,14 @@ import {
   contactMethodFrom,
   countByFilter,
   DECIDABLE_STATUSES,
+  defaultAgreement,
   documentKind,
   documentSize,
   filterRequests,
   isDecided,
   isFromProfessional,
   isFull,
+  isOverdue,
   isValidReason,
   messageTime,
   OPPORTUNITY_STATUS_LABEL,
@@ -26,7 +28,9 @@ import {
   opportunityStatusFrom,
   relativeDay,
   remainingVacancies,
+  REQUEST_FILTER_LABEL,
   REQUEST_FILTERS,
+  REQUEST_STATUSES,
   REQUEST_STATUS_LABEL,
   REQUEST_STATUS_TONE,
   requestStatusFrom,
@@ -154,30 +158,74 @@ describe('Resumo do painel', () => {
 })
 
 describe('Status da solicitacao', () => {
-  it.each(['EM_ANALISE', 'APROVADA', 'RECUSADA'] as const)('mantem %s', (status) => {
+  it.each(REQUEST_STATUSES)('mantem %s', (status) => {
     expect(requestStatusFrom(status)).toBe(status)
   })
 
-  it('status desconhecido cai em nova', () => {
-    expect(requestStatusFrom('ARQUIVADA')).toBe('NOVA')
+  it('sao os 6 estados do contrato, na ordem do fluxo', () => {
+    expect(REQUEST_STATUSES).toEqual([
+      'RECEBIDA',
+      'EM_ANALISE',
+      'AGUARDANDO_INFORMACOES',
+      'APROVADA',
+      'RECUSADA',
+      'CANCELADA',
+    ])
   })
 
-  it('aprovada e recusada contam como decididas', () => {
+  it.each(['ARQUIVADA', 'NOVA', 'AGUARDANDO_INFO', ''])(
+    'valor desconhecido %s cai em recebida',
+    (raw) => {
+      expect(requestStatusFrom(raw)).toBe('RECEBIDA')
+    },
+  )
+
+  it('aprovada, recusada e cancelada encerram o pedido', () => {
     expect(isDecided('APROVADA')).toBe(true)
     expect(isDecided('RECUSADA')).toBe(true)
+    expect(isDecided('CANCELADA')).toBe(true)
     expect(isDecided('EM_ANALISE')).toBe(false)
-    expect(isDecided('NOVA')).toBe(false)
+    expect(isDecided('RECEBIDA')).toBe(false)
+    expect(isDecided('AGUARDANDO_INFORMACOES')).toBe(false)
   })
 
-  it('a tela de decisao nao oferece "nova" como escolha', () => {
-    expect(DECIDABLE_STATUSES).not.toContain('NOVA')
-    expect(DECIDABLE_STATUSES).toHaveLength(3)
+  it('a decisao so pode ser aprovar ou recusar', () => {
+    expect(DECIDABLE_STATUSES).toEqual(['APROVADA', 'RECUSADA'])
   })
 
   it('todo status tem rotulo', () => {
-    for (const status of ['NOVA', 'EM_ANALISE', 'APROVADA', 'RECUSADA'] as const) {
+    for (const status of REQUEST_STATUSES) {
       expect(REQUEST_STATUS_LABEL[status]).not.toBe('')
     }
+  })
+
+  it('recebida e cancelada tem rotulo e tom neutro', () => {
+    expect(REQUEST_STATUS_LABEL.RECEBIDA).toBe('Recebida')
+    expect(REQUEST_STATUS_LABEL.CANCELADA).toBe('Cancelada')
+    expect(REQUEST_STATUS_TONE.RECEBIDA).toBe('neutral')
+    expect(REQUEST_STATUS_TONE.CANCELADA).toBe('neutral')
+  })
+})
+
+describe('Atrasada', () => {
+  const now = new Date('2026-11-20T12:00:00Z')
+  const late = { deadline: '2026-11-19T09:12:00Z' }
+
+  it.each(['RECEBIDA', 'EM_ANALISE'] as const)('%s depois do prazo esta atrasada', (status) => {
+    expect(isOverdue({ ...late, status }, now)).toBe(true)
+  })
+
+  it.each(['AGUARDANDO_INFORMACOES', 'APROVADA', 'RECUSADA', 'CANCELADA'] as const)(
+    '%s nao fica atrasada',
+    (status) => {
+      expect(isOverdue({ ...late, status }, now)).toBe(false)
+    },
+  )
+
+  it('dentro do prazo, ou sem prazo, nao esta atrasada', () => {
+    expect(isOverdue({ status: 'RECEBIDA', deadline: '2026-11-21T00:00:00Z' }, now)).toBe(false)
+    expect(isOverdue({ status: 'RECEBIDA', deadline: null }, now)).toBe(false)
+    expect(isOverdue({ status: 'RECEBIDA', deadline: 'sem data' }, now)).toBe(false)
   })
 })
 
@@ -198,7 +246,8 @@ describe('Filtro de solicitacoes', () => {
     ['APROVADA', 2],
     ['EM_ANALISE', 1],
     ['RECUSADA', 1],
-    ['NOVA', 0],
+    ['RECEBIDA', 0],
+    ['CANCELADA', 0],
   ] as const)('filtro %s conta %i', (filter, expected) => {
     expect(countByFilter(items, filter)).toBe(expected)
   })
@@ -209,7 +258,7 @@ describe('Filtro de solicitacoes', () => {
   })
 
   it('filtro sem resultado devolve lista vazia, nao a lista toda', () => {
-    expect(filterRequests(items, 'NOVA')).toEqual([])
+    expect(filterRequests(items, 'RECEBIDA')).toEqual([])
   })
 })
 
@@ -247,6 +296,7 @@ describe('Mensagens', () => {
       isFromProfessional({
         id: '1',
         author: 'PROFISSIONAL',
+        authorName: 'Marcos Vieira',
         text: 'oi',
         sentAt: '2026-10-21T12:46:00Z',
       }),
@@ -255,6 +305,7 @@ describe('Mensagens', () => {
       isFromProfessional({
         id: '2',
         author: 'PACIENTE',
+        authorName: 'Ana Souza',
         text: 'oi',
         sentAt: '2026-10-21T12:45:00Z',
       }),
@@ -317,12 +368,12 @@ describe('Modalidade de acesso e atendimento', () => {
 
 describe('Status da solicitacao', () => {
   it('aguardando informacoes e um status proprio', () => {
-    expect(requestStatusFrom('AGUARDANDO_INFO')).toBe('AGUARDANDO_INFO')
-    expect(REQUEST_STATUS_LABEL.AGUARDANDO_INFO).toBe('Aguardando informações')
+    expect(requestStatusFrom('AGUARDANDO_INFORMACOES')).toBe('AGUARDANDO_INFORMACOES')
+    expect(REQUEST_STATUS_LABEL.AGUARDANDO_INFORMACOES).toBe('Aguardando informações')
   })
 
   it('aguardando informacoes ainda nao e uma decisao', () => {
-    expect(isDecided('AGUARDANDO_INFO')).toBe(false)
+    expect(isDecided('AGUARDANDO_INFORMACOES')).toBe(false)
   })
 
   it('cada status tem o tom do selo', () => {
@@ -333,19 +384,24 @@ describe('Status da solicitacao', () => {
     expect(OPPORTUNITY_STATUS_TONE.ENCERRADA).toBe('neutral')
   })
 
-  it('quem aguarda informacoes aparece em Todas, sem filtro proprio', () => {
+  it('cada estado tem filtro proprio, alem de Todas', () => {
     const items = [
-      makeReceivedRequest({ id: '1', status: 'AGUARDANDO_INFO' }),
+      makeReceivedRequest({ id: '1', status: 'AGUARDANDO_INFORMACOES' }),
       makeReceivedRequest({ id: '2', status: 'APROVADA' }),
+      makeReceivedRequest({ id: '3', status: 'CANCELADA' }),
     ]
-    expect(filterRequests(items, 'TODAS')).toHaveLength(2)
-    expect(REQUEST_FILTERS).not.toContain('AGUARDANDO_INFO')
+    expect(filterRequests(items, 'TODAS')).toHaveLength(3)
+    expect(filterRequests(items, 'AGUARDANDO_INFORMACOES').map((i) => i.id)).toEqual(['1'])
+    expect(filterRequests(items, 'CANCELADA').map((i) => i.id)).toEqual(['3'])
+    expect(REQUEST_FILTERS).toEqual(['TODAS', ...REQUEST_STATUSES])
+    for (const filter of REQUEST_FILTERS) expect(REQUEST_FILTER_LABEL[filter]).not.toBe('')
   })
 
   it('mensagens so depois da aprovacao', () => {
     expect(canExchangeMessages('APROVADA')).toBe(true)
     expect(canExchangeMessages('EM_ANALISE')).toBe(false)
     expect(canExchangeMessages('RECUSADA')).toBe(false)
+    expect(canExchangeMessages('CANCELADA')).toBe(false)
   })
 })
 
@@ -360,6 +416,10 @@ describe('Decisao', () => {
     expect(shortDate(responseDeadline('2026-11-10T09:12:00Z'))).toBe('25/11')
   })
 
+  it('o prazo segue os dias da oportunidade quando ela diz outro', () => {
+    expect(shortDate(responseDeadline('2026-11-10T09:12:00Z', 5))).toBe('15/11')
+  })
+
   it('data invalida nao gera prazo nem texto', () => {
     expect(responseDeadline('nao e data')).toBeNull()
     expect(shortDate('nao e data')).toBe('')
@@ -368,7 +428,7 @@ describe('Decisao', () => {
 })
 
 describe('Documento enviado', () => {
-  const document = { id: 'd1', name: 'RG_frente.jpg', sizeKb: 420, sentAt: null }
+  const document = { id: 'd1', documentId: 'rg', name: 'RG_frente.jpg', sizeKb: 420, sentAt: null }
 
   it('o tipo vem da extensao', () => {
     expect(documentKind(document)).toBe('JPG')
@@ -378,5 +438,29 @@ describe('Documento enviado', () => {
   it('o tamanho sai em KB ate 1 MB e em MB dali em diante', () => {
     expect(documentSize(document)).toBe('420 KB')
     expect(documentSize({ ...document, sizeKb: 1229 })).toBe('1,2 MB')
+  })
+})
+
+describe('Combinado na aprovacao', () => {
+  it('presencial combina no endereco e leva os documentos exigidos', () => {
+    expect(defaultAgreement(makeManagedOpportunity())).toEqual({
+      when: 'A combinar',
+      where: 'Rua das Flores, 120',
+      bring: 'RG, Encaminhamento médico',
+    })
+  })
+
+  it('online combina pela modalidade', () => {
+    const online = makeManagedOpportunity({ modality: 'online', address: null })
+    expect(defaultAgreement(online).where).toBe('Online')
+  })
+
+  it('presencial sem endereco cai na modalidade', () => {
+    const noAddress = makeManagedOpportunity({ address: '  ' })
+    expect(defaultAgreement(noAddress).where).toBe('Presencial')
+  })
+
+  it('sem a oportunidade carregada tudo fica a combinar', () => {
+    expect(defaultAgreement(null)).toEqual({ when: 'A combinar', where: 'A combinar', bring: '' })
   })
 })

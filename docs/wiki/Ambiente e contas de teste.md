@@ -18,9 +18,9 @@ O backend ainda não existe. Estas duas contas são aceitas pelo servidor simula
 | Perfil | E-mail | Senha |
 |---|---|---|
 | Profissional de saúde | `profissional@teste.com` | qualquer senha não vazia |
-| Paciente | `paciente@teste.com` | qualquer senha não vazia |
+| Paciente | `paciente@teste.com` | qualquer senha não vazia (o painel recusa o perfil) |
 
-Não existe senha certa: o mock só valida o e-mail. Qualquer outro endereço é recusado com 401, de propósito, para dar como exercitar a tela de erro.
+Não existe senha certa: o mock só valida o e-mail. Qualquer outro endereço é recusado com 401, de propósito, para dar como exercitar a tela de erro. Cinco erros seguidos no mesmo e-mail bloqueiam o login por 15 minutos (429), como o contrato pede.
 
 A convenção usada nos testes automatizados é `Profissa@2026` e `Paciente@2026`, caso você queira padronizar.
 
@@ -32,7 +32,7 @@ A convenção usada nos testes automatizados é `Profissa@2026` e `Paciente@2026
 
 O cadastro aceita endereços que não estão na lista. O registro fica guardado em memória enquanto a aba estiver aberta, e a verificação devolve o perfil e o nome que você cadastrou.
 
-No cadastro de profissional, os dados do conselho são livres: escolha qualquer conselho, qualquer UF e qualquer número de registro.
+No cadastro de profissional, escolha qualquer conselho e UF; o número do registro tem de 4 a 7 dígitos. A conta nova nasce em verificação: salva rascunho, mas não publica.
 
 ## O que esperar
 

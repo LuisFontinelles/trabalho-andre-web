@@ -41,6 +41,12 @@ export const QUESTION_TYPE_LABEL: Record<QuestionType, string> = {
 /** Multipla escolha so funciona com pelo menos duas opcoes. */
 export const MIN_OPTIONS = 2
 
+/** A pergunta so aparece (e so e exigida) quando outra tem aquela resposta. */
+export interface QuestionDependency {
+  questionId: string
+  answer: string
+}
+
 export interface TriageQuestion {
   id: string
   label: string
@@ -48,7 +54,19 @@ export interface TriageQuestion {
   isRequired: boolean
   /** So a multipla escolha usa. */
   options: readonly string[]
+  /** So na multipla escolha: aceita mais de uma opcao. */
+  allowsMultiple?: boolean
+  /** So nas de texto. */
+  minLength?: number
+  maxLength?: number
+  /** Linha de apoio abaixo da pergunta. */
+  help?: string
+  dependsOn?: QuestionDependency
 }
+
+/** As respostas de uma pergunta Sim ou nao, como o paciente envia. */
+export const YES = 'Sim'
+export const NO = 'Não'
 
 export interface RequiredDocument {
   id: string
@@ -89,27 +107,109 @@ export interface OpportunityDraft {
   questions: readonly TriageQuestion[]
   documents: readonly RequiredDocument[]
   selectedDocumentIds: readonly string[]
+  /**
+   * O formulario nao edita estes campos, mas a edicao precisa devolve-los
+   * para o servidor nao apaga-los.
+   */
+  city: string | null
+  state: string | null
+  audienceNote: string | null
+  responseDays: number
 }
 
+/**
+ * O formulario padrao do contrato (secao 6), com os mesmos ids nos dois
+ * apps. O paciente ve exatamente o que o painel envia em triagem.perguntas.
+ */
 export const DEFAULT_QUESTIONS: readonly TriageQuestion[] = [
-  { id: 'q1', label: 'Qual o motivo principal?', type: 'TEXTO_LONGO', isRequired: true, options: [] },
   {
-    id: 'q2',
+    id: 'motivo',
+    label: 'Qual o motivo principal?',
+    type: 'TEXTO_LONGO',
+    isRequired: true,
+    options: [],
+    minLength: 10,
+    maxLength: 300,
+  },
+  {
+    id: 'tempo',
     label: 'Há quanto tempo?',
     type: 'MULTIPLA',
     isRequired: true,
     options: ['Menos de 1 semana', 'De 1 a 4 semanas', 'De 1 a 6 meses', 'Mais de 6 meses'],
   },
-  { id: 'q3', label: 'Já possui diagnóstico?', type: 'SIM_NAO', isRequired: true, options: [] },
-  { id: 'q4', label: 'Usa medicação contínua?', type: 'SIM_NAO', isRequired: true, options: [] },
+  { id: 'diagnostico', label: 'Já tem diagnóstico?', type: 'SIM_NAO', isRequired: true, options: [] },
   {
-    id: 'q5',
-    label: 'Qual a urgência percebida?',
+    id: 'qual-diagnostico',
+    label: 'Qual diagnóstico?',
+    type: 'TEXTO_CURTO',
+    isRequired: true,
+    options: [],
+    dependsOn: { questionId: 'diagnostico', answer: YES },
+  },
+  { id: 'medicacao', label: 'Usa medicação contínua?', type: 'SIM_NAO', isRequired: true, options: [] },
+  {
+    id: 'quais-medicacoes',
+    label: 'Quais medicações?',
+    type: 'TEXTO_CURTO',
+    isRequired: true,
+    options: [],
+    dependsOn: { questionId: 'medicacao', answer: YES },
+  },
+  {
+    id: 'urgencia',
+    label: 'Urgência percebida',
     type: 'MULTIPLA',
     isRequired: true,
     options: ['Baixa', 'Média', 'Alta'],
+    help: 'Alta: atrapalha suas atividades do dia a dia.',
+  },
+  {
+    id: 'horario',
+    label: 'Melhor horário',
+    type: 'MULTIPLA',
+    isRequired: false,
+    options: ['Manhã', 'Tarde', 'Noite'],
+    allowsMultiple: true,
   },
 ]
+
+/** As respostas que uma pergunta admite, para conferir uma dependencia. */
+export function possibleAnswers(question: TriageQuestion): readonly string[] | null {
+  if (question.type === 'SIM_NAO') return [YES, NO]
+  if (question.type === 'MULTIPLA') return question.options
+  return null
+}
+
+/**
+ * Tira a condicao das perguntas que dependem de uma que sumiu ou que nao
+ * admite mais aquela resposta. A pergunta continua na lista, agora sempre
+ * visivel, e o profissional decide se a remove.
+ */
+export function pruneDependencies(
+  questions: readonly TriageQuestion[],
+): readonly TriageQuestion[] {
+  return questions.map((question) => {
+    if (question.dependsOn === undefined) return question
+    const { questionId, answer } = question.dependsOn
+    const target = questions.find((item) => item.id === questionId)
+    const answers = target === undefined ? null : possibleAnswers(target)
+    if (answers !== null && answers.includes(answer)) return question
+    const rest = { ...question }
+    delete rest.dependsOn
+    return rest
+  })
+}
+
+/** A pergunta de que esta depende, para a tela mostrar a condicao. */
+export function dependencyOf(
+  question: TriageQuestion,
+  questions: readonly TriageQuestion[],
+): { question: TriageQuestion; answer: string } | null {
+  if (question.dependsOn === undefined) return null
+  const target = questions.find((item) => item.id === question.dependsOn?.questionId)
+  return target === undefined ? null : { question: target, answer: question.dependsOn.answer }
+}
 
 export function emptyOpportunityDraft(): OpportunityDraft {
   return {
@@ -134,6 +234,10 @@ export function emptyOpportunityDraft(): OpportunityDraft {
     questions: DEFAULT_QUESTIONS,
     documents: DOCUMENT_CATALOG,
     selectedDocumentIds: ['rg'],
+    city: null,
+    state: null,
+    audienceNote: null,
+    responseDays: 15,
   }
 }
 
@@ -299,7 +403,7 @@ export function accessErrors(draft: OpportunityDraft): DraftErrors {
 
   if (draft.opensAt.trim() === '') errors.opensAt = 'opensAtRequired'
   if (draft.closesAt.trim() === '') errors.closesAt = 'closesAtRequired'
-  else if (draft.opensAt.trim() !== '' && draft.closesAt < draft.opensAt) {
+  else if (draft.opensAt.trim() !== '' && draft.closesAt <= draft.opensAt) {
     errors.closesAt = 'closesBeforeOpens'
   }
 
@@ -392,12 +496,25 @@ export function newQuestion(): TriageQuestion {
   }
 }
 
-/** Trocar o tipo para longe da multipla escolha descarta as opcoes. */
+const isText = (type: QuestionType) => type === 'TEXTO_CURTO' || type === 'TEXTO_LONGO'
+
+/**
+ * Trocar o tipo descarta o que so valia para o anterior: as opcoes e o
+ * "aceita varias" da multipla escolha, os limites de caracteres do texto.
+ */
 export function withQuestionType(
   question: TriageQuestion,
   type: QuestionType,
 ): TriageQuestion {
-  return { ...question, type, options: type === 'MULTIPLA' ? question.options : [] }
+  const { allowsMultiple, minLength, maxLength, ...rest } = question
+  return {
+    ...rest,
+    type,
+    options: type === 'MULTIPLA' ? question.options : [],
+    ...(type === 'MULTIPLA' && allowsMultiple !== undefined ? { allowsMultiple } : {}),
+    ...(isText(type) && minLength !== undefined ? { minLength } : {}),
+    ...(isText(type) && maxLength !== undefined ? { maxLength } : {}),
+  }
 }
 
 export function validateQuestion(question: TriageQuestion): void {
@@ -419,19 +536,20 @@ export function saveQuestion(
     options: question.options.map((item) => item.trim()).filter((item) => item !== ''),
   }
   const exists = draft.questions.some((item) => item.id === cleaned.id)
-  return {
-    ...draft,
-    questions: exists
-      ? draft.questions.map((item) => (item.id === cleaned.id ? cleaned : item))
-      : [...draft.questions, cleaned],
-  }
+  const questions = exists
+    ? draft.questions.map((item) => (item.id === cleaned.id ? cleaned : item))
+    : [...draft.questions, cleaned]
+  return { ...draft, questions: pruneDependencies(questions) }
 }
 
 export function removeQuestion(
   draft: OpportunityDraft,
   id: string,
 ): OpportunityDraft {
-  return { ...draft, questions: draft.questions.filter((item) => item.id !== id) }
+  return {
+    ...draft,
+    questions: pruneDependencies(draft.questions.filter((item) => item.id !== id)),
+  }
 }
 
 export function toggleDocument(
@@ -447,11 +565,19 @@ export function toggleDocument(
   }
 }
 
+/** "outro-1", "outro-2": o id que o contrato da ao documento escrito a mao. */
+export function nextCustomDocumentId(documents: readonly RequiredDocument[]): string {
+  const used = new Set(documents.map((item) => item.id))
+  let index = 1
+  while (used.has(`outro-${index}`)) index += 1
+  return `outro-${index}`
+}
+
 /** O documento novo ja nasce marcado: foi o profissional que pediu por ele. */
 export function addDocument(draft: OpportunityDraft, label: string): OpportunityDraft {
   const name = label.trim()
   if (name === '') return draft
-  const id = `doc-${crypto.randomUUID()}`
+  const id = nextCustomDocumentId(draft.documents)
   return {
     ...draft,
     documents: [...draft.documents, { id, label: name, isCustom: true }],

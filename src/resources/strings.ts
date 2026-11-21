@@ -45,6 +45,8 @@ export const strings = {
     emailInvalid: 'E-mail inválido.',
     passwordRequired: 'Informe sua senha.',
     notProfessional: 'Esta conta não é de profissional de saúde. Use o app CareBridge para pacientes.',
+    tooManyAttempts:
+      'Acesso bloqueado por 15 minutos depois de 5 senhas erradas seguidas. Tente de novo mais tarde.',
   },
   signUp: {
     title: 'Criar conta de profissional',
@@ -57,6 +59,9 @@ export const strings = {
     stateLabel: 'UF *',
     registrationLabel: 'Nº do registro *',
     registrationPlaceholder: 'Ex.: 123456',
+    specialtyLabel: 'Especialidade principal',
+    workplaceLabel: 'Onde atende',
+    workplacePlaceholder: 'Clínica, hospital ou instituição',
     passwordLabel: 'Senha *',
     passwordPlaceholder: '8 caracteres ou mais, com letras e números',
     terms: 'Ao criar a conta você aceita os Termos de Uso e a Política de Privacidade.',
@@ -69,6 +74,7 @@ export const strings = {
     councilRequired: 'Selecione o conselho.',
     stateRequired: 'Selecione a UF.',
     registrationRequired: 'Informe o número do registro.',
+    registrationInvalid: 'O número do registro tem de 4 a 7 dígitos.',
     emailTaken: 'Este e-mail já está cadastrado.',
   },
   verification: {
@@ -188,6 +194,9 @@ export const strings = {
     questions: 'Perguntas',
     required: 'Obrigatória',
     optional: 'Opcional',
+    conditional: 'Condicional',
+    conditionHint: (question: string, answer: string) =>
+      ` (aparece se "${question}" for "${answer}")`,
     edit: 'Editar',
     remove: 'Remover',
     addQuestion: '+ Adicionar pergunta',
@@ -248,6 +257,7 @@ export const strings = {
     triageTitle: 'Respostas da triagem',
     documentsTitle: 'Documentos',
     noDocuments: 'Nenhum documento enviado.',
+    noAnswers: 'Sem respostas para mostrar.',
     open: 'Abrir',
     decisionTitle: 'Decisão',
     pendingHint: (received: string, deadline: string) =>
@@ -264,7 +274,19 @@ export const strings = {
       date === ''
         ? 'Recusada por você. A decisão não pode ser desfeita.'
         : `Recusada por você em ${date}. A decisão não pode ser desfeita.`,
-    waitingNote: 'Aguardando a resposta do paciente, que tem 5 dias para enviar o que falta.',
+    waitingNote: (deadline: string) =>
+      deadline === ''
+        ? 'Aguardando a resposta do paciente.'
+        : `Aguardando a resposta do paciente até ${deadline}.`,
+    infoAsked: (text: string) => `Você pediu: "${text}"`,
+    cancelledNote: (date: string) =>
+      `O paciente cancelou esta solicitação${date === '' ? '' : ` em ${date}`}. Os documentos e as respostas foram apagados.`,
+    rejectedReason: (reason: string) => `Motivo: ${reason}`,
+    agreement: (when: string, where: string, bring: string) =>
+      [`Quando: ${when}`, `Onde: ${where}`, bring === '' ? '' : `Levar: ${bring}`]
+        .filter(Boolean)
+        .join(' · '),
+    toArrange: 'A combinar',
     messagesTitle: 'Mensagens',
     messagesLocked: 'As mensagens ficam disponíveis depois que você aprovar a solicitação.',
     messagePlaceholder: 'Escreva uma mensagem',
@@ -283,7 +305,7 @@ export const strings = {
     rejectConfirm: 'Recusar solicitação',
     infoTitle: 'Pedir informações',
     infoMessage:
-      'O paciente recebe o pedido e tem 5 dias para responder. A solicitação fica como "Aguardando informações".',
+      'O paciente recebe o pedido e tem 3 dias para responder. A solicitação fica como "Aguardando informações".',
     infoField: 'O que falta? *',
     infoPlaceholder: 'Ex.: pode enviar o raio X mais recente?',
     infoRequired: 'Escreva o que falta.',

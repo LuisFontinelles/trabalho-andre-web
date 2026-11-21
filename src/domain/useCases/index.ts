@@ -1,21 +1,12 @@
 import {
   DEFAULT_CODE_LENGTH,
   requiresProfessionalData,
-  type Application,
-  type FilterCatalog,
-  type Opportunity,
-  type OpportunityPage,
+  type Catalog,
   type PendingVerification,
-  type ProfessionalCatalog,
-  type SearchCriteria,
   type Session,
   type SignUpDraft,
 } from '@/domain/entities'
-import type {
-  ApplicationRepository,
-  AuthRepository,
-  OpportunityRepository,
-} from '@/domain/repositories'
+import type { AuthRepository } from '@/domain/repositories'
 import { strings } from '@/resources/strings'
 
 export type ValidationCode =
@@ -29,6 +20,7 @@ export type ValidationCode =
   | 'councilRequired'
   | 'stateRequired'
   | 'registrationRequired'
+  | 'registrationInvalid'
   | 'codeIncomplete'
 
 const VALIDATION_MESSAGE: Record<ValidationCode, string> = {
@@ -42,6 +34,7 @@ const VALIDATION_MESSAGE: Record<ValidationCode, string> = {
   councilRequired: strings.signUp.councilRequired,
   stateRequired: strings.signUp.stateRequired,
   registrationRequired: strings.signUp.registrationRequired,
+  registrationInvalid: strings.signUp.registrationInvalid,
   codeIncomplete: strings.verification.incomplete,
 }
 
@@ -54,6 +47,8 @@ export class ValidationError extends Error {
     this.code = code
   }
 }
+
+const REGISTRATION_PATTERN = /^\d{4,7}$/
 
 const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 
@@ -86,8 +81,10 @@ export function validateSignUp(draft: SignUpDraft): void {
       throw new ValidationError('councilRequired')
     if (draft.professional.stateId === null)
       throw new ValidationError('stateRequired')
-    if (draft.professional.number.trim() === '')
-      throw new ValidationError('registrationRequired')
+    const number = draft.professional.number.trim()
+    if (number === '') throw new ValidationError('registrationRequired')
+    // O contrato aceita de 4 a 7 digitos no numero do registro.
+    if (!REGISTRATION_PATTERN.test(number)) throw new ValidationError('registrationInvalid')
   }
 
   validatePassword(draft.password, true)
@@ -114,6 +111,7 @@ export function makeSignUp(repository: AuthRepository) {
       professional: {
         ...draft.professional,
         number: draft.professional.number.trim(),
+        workplace: draft.professional.workplace.trim(),
       },
     })
   }
@@ -142,23 +140,6 @@ export function makeRequestPasswordReset(repository: AuthRepository) {
   }
 }
 
-export function makeLoadProfessionalCatalog(repository: AuthRepository) {
-  return (): Promise<ProfessionalCatalog> => repository.professionalCatalog()
-}
-
-export function makeSearchOpportunities(repository: OpportunityRepository) {
-  return (criteria: SearchCriteria): Promise<OpportunityPage> =>
-    repository.search(criteria)
-}
-
-export function makeLoadOpportunityDetail(repository: OpportunityRepository) {
-  return (id: string): Promise<Opportunity> => repository.detail(id)
-}
-
-export function makeLoadFilters(repository: OpportunityRepository) {
-  return (): Promise<FilterCatalog> => repository.filters()
-}
-
-export function makeLoadApplicationStatus(repository: ApplicationRepository) {
-  return (id: string): Promise<Application> => repository.status(id)
+export function makeLoadCatalog(repository: AuthRepository) {
+  return (): Promise<Catalog> => repository.catalog()
 }

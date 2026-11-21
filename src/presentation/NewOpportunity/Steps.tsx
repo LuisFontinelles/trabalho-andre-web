@@ -27,6 +27,7 @@ import {
   canEditTriage,
   draftErrorMessage,
   formatCep,
+  dependencyOf,
   newQuestion,
   removeQuestion,
   saveQuestion,
@@ -424,39 +425,45 @@ export function TriageStep({ draft, errors, onChange }: StepProps) {
       </div>
 
       <Panel title={text.questions} gap="md">
-        {draft.questions.map((question) => (
-          <div key={question.id} className="cb-question">
-            {isEditable ? (
-              <button
-                type="button"
-                className="cb-question__label cb-question__label--button"
-                title={`${text.edit}: ${question.label}`}
-                onClick={() => setEditing({ question, isNew: false })}
-              >
-                {question.label}
-              </button>
-            ) : (
-              <span className="cb-question__label" title={question.label}>
-                {question.label}
+        {draft.questions.map((question) => {
+          const dependency = dependencyOf(question, draft.questions)
+          const condition =
+            dependency === null ? '' : text.conditionHint(dependency.question.label, dependency.answer)
+          return (
+            <div key={question.id} className="cb-question">
+              {isEditable ? (
+                <button
+                  type="button"
+                  className="cb-question__label cb-question__label--button"
+                  title={`${text.edit}: ${question.label}${condition}`}
+                  onClick={() => setEditing({ question, isNew: false })}
+                >
+                  {question.label}
+                </button>
+              ) : (
+                <span className="cb-question__label" title={`${question.label}${condition}`}>
+                  {question.label}
+                </span>
+              )}
+              <span className="cb-question__tags">
+                <Chip label={QUESTION_TYPE_LABEL[question.type]} />
+                {dependency !== null && <Chip label={text.conditional} />}
+                <Chip
+                  label={question.isRequired ? text.required : text.optional}
+                  isSelected={question.isRequired}
+                />
               </span>
-            )}
-            <span className="cb-question__tags">
-              <Chip label={QUESTION_TYPE_LABEL[question.type]} />
-              <Chip
-                label={question.isRequired ? text.required : text.optional}
-                isSelected={question.isRequired}
-              />
-            </span>
-            {isEditable && (
-              <Button
-                title={text.remove}
-                kind="dangerSoft"
-                size="sm"
-                onClick={() => onChange(removeQuestion(draft, question.id))}
-              />
-            )}
-          </div>
-        ))}
+              {isEditable && (
+                <Button
+                  title={text.remove}
+                  kind="dangerSoft"
+                  size="sm"
+                  onClick={() => onChange(removeQuestion(draft, question.id))}
+                />
+              )}
+            </div>
+          )
+        })}
         {questionsError && (
           <span className="cb-field__help" role="alert">
             {questionsError}

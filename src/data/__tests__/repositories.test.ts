@@ -1,256 +1,258 @@
 import { describe, expect, it } from 'vitest'
-import { emptyCriteria } from '@/domain/entities'
+import { WrongProfileError } from '@/domain/entities'
 import { ValidationError } from '@/domain/useCases'
-import { DEBUG_VERIFICATION_CODE } from '@/data/network/mockBackend'
-import { testDependencies, validPatientDraft, validProfessionalDraft } from '@/test/factories'
+import {
+  DEBUG_VERIFICATION_CODE,
+  LOCK_MS,
+  MAX_FAILED_LOGINS,
+  authorizationLog,
+  requestLog,
+  setMockClock,
+} from '@/data/network/mockBackend'
+import { testDependencies, validProfessionalDraft } from '@/test/factories'
+
+const deps = () => testDependencies(null)
 
 describe('Login', () => {
-  it('conta de teste do paciente entra', async () => {
-    const session = await testDependencies().login('paciente@teste.com', 'Paciente@2026')
-    expect(session.user.profile).toBe('PACIENTE')
-    expect(session.user.email).toBe('paciente@teste.com')
-    expect(session.token).not.toBe('')
+  it('conta de teste do profissional entra com qualquer senha', async () => {
+    const session = await deps().login('profissional@teste.com', 'qualquer')
+    expect(session.user.profile).toBe('PROFISSIONAL')
+    expect(session.token).toBe('mock.profissional@teste.com')
+    expect(session.isVerified).toBe(true)
   })
 
-  it('conta de teste do profissional entra', async () => {
-    const session = await testDependencies().login('profissional@teste.com', 'Profissa@2026')
-    expect(session.user.profile).toBe('PROFISSIONAL')
+  it('o nome vem de GET /user/me, chamado logo depois com o token novo', async () => {
+    const session = await deps().login('profissional@teste.com', 'Profissa@2026')
+    expect(session.user.name).toBe('Marcos Vieira')
+    expect(session.user.id).toBe('9b3d7e21-5c8f-4a06-b2d4-71e5a0c9f302')
+    expect(requestLog).toEqual(['POST /user/login', 'GET /user/me'])
+    expect(authorizationLog).toEqual([null, 'Bearer mock.profissional@teste.com'])
+  })
+
+  it('conta de paciente e recusada no painel', async () => {
+    await expect(deps().login('paciente@teste.com', 'Paciente@2026')).rejects.toBeInstanceOf(
+      WrongProfileError,
+    )
   })
 
   it('e-mail e normalizado antes de bater no servidor', async () => {
-    const session = await testDependencies().login('  PACIENTE@TESTE.COM ', 'qualquer')
-    expect(session.user.profile).toBe('PACIENTE')
+    const session = await deps().login('  PROFISSIONAL@TESTE.COM ', 'qualquer')
+    expect(session.user.email).toBe('profissional@teste.com')
   })
 
-  it('conta fora da lista e recusada com 401', async () => {
-    await expect(
-      testDependencies().login('ninguem@teste.com', 'Senha@2026'),
-    ).rejects.toMatchObject({ kind: 'unauthorized' })
+  it('conta fora da lista e recusada com 401 e a mensagem do servidor', async () => {
+    await expect(deps().login('ninguem@teste.com', 'Senha@2026')).rejects.toMatchObject({
+      kind: 'unauthorized',
+      status: 401,
+      apiMessage: 'E-mail ou senha incorretos.',
+    })
   })
 
   it('o caso de uso valida antes de chamar a rede', async () => {
-    const deps = testDependencies()
-    await expect(deps.login('sem-arroba', 'Senha@2026')).rejects.toBeInstanceOf(
+    const dependencies = deps()
+    await expect(dependencies.login('sem-arroba', 'Senha@2026')).rejects.toBeInstanceOf(
       ValidationError,
     )
-    await expect(deps.login('paciente@teste.com', '')).rejects.toBeInstanceOf(
+    await expect(dependencies.login('profissional@teste.com', '')).rejects.toBeInstanceOf(
       ValidationError,
     )
+    expect(requestLog).toEqual([])
+  })
+})
+
+describe('Bloqueio depois de 5 senhas erradas', () => {
+  const wrong = (dependencies: ReturnType<typeof deps>, email = 'ana@clinica.com') =>
+    dependencies.login(email, 'errada').catch((error: unknown) => error)
+
+  it('as 4 primeiras dao 401 e a quinta bloqueia com 429', async () => {
+    const dependencies = deps()
+    for (let attempt = 1; attempt < MAX_FAILED_LOGINS; attempt += 1) {
+      expect(await wrong(dependencies)).toMatchObject({ kind: 'unauthorized' })
+    }
+    expect(await wrong(dependencies)).toMatchObject({
+      kind: 'tooManyAttempts',
+      status: 429,
+      apiMessage: 'Muitas tentativas. Tente de novo em 15 minutos.',
+    })
+  })
+
+  it('bloqueado, nem a senha certa entra; depois de 15 minutos entra', async () => {
+    let now = Date.parse('2026-11-19T12:00:00Z')
+    setMockClock(() => now)
+    const dependencies = deps()
+    // A conta de teste so erra com senha vazia, que o caso de uso barra
+    // antes; aqui a falha vai direto pelo repositorio.
+    for (let attempt = 0; attempt < MAX_FAILED_LOGINS; attempt += 1) {
+      await dependencies.authRepository.login('profissional@teste.com', '').catch(() => null)
+    }
+    await expect(dependencies.login('profissional@teste.com', 'certa')).rejects.toMatchObject({
+      kind: 'tooManyAttempts',
+    })
+    now += LOCK_MS + 1
+    await expect(dependencies.login('profissional@teste.com', 'certa')).resolves.toMatchObject({
+      user: { name: 'Marcos Vieira' },
+    })
+  })
+
+  it('o bloqueio e por e-mail', async () => {
+    const dependencies = deps()
+    for (let attempt = 0; attempt < MAX_FAILED_LOGINS; attempt += 1) await wrong(dependencies)
+    await expect(dependencies.login('profissional@teste.com', 'x')).resolves.toBeDefined()
+  })
+
+  it('acertar zera a contagem', async () => {
+    const dependencies = deps()
+    const draft = { ...validProfessionalDraft(), email: 'conta.nova@clinica.com' }
+    await dependencies.signUp(draft)
+    await dependencies.verifyCode(draft.email, DEBUG_VERIFICATION_CODE)
+    for (let attempt = 1; attempt < MAX_FAILED_LOGINS; attempt += 1) {
+      await wrong(dependencies, draft.email)
+    }
+    await expect(dependencies.login(draft.email, draft.password)).resolves.toBeDefined()
+    for (let attempt = 1; attempt < MAX_FAILED_LOGINS; attempt += 1) {
+      expect(await wrong(dependencies, draft.email)).toMatchObject({ kind: 'unauthorized' })
+    }
   })
 })
 
 describe('Cadastro e verificacao', () => {
-  it('cadastro devolve o desafio de verificacao', async () => {
-    const pending = await testDependencies().signUp(validProfessionalDraft())
-    expect(pending.email).toBe('profissional@teste.com')
-    expect(pending.profile).toBe('PROFISSIONAL')
-    expect(pending.codeLength).toBe(4)
+  it('cadastro devolve o desafio de verificacao de 4 digitos', async () => {
+    const pending = await deps().signUp(validProfessionalDraft())
+    expect(pending).toEqual({
+      email: 'novo.medico@clinica.com',
+      profile: 'PROFISSIONAL',
+      codeLength: 4,
+      requiresCode: true,
+    })
+    expect(requestLog).toEqual(['POST /profissional-saude/cadastro'])
   })
 
   it('o caso de uso normaliza o e-mail antes de enviar', async () => {
-    const draft = { ...validPatientDraft(), email: '  Novo.Paciente@Teste.COM ' }
-    const pending = await testDependencies().signUp(draft)
-    expect(pending.email).toBe('novo.paciente@teste.com')
+    const draft = { ...validProfessionalDraft(), email: '  Nova.Medica@Clinica.COM ' }
+    const pending = await deps().signUp(draft)
+    expect(pending.email).toBe('nova.medica@clinica.com')
+  })
+
+  it('e-mail que ja tem conta responde 409', async () => {
+    const draft = { ...validProfessionalDraft(), email: 'profissional@teste.com' }
+    await expect(deps().signUp(draft)).rejects.toMatchObject({
+      kind: 'conflict',
+      apiMessage: 'Já existe um usuário cadastrado com este e-mail.',
+    })
   })
 
   it('sem aceitar os termos o caso de uso nem chega na rede', async () => {
-    const draft = { ...validPatientDraft(), acceptedTerms: false }
-    await expect(testDependencies().signUp(draft)).rejects.toBeInstanceOf(ValidationError)
+    const draft = { ...validProfessionalDraft(), acceptedTerms: false }
+    await expect(deps().signUp(draft)).rejects.toBeInstanceOf(ValidationError)
+    expect(requestLog).toEqual([])
   })
 
-  it('o codigo de depuracao conclui a verificacao', async () => {
-    const deps = testDependencies()
-    const pending = await deps.signUp(validPatientDraft())
-    const session = await deps.verifyCode(pending.email, DEBUG_VERIFICATION_CODE)
-    expect(session.user.email).toBe('paciente@teste.com')
-  })
-
-  it('verificacao devolve o perfil de quem se cadastrou', async () => {
-    const deps = testDependencies()
-    const draft = {
-      ...validProfessionalDraft(),
+  it('o codigo de depuracao conclui a verificacao e devolve a sessao', async () => {
+    const dependencies = deps()
+    const draft = { ...validProfessionalDraft(), name: 'Helena Souza' }
+    const pending = await dependencies.signUp(draft)
+    const session = await dependencies.verifyCode(pending.email, DEBUG_VERIFICATION_CODE)
+    expect(session.user).toMatchObject({
       email: 'novo.medico@clinica.com',
       name: 'Helena Souza',
-    }
-    const pending = await deps.signUp(draft)
-    const session = await deps.verifyCode(pending.email, '0000')
-    expect(session.user.profile).toBe('PROFISSIONAL')
-    expect(session.user.email).toBe('novo.medico@clinica.com')
-    expect(session.user.name).toBe('Helena Souza')
+      profile: 'PROFISSIONAL',
+    })
+    expect(session.token).toBe('mock.novo.medico@clinica.com')
+    // O profissional nasce EM_VERIFICACAO: ainda sem o selo.
+    expect(session.isVerified).toBe(false)
+  })
+
+  it('antes do codigo a conta nova nao entra', async () => {
+    const dependencies = deps()
+    const draft = validProfessionalDraft()
+    await dependencies.signUp(draft)
+    await expect(dependencies.login(draft.email, draft.password)).rejects.toMatchObject({
+      kind: 'unauthorized',
+    })
+  })
+
+  it('depois do codigo a conta nova entra so com a senha cadastrada', async () => {
+    const dependencies = deps()
+    const draft = validProfessionalDraft()
+    await dependencies.signUp(draft)
+    await dependencies.verifyCode(draft.email, DEBUG_VERIFICATION_CODE)
+    await expect(dependencies.login(draft.email, draft.password)).resolves.toMatchObject({
+      isVerified: false,
+    })
+    await expect(dependencies.login(draft.email, 'Outra@2026')).rejects.toMatchObject({
+      kind: 'unauthorized',
+    })
   })
 
   it.each(['1234', '0001', '9999'])('codigo errado %s devolve 401', async (code) => {
-    await expect(
-      testDependencies().verifyCode('paciente@teste.com', code),
-    ).rejects.toMatchObject({ kind: 'unauthorized' })
+    await expect(deps().verifyCode('profissional@teste.com', code)).rejects.toMatchObject({
+      kind: 'unauthorized',
+      apiMessage: 'Código incorreto ou expirado.',
+    })
   })
 
-  it.each(['', '0', '00', '000'])(
-    'codigo incompleto %s para no caso de uso',
-    async (code) => {
-      await expect(
-        testDependencies().verifyCode('paciente@teste.com', code),
-      ).rejects.toBeInstanceOf(ValidationError)
-    },
-  )
+  it.each(['', '0', '00', '000'])('codigo incompleto %s para no caso de uso', async (code) => {
+    await expect(deps().verifyCode('profissional@teste.com', code)).rejects.toBeInstanceOf(
+      ValidationError,
+    )
+  })
 
   it('caracteres nao numericos sao descartados antes de contar', async () => {
-    const session = await testDependencies().verifyCode('paciente@teste.com', '0-0 0a0')
-    expect(session.user.profile).toBe('PACIENTE')
+    const session = await deps().verifyCode('profissional@teste.com', '0-0 0a0')
+    expect(session.user.profile).toBe('PROFISSIONAL')
   })
 
-  it('reenvio de codigo responde sem corpo', async () => {
-    await expect(
-      testDependencies().resendCode('paciente@teste.com'),
-    ).resolves.toBeUndefined()
+  it('verificar e-mail sem cadastro responde 404', async () => {
+    await expect(deps().verifyCode('ninguem@teste.com', '0000')).rejects.toMatchObject({
+      kind: 'notFound',
+    })
   })
 
-  it('catalogo profissional traz conselhos e UFs', async () => {
-    const catalog = await testDependencies().loadProfessionalCatalog()
+  it('reenvio de codigo responde 204', async () => {
+    await expect(deps().resendCode('profissional@teste.com')).resolves.toBeUndefined()
+    expect(requestLog).toEqual(['POST /user/verificacao/reenvio'])
+  })
+})
+
+describe('Catalogo', () => {
+  it('traz conselhos, UFs e especialidades de GET /catalogos', async () => {
+    const catalog = await deps().loadCatalog()
+    expect(requestLog).toEqual(['GET /catalogos'])
     expect(catalog.councils.map((item) => item.id)).toEqual([
       'CRM',
       'COREN',
       'CRO',
       'CRP',
       'CREFITO',
+      'CRN',
+      'CRF',
+      'CREFONO',
+      'CRESS',
       'CREF',
+      'CRBM',
     ])
-    expect(catalog.states.length).toBeGreaterThan(0)
+    expect(catalog.states).toHaveLength(27)
+    expect(catalog.states[0]).toEqual({ id: 'AC', label: 'AC' })
+    expect(catalog.specialties).toContainEqual({ id: 'clinica-geral', label: 'Clínica geral' })
   })
 })
 
 describe('Recuperar senha', () => {
   it('envia o pedido com o e-mail normalizado', async () => {
-    const dependencies = testDependencies()
-    await expect(
-      dependencies.requestPasswordReset('  Profissional@Teste.com '),
-    ).resolves.toBeUndefined()
+    await expect(deps().requestPasswordReset('  Profissional@Teste.com ')).resolves.toBeUndefined()
+    expect(requestLog).toEqual(['POST /user/senha/recuperacao'])
   })
 
   it('responde igual para e-mail sem conta, para nao revelar quem tem cadastro', async () => {
-    await expect(
-      testDependencies().requestPasswordReset('ninguem@exemplo.com'),
-    ).resolves.toBeUndefined()
+    await expect(deps().requestPasswordReset('ninguem@exemplo.com')).resolves.toBeUndefined()
   })
 
   it('e-mail invalido nem chega ao servidor', async () => {
-    await expect(testDependencies().requestPasswordReset('sem-arroba')).rejects.toMatchObject({
+    await expect(deps().requestPasswordReset('sem-arroba')).rejects.toMatchObject({
       code: 'emailInvalid',
     })
-    await expect(testDependencies().requestPasswordReset('  ')).rejects.toMatchObject({
+    await expect(deps().requestPasswordReset('  ')).rejects.toMatchObject({
       code: 'emailRequired',
     })
-  })
-})
-
-describe('Busca de oportunidades', () => {
-  it('busca sem filtro traz a primeira pagina', async () => {
-    const page = await testDependencies().searchOpportunities(emptyCriteria())
-    expect(page.page).toBe(1)
-    expect(page.items).toHaveLength(6)
-    expect(page.totalItems).toBe(14)
-    expect(page.totalPages).toBe(3)
-  })
-
-  it('a ultima pagina traz o resto', async () => {
-    const page = await testDependencies().searchOpportunities({
-      ...emptyCriteria(),
-      page: 3,
-    })
-    expect(page.items).toHaveLength(2)
-  })
-
-  it('pagina fora do intervalo e presa no limite', async () => {
-    const page = await testDependencies().searchOpportunities({
-      ...emptyCriteria(),
-      page: 99,
-    })
-    expect(page.page).toBe(3)
-  })
-
-  it('paginas nao repetem itens', async () => {
-    const deps = testDependencies()
-    const first = await deps.searchOpportunities({ ...emptyCriteria(), page: 1 })
-    const second = await deps.searchOpportunities({ ...emptyCriteria(), page: 2 })
-    const ids = new Set(first.items.map((item) => item.id))
-    expect(second.items.every((item) => !ids.has(item.id))).toBe(true)
-  })
-
-  it('filtro de especialidade reduz o resultado', async () => {
-    const page = await testDependencies().searchOpportunities({
-      ...emptyCriteria(),
-      specialties: ['psicologia'],
-    })
-    expect(page.totalItems).toBe(3)
-    expect(page.items.every((item) => item.specialtyId === 'psicologia')).toBe(true)
-  })
-
-  it('filtros se somam em vez de se substituir', async () => {
-    const deps = testDependencies()
-    const wide = await deps.searchOpportunities({
-      ...emptyCriteria(),
-      specialties: ['psicologia'],
-    })
-    const narrow = await deps.searchOpportunities({
-      ...emptyCriteria(),
-      specialties: ['psicologia'],
-      modalities: ['online'],
-    })
-    expect(narrow.totalItems).toBeLessThanOrEqual(wide.totalItems)
-    expect(narrow.totalItems).toBeGreaterThan(0)
-  })
-
-  it.each(['PSICOLOGIA', 'psicologia', 'Psicología'])(
-    'busca por %s ignora acento e caixa',
-    async (term) => {
-      const page = await testDependencies().searchOpportunities({
-        ...emptyCriteria(),
-        term,
-      })
-      expect(page.items.length).toBeGreaterThan(0)
-    },
-  )
-
-  it('termo sem resultado devolve pagina vazia', async () => {
-    const page = await testDependencies().searchOpportunities({
-      ...emptyCriteria(),
-      term: 'zzzzz-nao-existe',
-    })
-    expect(page.items).toHaveLength(0)
-    expect(page.totalItems).toBe(0)
-  })
-
-  it('filtro de distancia respeita o limite', async () => {
-    const page = await testDependencies().searchOpportunities({
-      ...emptyCriteria(),
-      distance: '5',
-    })
-    expect(page.items.every((item) => (item.distanceKm ?? 0) <= 5)).toBe(true)
-  })
-})
-
-describe('Detalhe, filtros e candidatura', () => {
-  it('detalhe devolve a oportunidade pedida, nao a da fixture fixa', async () => {
-    const deps = testDependencies()
-    const listed = await deps.searchOpportunities(emptyCriteria())
-    const target = listed.items.at(-1)
-    expect(target).toBeDefined()
-    const detail = await deps.loadOpportunityDetail(target!.id)
-    expect(detail.id).toBe(target!.id)
-    expect(detail.title).toBe(target!.title)
-  })
-
-  it('catalogo de filtros vem completo', async () => {
-    const catalog = await testDependencies().loadFilters()
-    expect(catalog.specialties.length).toBeGreaterThan(0)
-    expect(catalog.modalities).toHaveLength(2)
-    expect(catalog.offerTypes).toHaveLength(3)
-  })
-
-  it('status da candidatura traz a linha do tempo', async () => {
-    const application = await testDependencies().loadApplicationStatus('app-20418')
-    expect(application.protocolNumber).toBe('20418')
-    expect(application.steps.length).toBeGreaterThanOrEqual(2)
-    expect(application.steps[0]?.isDone).toBe(true)
   })
 })

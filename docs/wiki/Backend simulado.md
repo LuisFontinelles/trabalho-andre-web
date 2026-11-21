@@ -14,35 +14,44 @@ E apontar para a API de verdade vira não instalar o interceptador. Nenhuma tela
 
 ## Onde fica
 
-`src/data/network/mockBackend.ts`, com as fixtures em `src/resources/fixtures/`.
-
-Os JSONs são **os mesmos arquivos do projeto iOS**, copiados. As duas interfaces mostram exatamente os mesmos dados, o que facilita comparar comportamento.
+`src/data/network/mockBackend.ts`, com as fixtures em `src/resources/fixtures/` (`contas`, `catalogos`, `oportunidades_profissional`, `inscricoes`), todas no formato do contrato v2.
 
 ## Rotas
 
-As de produto seguem o contrato em `CONTRATO-API-CareBridge.md`.
+As de produto seguem o `CONTRATO-API-CareBridge.md` (versão 2): sem `/v1`, nomes em português, valores fechados em MAIÚSCULAS.
 
 Estas existem só para exercitar o tratamento de erro e **não precisam ser implementadas no servidor**:
 
 | Rota | Status |
 |---|---|
-| `GET /v1/debug/no-content` | 204 |
-| `GET /v1/debug/bad-request` | 400 |
-| `GET /v1/debug/unauthorized` | 401 |
-| `GET /v1/debug/not-found` | 404 |
-| `GET /v1/debug/server-error` | 500 |
+| `GET /debug/no-content` | 204 |
+| `GET /debug/bad-request` | 400 |
+| `GET /debug/unauthorized` | 401 |
+| `GET /debug/forbidden` | 403 |
+| `GET /debug/not-found` | 404 |
+| `GET /debug/conflict` | 409 |
+| `GET /debug/too-many` | 429 |
+| `GET /debug/server-error` | 500 |
 
 ## Regras do mock
 
-**Login** aceita apenas `profissional@teste.com` e `paciente@teste.com`, com qualquer senha não vazia. Qualquer outro e-mail responde 401.
+As da seção 10 do contrato, iguais às do mock do app iOS.
+
+**Login** aceita `profissional@teste.com` com qualquer senha não vazia (`paciente@teste.com` também entra, mas o painel recusa o perfil). Conta cadastrada na sessão entra com a senha do cadastro, depois do código. Cinco erros seguidos no mesmo e-mail bloqueiam por 15 minutos (429).
+
+**Token** é `mock.<email>` e vai em `Authorization: Bearer` nas rotas com cadeado. Sem token, ou com o token `expired`, a rota responde 401 e o painel volta para o login. Paciente numa rota do profissional recebe 403. Um token que não é do mock (o JWT da API real, quando login e cadastro vão para lá) vale como o profissional de demonstração.
 
 **Verificação** aceita apenas `0000`. Qualquer outro código responde 401.
 
-**Cadastro** guarda o registro em memória, e a verificação devolve o perfil e o nome cadastrados, não uma conta fixa.
+**Cadastro** guarda a conta em memória como `EM_VERIFICACAO`: ela pode salvar rascunho, mas publicar responde 403.
+
+**Oportunidade**: publicar valida as regras da seção 5 (400 com o motivo), encerrada não aceita edição (409), só ativa encerra e só rascunho exclui (409).
+
+**Solicitação**: decisão final não volta atrás (409), recusar sem motivo é 400, aprovar sem vaga é 409 e soma 1 em `vagasPreenchidas`, mensagens só em `APROVADA` (409), pedido de informação dá 3 dias de prazo.
 
 ## Latência
 
-O mock simula latência de rede por padrão, entre 50ms e 500ms conforme a rota, para os estados de carregamento serem visíveis no desenvolvimento.
+O mock simula latência de rede por padrão, entre 50ms e 600ms conforme a rota, para os estados de carregamento serem visíveis no desenvolvimento.
 
 Nos testes a latência é desligada:
 
@@ -52,23 +61,20 @@ createMockFetch({ latency: false })
 
 ## Corpo de erro
 
-O mesmo formato em todas as rotas, igual ao que o backend vai devolver:
+O do contrato: pelo menos `status` e `message`, com os campos padrão do Spring junto.
 
 ```json
 {
-  "statusCode": 404,
-  "message": "Not Found: user not found",
-  "error": "Not Found",
-  "requestId": "ddfd6adc-59d5-4ef0-a1f1-7bc904c9b17e"
+  "status": 409,
+  "message": "Já existe um usuário cadastrado com este e-mail.",
+  "error": "Conflict",
+  "path": "/profissional-saude/cadastro",
+  "timestamp": "2026-11-19T02:52:06Z"
 }
 ```
 
-O `NetworkError` carrega esse corpo, então a tela pode mostrar a mensagem do servidor quando ela for útil, e uma mensagem própria quando não for.
+O `NetworkError` carrega esse corpo e separa os casos: `unauthorized` (401), `forbidden` (403), `notFound`, `conflict` (409), `tooManyAttempts` (429), `badRequest` e `server`. A tela mostra a `message` do servidor quando ela explica o que fazer.
 
 ## Quando o backend chegar
 
-1. Trocar `BASE_URL` pela URL real.
-2. Chamar `createDependencies()` sem passar o `createMockFetch()`.
-3. Remover a lógica de filtro e paginação do `createOpportunityRepository`, que hoje roda no cliente e passa a ser responsabilidade do servidor.
-
-Dá para fazer rota por rota, sem big bang: basta encaminhar ao servidor as que já existem e deixar o mock responder o resto.
+O mock e a API falam o mesmo contrato, então trocar é rota por rota: em `createDependencies`, o repositório da rota que já existe passa a usar o cliente da API real. Login e cadastro do profissional já estão assim (ver `src/data/carebridgeApi.ts`).

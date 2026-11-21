@@ -1,58 +1,53 @@
-import authLogin from '@/resources/fixtures/auth_login.json'
-import authLoginProfessional from '@/resources/fixtures/auth_login_professional.json'
-import authSignup from '@/resources/fixtures/auth_signup.json'
-import professionalCatalog from '@/resources/fixtures/professional_catalog.json'
-import opportunities from '@/resources/fixtures/opportunities.json'
-import opportunityDetail from '@/resources/fixtures/opportunity_detail.json'
-import filters from '@/resources/fixtures/filters.json'
-import applicationStatus from '@/resources/fixtures/application_status.json'
-import myOpportunities from '@/resources/fixtures/my_opportunities.json'
-import receivedRequests from '@/resources/fixtures/received_requests.json'
-import requestDetail from '@/resources/fixtures/request_detail.json'
-import triageTemplate from '@/resources/fixtures/triage_template.json'
-import error400 from '@/resources/fixtures/error_400.json'
-import error401 from '@/resources/fixtures/error_401.json'
-import error404 from '@/resources/fixtures/error_404.json'
-import error500 from '@/resources/fixtures/error_500.json'
+import contas from '@/resources/fixtures/contas.json'
+import catalogos from '@/resources/fixtures/catalogos.json'
+import oportunidadesProfissional from '@/resources/fixtures/oportunidades_profissional.json'
+import inscricoes from '@/resources/fixtures/inscricoes.json'
 
-import type { AuthResponseDTO, SignUpRequestDTO } from '@/data/dto'
+import type {
+  LoginResponseDTO,
+  MeDTO,
+  ProfissionalCadastroDTO,
+} from '@/data/dto'
+import type {
+  CombinadoDTO,
+  InscricaoDTO,
+  MensagemDTO,
+  OfertanteDTO,
+  OportunidadeDTO,
+  OportunidadeRequestDTO,
+} from '@/data/professionalDto'
 import type { HttpMethod } from '@/data/network/httpClient'
 
 /**
- * Backend de mentira do CareBridge, equivalente ao FixtureURLProtocol do
- * aplicativo iOS. Ele substitui o fetch, entao todo o caminho real continua
- * sendo exercitado: montagem da URL, status, corpo de erro e decodificacao.
- * Apontar para a API de verdade e nao instalar este interceptador.
+ * Servidor simulado do CareBridge, equivalente ao MockBackend do app iOS.
+ * Responde o CONTRATO-API-CareBridge.md (versao 2) com as regras da secao 10:
+ * contas de teste, codigo 0000, bloqueio depois de 5 senhas erradas e token
+ * `mock.<email>`. Ele substitui o fetch, entao todo o caminho real continua
+ * sendo exercitado: montagem da URL, token, status, corpo de erro e
+ * decodificacao. Apontar para a API de verdade e nao instalar este fetch.
  */
 
-export const BASE_URL = 'https://api.carebridge.local/v1'
+export const BASE_URL = 'https://api.carebridge.local'
 
-export const TEST_ACCOUNTS = {
-  'paciente@teste.com': 'auth_login',
-  'profissional@teste.com': 'auth_login_professional',
-} as const
-
-export type TestAccountEmail = keyof typeof TEST_ACCOUNTS
+export const TEST_ACCOUNTS = ['paciente@teste.com', 'profissional@teste.com'] as const
+export type TestAccountEmail = (typeof TEST_ACCOUNTS)[number]
 
 export const DEBUG_VERIFICATION_CODE = '0000'
+/** Token que o servidor simulado trata como vencido. */
+export const EXPIRED_TOKEN = 'expired'
+export const MAX_FAILED_LOGINS = 5
+export const LOCK_MS = 15 * 60 * 1000
+export const TOKEN_SECONDS = 3600
+/** Prazo que o paciente tem para responder um pedido de informacao. */
+export const INFO_REQUEST_DAYS = 3
+
+const DAY_MS = 24 * 60 * 60 * 1000
 
 const FIXTURES: Record<string, unknown> = {
-  auth_login: authLogin,
-  auth_login_professional: authLoginProfessional,
-  auth_signup: authSignup,
-  professional_catalog: professionalCatalog,
-  opportunities,
-  opportunity_detail: opportunityDetail,
-  filters,
-  application_status: applicationStatus,
-  my_opportunities: myOpportunities,
-  received_requests: receivedRequests,
-  request_detail: requestDetail,
-  triage_template: triageTemplate,
-  error_400: error400,
-  error_401: error401,
-  error_404: error404,
-  error_500: error500,
+  contas,
+  catalogos,
+  oportunidades_profissional: oportunidadesProfissional,
+  inscricoes,
 }
 
 export function loadFixture<T = unknown>(name: string): T {
@@ -61,36 +56,42 @@ export function loadFixture<T = unknown>(name: string): T {
   return structuredClone(value) as T
 }
 
+export function normalizeEmail(email: string | null | undefined): string {
+  return (email ?? '').trim().toLowerCase()
+}
+
 export function matchTestAccount(email: string | null | undefined): TestAccountEmail | null {
-  if (!email) return null
-  const normalized = email.trim().toLowerCase()
-  return normalized in TEST_ACCOUNTS ? (normalized as TestAccountEmail) : null
+  const normalized = normalizeEmail(email)
+  return TEST_ACCOUNTS.find((item) => item === normalized) ?? null
 }
 
-/** Cadastros feitos durante a sessao, para a verificacao devolver o perfil certo. */
-interface RegisteredAccount {
-  name: string
-  email: string
-  profile: string
+/** Relogio do servidor simulado. Os testes trocam para controlar o bloqueio. */
+let clock: () => number = () => Date.now()
+
+export function setMockClock(next: (() => number) | null): void {
+  clock = next ?? (() => Date.now())
 }
 
-const registrations = new Map<string, RegisteredAccount>()
+const isoNow = () => new Date(clock()).toISOString()
 
-/**
- * O painel do profissional muda estado: encerrar, excluir, decidir e
- * responder. O mock guarda isso em memoria para a tela refletir a acao,
- * como o servidor fara.
- */
-interface PanelState {
-  opportunities: Record<string, unknown>[]
-  requests: Record<string, unknown>[]
-  detail: Record<string, unknown> | null
+interface Account {
+  me: MeDTO
+  /** Nulo nas contas de teste, que entram com qualquer senha nao vazia. */
+  password: string | null
+  /** Ja confirmou o codigo por e-mail. */
+  isVerified: boolean
+  /** Dados do registro, para montar o `ofertante` das oportunidades. */
+  ofertante: OfertanteDTO | null
 }
 
-let panel: PanelState = { opportunities: [], requests: [], detail: null }
-let sequence = 0
-
-const DAY_MS = 24 * 60 * 60 * 1000
+interface State {
+  accounts: Map<string, Account>
+  failedLogins: Map<string, number>
+  lockedUntil: Map<string, number>
+  opportunities: OportunidadeDTO[]
+  requests: InscricaoDTO[]
+  sequence: number
+}
 
 /**
  * As datas das fixtures sao fixas, entao com o passar dos dias a lista do
@@ -98,17 +99,31 @@ const DAY_MS = 24 * 60 * 60 * 1000
  * prototipo. Aqui as datas andam em dias inteiros para que a mais recente
  * caia no dia de hoje, mantendo a distancia entre elas e o horario.
  */
+export function dayShift(
+  items: readonly Record<string, unknown>[],
+  field: string,
+  now: Date = new Date(),
+): number {
+  const times = items
+    .map((item) => new Date(String(item[field])).getTime())
+    .filter((time) => !Number.isNaN(time))
+  if (times.length === 0) return 0
+  const startOf = (time: number) => Math.floor(time / DAY_MS) * DAY_MS
+  return startOf(now.getTime()) - startOf(Math.max(...times))
+}
+
+function shiftIso(value: string | null | undefined, shift: number): string | null {
+  if (value === null || value === undefined) return null
+  const time = new Date(value).getTime()
+  return Number.isNaN(time) ? value : new Date(time + shift).toISOString()
+}
+
 export function rebaseToToday(
   items: Record<string, unknown>[],
   field: string,
   now: Date = new Date(),
 ): Record<string, unknown>[] {
-  const times = items
-    .map((item) => new Date(String(item[field])).getTime())
-    .filter((time) => !Number.isNaN(time))
-  if (times.length === 0) return items
-  const startOf = (time: number) => Math.floor(time / DAY_MS) * DAY_MS
-  const shift = startOf(now.getTime()) - startOf(Math.max(...times))
+  const shift = dayShift(items, field, now)
   return items.map((item) => {
     const time = new Date(String(item[field])).getTime()
     if (Number.isNaN(time)) return item
@@ -116,356 +131,662 @@ export function rebaseToToday(
   })
 }
 
-function resetPanel(): void {
-  panel = {
-    opportunities: loadFixture<{ items: Record<string, unknown>[] }>(
-      'my_opportunities',
-    ).items,
-    requests: rebaseToToday(
-      loadFixture<{ items: Record<string, unknown>[] }>('received_requests').items,
-      'receivedAt',
-    ),
-    detail: loadFixture<Record<string, unknown>>('request_detail'),
+/** Anda todas as datas da inscricao juntas, para os prazos continuarem coerentes. */
+export function rebaseRequests(items: InscricaoDTO[], now: Date = new Date()): InscricaoDTO[] {
+  const shift = dayShift(items as unknown as Record<string, unknown>[], 'dataInscricao', now)
+  const message = (item: MensagemDTO): MensagemDTO => ({
+    ...item,
+    enviadaEm: shiftIso(item.enviadaEm, shift) ?? item.enviadaEm,
+  })
+  return items.map((item) => ({
+    ...item,
+    dataInscricao: shiftIso(item.dataInscricao, shift) ?? item.dataInscricao,
+    prazoResposta: shiftIso(item.prazoResposta, shift),
+    decididaEm: shiftIso(item.decididaEm, shift),
+    consentimentoDadosSaudeEm: shiftIso(item.consentimentoDadosSaudeEm, shift),
+    pedidoInformacao:
+      item.pedidoInformacao === null
+        ? null
+        : {
+            ...item.pedidoInformacao,
+            prazo: shiftIso(item.pedidoInformacao.prazo, shift) ?? item.pedidoInformacao.prazo,
+          },
+    documentos: item.documentos.map((document) => ({
+      ...document,
+      enviadoEm: shiftIso(document.enviadoEm, shift) ?? document.enviadoEm,
+    })),
+    ultimaMensagem: item.ultimaMensagem === null ? null : message(item.ultimaMensagem),
+    mensagens: item.mensagens === null ? null : item.mensagens.map(message),
+  }))
+}
+
+const DEMO_PROFESSIONAL = 'profissional@teste.com'
+
+function seed(): State {
+  const accounts = new Map<string, Account>()
+  const opportunities = loadFixture<OportunidadeDTO[]>('oportunidades_profissional')
+  for (const me of loadFixture<MeDTO[]>('contas')) {
+    accounts.set(me.email, {
+      me,
+      password: null,
+      isVerified: true,
+      ofertante: me.email === DEMO_PROFESSIONAL ? (opportunities[0]?.ofertante ?? null) : null,
+    })
   }
-  sequence = 0
+  return {
+    accounts,
+    failedLogins: new Map(),
+    lockedUntil: new Map(),
+    opportunities,
+    requests: rebaseRequests(loadFixture<InscricaoDTO[]>('inscricoes'), new Date(clock())),
+    sequence: 0,
+  }
 }
 
-export function resetMockBackend(): void {
-  registrations.clear()
-  requestLog.length = 0
-  resetPanel()
-}
-
-resetPanel()
+let state: State = seed()
 
 export const requestLog: string[] = []
+/** Cabecalho Authorization de cada requisicao, na mesma ordem do requestLog. */
+export const authorizationLog: (string | null)[] = []
+
+export function resetMockBackend(): void {
+  setMockClock(null)
+  requestLog.length = 0
+  authorizationLog.length = 0
+  state = seed()
+}
+
+interface MockRequest {
+  method: HttpMethod
+  path: string
+  query: URLSearchParams
+  body: unknown
+  token: string | null
+}
 
 interface MockResponse {
   status: number
   body: unknown | null
 }
 
-function errorPayload(message: string, status: number, error: string): MockResponse {
+const REASON: Record<number, string> = {
+  400: 'Bad Request',
+  401: 'Unauthorized',
+  403: 'Forbidden',
+  404: 'Not Found',
+  409: 'Conflict',
+  429: 'Too Many Requests',
+  500: 'Internal Server Error',
+}
+
+/** Corpo de erro do contrato: `status` e `message`, mais os campos do Spring. */
+function failure(status: number, message: string, path = ''): MockResponse {
   return {
     status,
-    body: {
-      statusCode: status,
-      message,
-      error,
-      requestId: crypto.randomUUID(),
-    },
+    body: { status, message, error: REASON[status] ?? 'Error', path, timestamp: isoNow() },
   }
 }
 
-type Handler = (body: unknown, path: string) => MockResponse
+const ok = (body: unknown, status = 200): MockResponse => ({ status, body })
+const empty = (): MockResponse => ({ status: 204, body: null })
+
+type Handler = (request: MockRequest, params: string[]) => MockResponse
 
 interface Route {
   method: HttpMethod
   pattern: string
-  status: number
-  fixture: string | null
   latencyMs: number
-  respond?: Handler
+  handler: Handler
 }
 
-/** Aceita curingas no formato /opportunities/{id}. */
+/** Aceita curingas no formato /oportunidades/{id}. */
 export function matchesPattern(pattern: string, path: string): boolean {
+  return paramsOf(pattern, path) !== null
+}
+
+function paramsOf(pattern: string, path: string): string[] | null {
   const p = pattern.split('/').filter(Boolean)
   const c = path.split('/').filter(Boolean)
-  if (p.length !== c.length) return false
-  return p.every((segment, index) => segment.startsWith('{') || segment === c[index])
+  if (p.length !== c.length) return null
+  const params: string[] = []
+  for (let index = 0; index < p.length; index += 1) {
+    const segment = p[index]!
+    if (segment.startsWith('{')) params.push(decodeURIComponent(c[index]!))
+    else if (segment !== c[index]) return null
+  }
+  return params
 }
 
-const loginResponder: Handler = (body) => {
-  const request = body as { email?: string; password?: string } | null
-  if (!request) return errorPayload('Bad Request: malformed body', 400, 'Bad Request')
-  const account = matchTestAccount(request.email)
-  if (account === null || !request.password) {
-    return { status: 401, body: loadFixture('error_401') }
-  }
-  return { status: 200, body: loadFixture(TEST_ACCOUNTS[account]) }
-}
+// ---------------------------------------------------------------------------
+// Acesso
 
-const signUpResponder: Handler = (body) => {
-  const request = body as SignUpRequestDTO | null
-  if (!request) return errorPayload('Bad Request: malformed body', 400, 'Bad Request')
-  if (!request.acceptedTerms) {
-    return errorPayload(
-      'Unprocessable Entity: terms not accepted',
-      422,
-      'Unprocessable Entity',
-    )
-  }
-  const email = request.email.toLowerCase()
-  registrations.set(email, {
-    name: request.username,
-    email,
-    profile: request.profile,
-  })
+function loginResponse(account: Account): LoginResponseDTO {
   return {
-    status: 201,
-    body: { email, profile: request.profile, codeLength: 4 },
+    token: `mock.${account.me.email}`,
+    autenticado: true,
+    tipoPerfil: account.me.tipoPerfil,
+    validadoInstitucionalmente:
+      account.me.tipoPerfil !== 'PROFISSIONAL_SAUDE' ||
+      account.me.situacaoRegistro === 'VERIFICADO',
+    expiraEmSegundos: TOKEN_SECONDS,
   }
 }
 
-const verifyResponder: Handler = (body) => {
-  const request = body as { email?: string; code?: string } | null
-  if (!request) return errorPayload('Bad Request: malformed body', 400, 'Bad Request')
-  if (request.code !== DEBUG_VERIFICATION_CODE) {
-    return { status: 401, body: loadFixture('error_401') }
-  }
+const TOO_MANY = 'Muitas tentativas. Tente de novo em 15 minutos.'
 
-  const email = (request.email ?? '').toLowerCase()
-  const account = matchTestAccount(email)
-  const registration = registrations.get(email)
-  const fixture =
-    account !== null
-      ? TEST_ACCOUNTS[account]
-      : registration?.profile === 'PROFISSIONAL'
-        ? 'auth_login_professional'
-        : 'auth_login'
+const login: Handler = (request) => {
+  const body = request.body as { email?: string; password?: string } | null
+  if (body === null || typeof body !== 'object') return failure(400, 'Corpo inválido.', request.path)
+  const email = normalizeEmail(body.email)
+  const now = clock()
 
-  const session = loadFixture<AuthResponseDTO>(fixture)
-  if (registration) {
-    session.user = {
-      ...session.user,
-      username: registration.name,
-      email: registration.email,
+  const until = state.lockedUntil.get(email)
+  if (until !== undefined && until > now) return failure(429, TOO_MANY, request.path)
+
+  const account = state.accounts.get(email)
+  const password = body.password ?? ''
+  const matches =
+    account !== undefined &&
+    account.isVerified &&
+    password !== '' &&
+    (account.password === null || account.password === password)
+  if (!matches) {
+    const failures = (state.failedLogins.get(email) ?? 0) + 1
+    state.failedLogins.set(email, failures)
+    if (failures >= MAX_FAILED_LOGINS) {
+      state.failedLogins.set(email, 0)
+      state.lockedUntil.set(email, now + LOCK_MS)
+      return failure(429, TOO_MANY, request.path)
     }
+    return failure(401, 'E-mail ou senha incorretos.', request.path)
   }
-  return { status: 200, body: session }
+  state.failedLogins.delete(email)
+  state.lockedUntil.delete(email)
+  return ok(loginResponse(account))
 }
 
-function pathIdOf(path: string, index: number): string {
-  return path.split('/').filter(Boolean)[index] ?? ''
+const signUp: Handler = (request) => {
+  const body = request.body as ProfissionalCadastroDTO | null
+  if (body === null || typeof body !== 'object' || body.usuarioDto === undefined) {
+    return failure(400, 'Corpo inválido.', request.path)
+  }
+  if (body.aceitouTermos !== true) {
+    return failure(400, 'Aceite os Termos de Uso e a Política de Privacidade.', request.path)
+  }
+  if (!/^\d{4,7}$/.test(body.numeroRegistro ?? '')) {
+    return failure(400, 'O número do registro tem de 4 a 7 dígitos.', request.path)
+  }
+  const email = normalizeEmail(body.usuarioDto.email)
+  if (state.accounts.get(email)?.isVerified === true) {
+    return failure(409, 'Já existe um usuário cadastrado com este e-mail.', request.path)
+  }
+  state.sequence += 1
+  const id = `us-${String(state.sequence).padStart(4, '0')}`
+  // O perfil vem da rota, nunca do corpo.
+  state.accounts.set(email, {
+    me: {
+      id,
+      email,
+      tipoPerfil: 'PROFISSIONAL_SAUDE',
+      nome: body.nome,
+      dataNascimento: null,
+      telefone: null,
+      situacaoRegistro: 'EM_VERIFICACAO',
+      conselho: body.conselho,
+      uf: body.uf,
+      numeroRegistro: body.numeroRegistro,
+      especialidade: body.especialidade,
+      ondeAtende: body.ondeAtende,
+    },
+    password: body.usuarioDto.senha,
+    isVerified: false,
+    ofertante: {
+      id: `pr-${id}`,
+      nome: body.nome,
+      conselho: body.conselho,
+      uf: body.uf,
+      numeroRegistro: body.numeroRegistro,
+      ondeAtende: body.ondeAtende,
+      verificado: false,
+    },
+  })
+  return ok(
+    { email, tipoPerfil: 'PROFISSIONAL_SAUDE', exigeVerificacao: true, tamanhoCodigo: 4 },
+    201,
+  )
 }
 
-/** O handler recebe o corpo e o caminho, para as rotas com id. */
-const listMyOpportunities: Handler = () => ({
-  status: 200,
-  body: {
-    items: panel.opportunities,
-    page: 1,
-    totalPages: 1,
-    totalItems: panel.opportunities.length,
-  },
+const verify: Handler = (request) => {
+  const body = request.body as { email?: string; codigo?: string } | null
+  if (body === null || typeof body !== 'object') return failure(400, 'Corpo inválido.', request.path)
+  if (body.codigo !== DEBUG_VERIFICATION_CODE) {
+    return failure(401, 'Código incorreto ou expirado.', request.path)
+  }
+  const email = normalizeEmail(body.email)
+  const account = state.accounts.get(email)
+  if (account === undefined) return failure(404, 'Cadastro não encontrado.', request.path)
+  account.isVerified = true
+  return ok(loginResponse(account))
+}
+
+const emailOnly: Handler = (request) => {
+  const body = request.body as { email?: string } | null
+  if (normalizeEmail(body?.email) === '') return failure(400, 'Informe o e-mail.', request.path)
+  return empty()
+}
+
+/**
+ * Quem esta chamando. `mock.<email>` e a conta daquele e-mail. Um token que
+ * nao e do simulado (o JWT da API real, quando login e cadastro vao para la)
+ * vale como o profissional de demonstracao, para o resto do painel seguir
+ * funcionando sobre as fixtures.
+ */
+function caller(request: MockRequest): Account | null {
+  const token = request.token
+  if (token === null || token === '' || token === EXPIRED_TOKEN) return null
+  if (!token.startsWith('mock.')) return state.accounts.get(DEMO_PROFESSIONAL) ?? null
+  const account = state.accounts.get(normalizeEmail(token.slice(5)))
+  return account?.isVerified ? account : null
+}
+
+const SESSION_EXPIRED = 'Sua sessão expirou. Entre de novo.'
+
+function authenticated(handler: (request: MockRequest, params: string[], account: Account) => MockResponse): Handler {
+  return (request, params) => {
+    const account = caller(request)
+    if (account === null) return failure(401, SESSION_EXPIRED, request.path)
+    return handler(request, params, account)
+  }
+}
+
+function professional(handler: (request: MockRequest, params: string[], account: Account) => MockResponse): Handler {
+  return authenticated((request, params, account) => {
+    if (account.me.tipoPerfil !== 'PROFISSIONAL_SAUDE') {
+      return failure(403, 'Esta área é só para profissionais de saúde.', request.path)
+    }
+    return handler(request, params, account)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Oportunidades
+
+const PRESENTIAL = ['PRESENCIAL', 'HIBRIDO']
+
+/**
+ * Publicar valida a tabela de regras da secao 5 (mais titulo e as duas
+ * modalidades, de que as regras dependem). Rascunho aceita campos vazios.
+ * O resto (tipo de servico, publico, contato, triagem) o painel ja exige
+ * antes de enviar.
+ */
+export function publishError(body: OportunidadeRequestDTO): string | null {
+  const filled = (value: string | null | undefined) => (value ?? '').trim() !== ''
+  if (!filled(body.titulo)) return 'Informe o título.'
+  const description = (body.descricao ?? '').trim()
+  if (description.length < 40 || description.length > 600) {
+    return 'A descrição precisa ter de 40 a 600 caracteres.'
+  }
+  if (!filled(body.modalidade)) return 'Informe a modalidade de atendimento.'
+  if (PRESENTIAL.includes(body.modalidade ?? '') && (!filled(body.cep) || !filled(body.endereco))) {
+    return 'CEP e endereço são obrigatórios no atendimento presencial ou híbrido.'
+  }
+  if (!filled(body.modalidadeAcesso)) return 'Informe a modalidade de acesso.'
+  if (body.modalidadeAcesso === 'PRECO_SOCIAL' && !((body.preco ?? 0) > 0)) {
+    return 'Informe um preço maior que zero.'
+  }
+  if (body.modalidadeAcesso !== 'PRECO_SOCIAL' && body.preco !== null) {
+    return 'Só a modalidade preço social tem preço.'
+  }
+  if (!((body.vagasTotais ?? 0) >= 1)) return 'O número de vagas precisa ser 1 ou mais.'
+  if (!filled(body.inscricoesDe) || !filled(body.inscricoesAte)) {
+    return 'Informe o período de inscrições.'
+  }
+  if ((body.inscricoesAte ?? '') <= (body.inscricoesDe ?? '')) {
+    return 'O encerramento precisa ser depois do início.'
+  }
+  if (!body.semRestricoes && !filled(body.criteriosElegibilidade)) {
+    return 'Informe os critérios de elegibilidade ou marque sem restrições.'
+  }
+  return null
+}
+
+/** Os campos que o corpo traz, como vieram. */
+function fieldsOf(body: OportunidadeRequestDTO): Omit<OportunidadeRequestDTO, 'status'> {
+  return {
+    titulo: String(body.titulo ?? '').trim(),
+    descricao: body.descricao ?? null,
+    tipoServico: body.tipoServico ?? null,
+    especialidade: body.especialidade ?? null,
+    modalidade: body.modalidade ?? null,
+    modalidadeAcesso: body.modalidadeAcesso ?? null,
+    preco: body.preco ?? null,
+    publicoAlvo: Array.isArray(body.publicoAlvo) ? body.publicoAlvo : [],
+    publicoAlvoObservacao: body.publicoAlvoObservacao ?? null,
+    vagasTotais: body.vagasTotais ?? null,
+    cep: body.cep ?? null,
+    endereco: body.endereco ?? null,
+    cidade: body.cidade ?? null,
+    uf: body.uf ?? null,
+    inscricoesDe: body.inscricoesDe ?? null,
+    inscricoesAte: body.inscricoesAte ?? null,
+    criteriosElegibilidade: body.criteriosElegibilidade ?? null,
+    semRestricoes: body.semRestricoes === true,
+    formaContato: body.formaContato ?? null,
+    prazoRespostaDias: body.prazoRespostaDias ?? 15,
+    triagem: body.triagem ?? null,
+  }
+}
+
+const NOT_VERIFIED =
+  'Seu cadastro ainda está em verificação. Salve como rascunho; publicar fica liberado depois da verificação.'
+
+function canPublish(account: Account): boolean {
+  return account.me.situacaoRegistro === 'VERIFICADO'
+}
+
+function ofertanteOf(account: Account): OfertanteDTO {
+  return (
+    account.ofertante ?? {
+      id: `pr-${account.me.id}`,
+      nome: account.me.nome,
+      conselho: null,
+      uf: null,
+      numeroRegistro: null,
+      ondeAtende: null,
+      verificado: canPublish(account),
+    }
+  )
+}
+
+const myOpportunities = professional(() => ok(state.opportunities))
+
+/** Publica. O rascunho so aparece para o profissional (dono do painel simulado). */
+const getOpportunity: Handler = (request, [id]) => {
+  const found = state.opportunities.find((item) => item.id === id)
+  const account = caller(request)
+  const isOwner = account?.me.tipoPerfil === 'PROFISSIONAL_SAUDE'
+  if (found === undefined || (found.status === 'RASCUNHO' && !isOwner)) {
+    return failure(404, 'Oportunidade não encontrada.', request.path)
+  }
+  return ok(isOwner ? found : { ...found, totalInscricoes: null })
+}
+
+const createOpportunity = professional((request, _params, account) => {
+  const body = request.body as OportunidadeRequestDTO | null
+  if (body === null || typeof body !== 'object') return failure(400, 'Corpo inválido.', request.path)
+  const status = body.status === 'RASCUNHO' ? 'RASCUNHO' : 'ATIVA'
+  if (status === 'ATIVA') {
+    if (!canPublish(account)) return failure(403, NOT_VERIFIED, request.path)
+    const problem = publishError(body)
+    if (problem !== null) return failure(400, problem, request.path)
+  } else if (String(body.titulo ?? '').trim() === '') {
+    return failure(400, 'Informe o título.', request.path)
+  }
+  state.sequence += 1
+  const created: OportunidadeDTO = {
+    id: `op-2${String(state.sequence).padStart(2, '0')}`,
+    ...fieldsOf(body),
+    status,
+    vagasPreenchidas: 0,
+    distanciaKm: null,
+    ultimaAtualizacao: isoNow(),
+    ofertante: ofertanteOf(account),
+    totalInscricoes: 0,
+  }
+  state.opportunities = [created, ...state.opportunities]
+  return ok(created, 201)
 })
 
-/** Campos do formulario que o servidor guarda como vieram. */
-function formFieldsOf(request: Record<string, unknown>): Record<string, unknown> {
-  return {
-    description: request.description ?? null,
-    serviceType: request.serviceType ?? null,
-    audiences: Array.isArray(request.audiences) ? request.audiences : [],
-    cep: request.cep ?? null,
-    eligibility: request.eligibility ?? null,
-    noRestrictions: request.noRestrictions === true,
-    contactMethod: request.contactMethod ?? null,
+const updateOpportunity = professional((request, [id], account) => {
+  const body = request.body as OportunidadeRequestDTO | null
+  if (body === null || typeof body !== 'object') return failure(400, 'Corpo inválido.', request.path)
+  const current = state.opportunities.find((item) => item.id === id)
+  if (current === undefined) return failure(404, 'Oportunidade não encontrada.', request.path)
+  if (current.status === 'ENCERRADA') {
+    return failure(409, 'Oportunidade encerrada não pode ser editada.', request.path)
   }
+  // O que ja foi publicado nao volta a ser rascunho.
+  const status = current.status === 'RASCUNHO' && body.status === 'RASCUNHO' ? 'RASCUNHO' : 'ATIVA'
+  if (status === 'ATIVA') {
+    if (current.status === 'RASCUNHO' && !canPublish(account)) {
+      return failure(403, NOT_VERIFIED, request.path)
+    }
+    const problem = publishError(body)
+    if (problem !== null) return failure(400, problem, request.path)
+  }
+  const updated: OportunidadeDTO = {
+    ...current,
+    ...fieldsOf(body),
+    status,
+    ultimaAtualizacao: isoNow(),
+  }
+  state.opportunities = state.opportunities.map((item) => (item.id === id ? updated : item))
+  return ok(updated)
+})
+
+const closeOpportunity = professional((request, [id]) => {
+  const current = state.opportunities.find((item) => item.id === id)
+  if (current === undefined) return failure(404, 'Oportunidade não encontrada.', request.path)
+  if (current.status !== 'ATIVA') {
+    return failure(409, 'Só uma oportunidade ativa pode ser encerrada.', request.path)
+  }
+  state.opportunities = state.opportunities.map((item) =>
+    item.id === id ? { ...item, status: 'ENCERRADA', ultimaAtualizacao: isoNow() } : item,
+  )
+  return empty()
+})
+
+const deleteOpportunity = professional((request, [id]) => {
+  const current = state.opportunities.find((item) => item.id === id)
+  if (current === undefined) return failure(404, 'Oportunidade não encontrada.', request.path)
+  if (current.status !== 'RASCUNHO') {
+    return failure(409, 'Só rascunho pode ser excluído.', request.path)
+  }
+  state.opportunities = state.opportunities.filter((item) => item.id !== id)
+  return empty()
+})
+
+// ---------------------------------------------------------------------------
+// Inscricoes
+
+const FINAL_STATUSES = ['APROVADA', 'RECUSADA', 'CANCELADA']
+const ALREADY_DECIDED = 'Esta solicitação já foi decidida.'
+
+function listed(item: InscricaoDTO): InscricaoDTO {
+  return { ...item, mensagens: null }
 }
 
-const createOpportunity: Handler = (body) => {
-  const request = body as Record<string, unknown> | null
-  if (!request) return errorPayload('Bad Request: malformed body', 400, 'Bad Request')
-  sequence += 1
-  const created = {
-    id: `op-2${String(sequence).padStart(2, '0')}`,
-    title: String(request.title ?? '') || 'Oportunidade sem titulo',
-    specialty: String(request.specialty ?? ''),
-    accessMode: String(request.accessMode ?? 'gratuito'),
-    price: request.price ?? null,
-    filledVacancies: 0,
-    totalVacancies: Number(request.totalVacancies ?? 0),
-    applicationCount: 0,
-    status: request.status === 'RASCUNHO' ? 'RASCUNHO' : 'ATIVA',
-    modality: String(request.modality ?? 'presencial'),
-    address: request.address ?? null,
-    opensAt: request.opensAt || null,
-    closesAt: request.closesAt || null,
-    ...formFieldsOf(request),
-    updatedAt: new Date().toISOString(),
-  }
-  panel.opportunities = [created, ...panel.opportunities]
-  return { status: 201, body: created }
+function replaceRequest(updated: InscricaoDTO): InscricaoDTO {
+  state.requests = state.requests.map((item) => (item.id === updated.id ? updated : item))
+  return updated
 }
 
-/** O detalhe de um pedido: a base da fixture com os dados da linha da lista. */
-function requestDetailOf(listed: Record<string, unknown>): Record<string, unknown> {
-  const base = panel.detail ?? loadFixture<Record<string, unknown>>('request_detail')
-  return {
-    ...base,
-    id: listed.id,
-    patientName: listed.patientName,
-    opportunityId: listed.opportunityId,
-    opportunityTitle: listed.opportunityTitle,
-    receivedAt: listed.receivedAt,
-    status: listed.status,
-    protocol: listed.protocol ?? null,
-    decidedAt: listed.decidedAt ?? null,
-  }
+function withRequest(
+  handler: (request: MockRequest, item: InscricaoDTO, account: Account) => MockResponse,
+): Handler {
+  return professional((request, [id], account) => {
+    const item = state.requests.find((entry) => entry.id === id)
+    if (item === undefined) return failure(404, 'Solicitação não encontrada.', request.path)
+    return handler(request, item, account)
+  })
 }
 
-const listRequests: Handler = () => ({
-  status: 200,
-  body: {
-    items: panel.requests,
-    page: 1,
-    totalPages: 1,
-    totalItems: panel.requests.length,
-  },
+const listRequests = professional((request) => {
+  const status = request.query.get('status')
+  const items = [...state.requests]
+    .filter((item) => status === null || status === '' || item.status === status)
+    .sort((a, b) => b.dataInscricao.localeCompare(a.dataInscricao))
+  return ok(items.map(listed))
+})
+
+const requestDetail = withRequest((_request, item) =>
+  ok({ ...item, mensagens: item.mensagens ?? [] }),
+)
+
+const decide = withRequest((request, item) => {
+  const body = request.body as { status?: string; motivo?: string | null; combinado?: CombinadoDTO | null } | null
+  const status = body?.status
+  if (status !== 'APROVADA' && status !== 'RECUSADA') {
+    return failure(400, 'A decisão precisa ser APROVADA ou RECUSADA.', request.path)
+  }
+  const reason = (body?.motivo ?? '').trim()
+  if (status === 'RECUSADA' && reason === '') {
+    return failure(400, 'Informe o motivo da recusa.', request.path)
+  }
+  if (FINAL_STATUSES.includes(item.status)) return failure(409, ALREADY_DECIDED, request.path)
+
+  if (status === 'APROVADA') {
+    const opportunity = state.opportunities.find((entry) => entry.id === item.oportunidade.id)
+    if (opportunity !== undefined) {
+      if (opportunity.vagasPreenchidas >= (opportunity.vagasTotais ?? 0)) {
+        return failure(409, 'Não há vagas restantes nesta oportunidade.', request.path)
+      }
+      // Aprovar soma 1 em vagasPreenchidas.
+      state.opportunities = state.opportunities.map((entry) =>
+        entry.id === opportunity.id
+          ? { ...entry, vagasPreenchidas: entry.vagasPreenchidas + 1 }
+          : entry,
+      )
+    }
+  }
+  const decided = replaceRequest({
+    ...item,
+    status,
+    decididaEm: isoNow(),
+    motivoDecisao: status === 'RECUSADA' ? reason : null,
+    combinado:
+      status === 'APROVADA'
+        ? (body?.combinado ?? { quando: 'A combinar', onde: 'A combinar', levar: '' })
+        : null,
+    podeTrocarMensagens: status === 'APROVADA',
+  })
+  return ok({ ...decided, mensagens: decided.mensagens ?? [] })
+})
+
+const askInfo = withRequest((request, item) => {
+  const body = request.body as { texto?: string } | null
+  const text = (body?.texto ?? '').trim()
+  if (text === '') return failure(400, 'Escreva o que falta.', request.path)
+  if (FINAL_STATUSES.includes(item.status)) return failure(409, ALREADY_DECIDED, request.path)
+  const waiting = replaceRequest({
+    ...item,
+    status: 'AGUARDANDO_INFORMACOES',
+    pedidoInformacao: {
+      texto: text,
+      prazo: new Date(clock() + INFO_REQUEST_DAYS * DAY_MS).toISOString(),
+    },
+  })
+  return ok({ ...waiting, mensagens: waiting.mensagens ?? [] })
+})
+
+const sendMessage = withRequest((request, item, account) => {
+  const body = request.body as { texto?: string } | null
+  const text = (body?.texto ?? '').trim()
+  if (text === '') return failure(400, 'Escreva a mensagem.', request.path)
+  if (item.status !== 'APROVADA') {
+    return failure(409, 'As mensagens ficam disponíveis depois da aprovação.', request.path)
+  }
+  state.sequence += 1
+  const message: MensagemDTO = {
+    id: `msg-${100 + state.sequence}`,
+    autor: 'PROFISSIONAL_SAUDE',
+    nomeAutor: account.me.nome,
+    texto: text,
+    enviadaEm: isoNow(),
+  }
+  replaceRequest({
+    ...item,
+    mensagens: [...(item.mensagens ?? []), message],
+    ultimaMensagem: message,
+  })
+  return ok(message, 201)
 })
 
 const ROUTES: Route[] = [
-  { method: 'POST', pattern: '/v1/auth/login', status: 200, fixture: 'auth_login', latencyMs: 400, respond: loginResponder },
-  { method: 'POST', pattern: '/v1/auth/google', status: 200, fixture: 'auth_login', latencyMs: 500 },
-  { method: 'POST', pattern: '/v1/auth/signup', status: 201, fixture: 'auth_signup', latencyMs: 450, respond: signUpResponder },
-  { method: 'POST', pattern: '/v1/auth/verify', status: 200, fixture: 'auth_login', latencyMs: 400, respond: verifyResponder },
-  { method: 'POST', pattern: '/v1/auth/resend-code', status: 204, fixture: null, latencyMs: 350 },
+  // Acesso
+  { method: 'POST', pattern: '/user/login', latencyMs: 400, handler: login },
+  {
+    method: 'GET',
+    pattern: '/user/me',
+    latencyMs: 200,
+    handler: authenticated((_request, _params, account) => ok(account.me)),
+  },
+  { method: 'POST', pattern: '/profissional-saude/cadastro', latencyMs: 600, handler: signUp },
+  { method: 'POST', pattern: '/user/verificacao', latencyMs: 400, handler: verify },
+  { method: 'POST', pattern: '/user/verificacao/reenvio', latencyMs: 350, handler: emailOnly },
   // Responde igual exista ou nao a conta, para nao revelar quem tem cadastro.
-  { method: 'POST', pattern: '/v1/auth/password-reset', status: 204, fixture: null, latencyMs: 400 },
-  { method: 'GET', pattern: '/v1/auth/professional-catalog', status: 200, fixture: 'professional_catalog', latencyMs: 200 },
-  { method: 'GET', pattern: '/v1/opportunities', status: 200, fixture: 'opportunities', latencyMs: 350 },
-  { method: 'GET', pattern: '/v1/opportunities/{id}', status: 200, fixture: 'opportunity_detail', latencyMs: 250 },
-  { method: 'GET', pattern: '/v1/filters', status: 200, fixture: 'filters', latencyMs: 200 },
-  { method: 'GET', pattern: '/v1/applications/{id}', status: 200, fixture: 'application_status', latencyMs: 250 },
+  { method: 'POST', pattern: '/user/senha/recuperacao', latencyMs: 400, handler: emailOnly },
 
-  // Painel do profissional
-  { method: 'GET', pattern: '/v1/professional/opportunities', status: 200, fixture: 'my_opportunities', latencyMs: 300, respond: listMyOpportunities },
-  { method: 'POST', pattern: '/v1/professional/opportunities', status: 201, fixture: null, latencyMs: 450, respond: createOpportunity },
-  { method: 'POST', pattern: '/v1/professional/opportunities/{id}/close', status: 204, fixture: null, latencyMs: 300,
-    respond: (_body, path) => {
-      const id = pathIdOf(path, 3)
-      const found = panel.opportunities.some((item) => item.id === id)
-      if (!found) return { status: 404, body: loadFixture('error_404') }
-      panel.opportunities = panel.opportunities.map((item) =>
-        item.id === id ? { ...item, status: 'ENCERRADA' } : item,
-      )
-      return { status: 204, body: null }
-    } },
-  { method: 'GET', pattern: '/v1/professional/opportunities/{id}', status: 200, fixture: null, latencyMs: 250,
-    respond: (_body, path) => {
-      const id = pathIdOf(path, 3)
-      const found = panel.opportunities.find((item) => item.id === id)
-      if (!found) return { status: 404, body: loadFixture('error_404') }
-      return { status: 200, body: found }
-    } },
-  { method: 'PUT', pattern: '/v1/professional/opportunities/{id}', status: 200, fixture: null, latencyMs: 400,
-    respond: (body, path) => {
-      const id = pathIdOf(path, 3)
-      const request = body as Record<string, unknown> | null
-      if (!request) return errorPayload('Bad Request: malformed body', 400, 'Bad Request')
-      const current = panel.opportunities.find((item) => item.id === id)
-      if (!current) return { status: 404, body: loadFixture('error_404') }
-      // Encerrada nao volta a ser editavel, mesmo que o cliente tente.
-      if (current.status === 'ENCERRADA') {
-        return errorPayload(
-          'Unprocessable Entity: closed opportunity cannot be edited',
-          422,
-          'Unprocessable Entity',
-        )
-      }
-      const updated = {
-        ...current,
-        title: String(request.title ?? '') || current.title,
-        specialty: String(request.specialty ?? current.specialty),
-        accessMode: String(request.accessMode ?? current.accessMode),
-        price: request.price ?? null,
-        totalVacancies: Number(request.totalVacancies ?? current.totalVacancies),
-        modality: String(request.modality ?? current.modality),
-        address: request.address ?? null,
-        opensAt: request.opensAt || current.opensAt,
-        closesAt: request.closesAt || current.closesAt,
-        ...formFieldsOf(request),
-        // Publicar um rascunho muda o status; salvar de novo como rascunho, nao.
-        status:
-          current.status === 'RASCUNHO' && request.status !== 'RASCUNHO'
-            ? 'ATIVA'
-            : current.status,
-        updatedAt: new Date().toISOString(),
-      }
-      panel.opportunities = panel.opportunities.map((item) =>
-        item.id === id ? updated : item,
-      )
-      return { status: 200, body: updated }
-    } },
-  { method: 'DELETE', pattern: '/v1/professional/opportunities/{id}', status: 204, fixture: null, latencyMs: 300,
-    respond: (_body, path) => {
-      const id = pathIdOf(path, 3)
-      const found = panel.opportunities.some((item) => item.id === id)
-      if (!found) return { status: 404, body: loadFixture('error_404') }
-      panel.opportunities = panel.opportunities.filter((item) => item.id !== id)
-      return { status: 204, body: null }
-    } },
-  { method: 'GET', pattern: '/v1/professional/requests', status: 200, fixture: 'received_requests', latencyMs: 300, respond: listRequests },
-  { method: 'GET', pattern: '/v1/professional/requests/{id}', status: 200, fixture: 'request_detail', latencyMs: 250,
-    respond: (_body, path) => {
-      const id = pathIdOf(path, 3)
-      const listed = panel.requests.find((item) => item.id === id)
-      if (!listed) return { status: 404, body: loadFixture('error_404') }
-      return { status: 200, body: requestDetailOf(listed) }
-    } },
-  { method: 'POST', pattern: '/v1/professional/requests/{id}/decision', status: 200, fixture: null, latencyMs: 350,
-    respond: (body, path) => {
-      const id = pathIdOf(path, 3)
-      const request = body as { status?: string; reason?: string } | null
-      const status = request?.status
-      if (status !== 'EM_ANALISE' && status !== 'APROVADA' && status !== 'RECUSADA') {
-        return errorPayload('Unprocessable Entity: unknown status', 422, 'Unprocessable Entity')
-      }
-      const listed = panel.requests.find((item) => item.id === id)
-      if (!listed) return { status: 404, body: loadFixture('error_404') }
-      const decided = {
-        ...listed,
-        status,
-        canMessage: status === 'APROVADA',
-        decidedAt: status === 'EM_ANALISE' ? null : new Date().toISOString(),
-        decisionReason: status === 'RECUSADA' ? (request?.reason ?? null) : null,
-      }
-      panel.requests = panel.requests.map((item) => (item.id === id ? decided : item))
-      return { status: 200, body: requestDetailOf(decided) }
-    } },
-  { method: 'POST', pattern: '/v1/professional/requests/{id}/info-request', status: 200, fixture: null, latencyMs: 350,
-    respond: (body, path) => {
-      const id = pathIdOf(path, 3)
-      const request = body as { text?: string } | null
-      if ((request?.text ?? '').trim() === '') {
-        return errorPayload('Unprocessable Entity: empty request', 422, 'Unprocessable Entity')
-      }
-      const listed = panel.requests.find((item) => item.id === id)
-      if (!listed) return { status: 404, body: loadFixture('error_404') }
-      const waiting = { ...listed, status: 'AGUARDANDO_INFO' }
-      panel.requests = panel.requests.map((item) => (item.id === id ? waiting : item))
-      return { status: 200, body: requestDetailOf(waiting) }
-    } },
-  { method: 'POST', pattern: '/v1/professional/requests/{id}/messages', status: 201, fixture: null, latencyMs: 250,
-    respond: (body) => {
-      const request = body as { text?: string } | null
-      const text = (request?.text ?? '').trim()
-      if (text === '') {
-        return errorPayload('Unprocessable Entity: empty message', 422, 'Unprocessable Entity')
-      }
-      sequence += 1
-      return {
-        status: 201,
-        body: {
-          id: `msg-${sequence + 10}`,
-          author: 'PROFISSIONAL',
-          text,
-          sentAt: new Date().toISOString(),
-        },
-      }
-    } },
-  { method: 'GET', pattern: '/v1/professional/triage-template', status: 200, fixture: 'triage_template', latencyMs: 200 },
+  // Catalogo
+  { method: 'GET', pattern: '/catalogos', latencyMs: 200, handler: () => ok(loadFixture('catalogos')) },
+
+  // Oportunidades
+  { method: 'GET', pattern: '/profissional-saude/oportunidades', latencyMs: 300, handler: myOpportunities },
+  { method: 'GET', pattern: '/oportunidades/{id}', latencyMs: 250, handler: getOpportunity },
+  { method: 'POST', pattern: '/oportunidades', latencyMs: 450, handler: createOpportunity },
+  { method: 'PUT', pattern: '/oportunidades/{id}', latencyMs: 400, handler: updateOpportunity },
+  { method: 'POST', pattern: '/oportunidades/{id}/encerrar', latencyMs: 300, handler: closeOpportunity },
+  { method: 'DELETE', pattern: '/oportunidades/{id}', latencyMs: 300, handler: deleteOpportunity },
+
+  // Inscricoes recebidas
+  { method: 'GET', pattern: '/profissional-saude/inscricoes', latencyMs: 300, handler: listRequests },
+  { method: 'GET', pattern: '/profissional-saude/inscricoes/{id}', latencyMs: 250, handler: requestDetail },
+  { method: 'POST', pattern: '/profissional-saude/inscricoes/{id}/decisao', latencyMs: 350, handler: decide },
+  { method: 'POST', pattern: '/profissional-saude/inscricoes/{id}/pedido-informacao', latencyMs: 350, handler: askInfo },
+  { method: 'POST', pattern: '/profissional-saude/inscricoes/{id}/mensagens', latencyMs: 250, handler: sendMessage },
 
   // Rotas so para exercitar o tratamento de erro da camada de rede.
-  { method: 'GET', pattern: '/v1/debug/no-content', status: 204, fixture: null, latencyMs: 50 },
-  { method: 'GET', pattern: '/v1/debug/bad-request', status: 400, fixture: 'error_400', latencyMs: 50 },
-  { method: 'GET', pattern: '/v1/debug/unauthorized', status: 401, fixture: 'error_401', latencyMs: 50 },
-  { method: 'GET', pattern: '/v1/debug/not-found', status: 404, fixture: 'error_404', latencyMs: 50 },
-  { method: 'GET', pattern: '/v1/debug/server-error', status: 500, fixture: 'error_500', latencyMs: 50 },
+  { method: 'GET', pattern: '/debug/no-content', latencyMs: 50, handler: () => empty() },
+  { method: 'GET', pattern: '/debug/bad-request', latencyMs: 50, handler: (r) => failure(400, 'Parâmetro inválido.', r.path) },
+  { method: 'GET', pattern: '/debug/unauthorized', latencyMs: 50, handler: (r) => failure(401, SESSION_EXPIRED, r.path) },
+  { method: 'GET', pattern: '/debug/forbidden', latencyMs: 50, handler: (r) => failure(403, 'Sem permissão.', r.path) },
+  { method: 'GET', pattern: '/debug/not-found', latencyMs: 50, handler: (r) => failure(404, 'Não encontrado.', r.path) },
+  { method: 'GET', pattern: '/debug/conflict', latencyMs: 50, handler: (r) => failure(409, 'Conflito.', r.path) },
+  { method: 'GET', pattern: '/debug/too-many', latencyMs: 50, handler: (r) => failure(429, TOO_MANY, r.path) },
+  { method: 'GET', pattern: '/debug/server-error', latencyMs: 50, handler: (r) => failure(500, 'Erro inesperado.', r.path) },
 ]
 
+export const mockRoutes = ROUTES
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** O Blob do jsdom nao tem text(); o FileReader le nos dois ambientes. */
+function readBlob(blob: Blob): Promise<string> {
+  if (typeof blob.text === 'function') return blob.text()
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsText(blob)
+  })
+}
+
+async function parseBody(body: BodyInit | null | undefined): Promise<unknown> {
+  try {
+    if (typeof body === 'string') return JSON.parse(body)
+    // Multipart do cadastro: o JSON vem na parte `dados`.
+    if (typeof FormData !== 'undefined' && body instanceof FormData) {
+      const part = body.get('dados')
+      if (part === null) return null
+      return JSON.parse(typeof part === 'string' ? part : await readBlob(part))
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+function headerOf(init: RequestInit | undefined, name: string): string | null {
+  const headers = init?.headers
+  if (headers === undefined) return null
+  if (headers instanceof Headers) return headers.get(name)
+  if (Array.isArray(headers)) {
+    return headers.find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1] ?? null
+  }
+  const record = headers as Record<string, string>
+  const key = Object.keys(record).find((entry) => entry.toLowerCase() === name.toLowerCase())
+  return key === undefined ? null : (record[key] ?? null)
+}
 
 /** Substitui o fetch. Use latency = false nos testes para nao esperar. */
 export function createMockFetch(options: { latency?: boolean } = {}): typeof fetch {
@@ -474,50 +795,45 @@ export function createMockFetch(options: { latency?: boolean } = {}): typeof fet
   return async function mockFetch(input, init) {
     const url = new URL(typeof input === 'string' ? input : String(input))
     const method = (init?.method ?? 'GET') as HttpMethod
+    const authorization = headerOf(init, 'Authorization')
     requestLog.push(`${method} ${url.pathname}${url.search}`)
+    authorizationLog.push(authorization)
 
-    const route = ROUTES.find(
-      (candidate) =>
-        candidate.method === method && matchesPattern(candidate.pattern, url.pathname),
-    )
+    let route: Route | undefined
+    let params: string[] = []
+    for (const candidate of ROUTES) {
+      if (candidate.method !== method) continue
+      const found = paramsOf(candidate.pattern, url.pathname)
+      if (found !== null) {
+        route = candidate
+        params = found
+        break
+      }
+    }
 
     if (useLatency) await sleep(route?.latencyMs ?? 100)
 
-    // 204 e 304 nao admitem corpo: o construtor de Response recusa.
-    const json = (payload: MockResponse) => {
-      const empty = payload.status === 204 || payload.status === 304
-      return new Response(
-        empty || payload.body === null ? null : JSON.stringify(payload.body),
-        {
-          status: payload.status,
-          headers: { 'Content-Type': 'application/json' },
-        },
-      )
+    const respond = (payload: MockResponse) => {
+      // 204 e 304 nao admitem corpo: o construtor de Response recusa.
+      const isEmpty = payload.status === 204 || payload.status === 304 || payload.body === null
+      return new Response(isEmpty ? null : JSON.stringify(payload.body), {
+        status: payload.status,
+        headers: { 'Content-Type': 'application/json' },
+      })
     }
 
-    if (!route) {
-      return json(
-        errorPayload(`Not Found: ${method} ${url.pathname}`, 404, 'Not Found'),
-      )
+    if (route === undefined) {
+      return respond(failure(404, `Rota não encontrada: ${method} ${url.pathname}`, url.pathname))
     }
 
-    if (route.respond) {
-      let parsed: unknown = null
-      if (typeof init?.body === 'string') {
-        try {
-          parsed = JSON.parse(init.body)
-        } catch {
-          parsed = null
-        }
-      }
-      return json(route.respond(parsed, url.pathname))
+    const token = authorization?.startsWith('Bearer ') ? authorization.slice(7).trim() : null
+    const request: MockRequest = {
+      method,
+      path: url.pathname,
+      query: url.searchParams,
+      body: await parseBody(init?.body),
+      token,
     }
-
-    return json({
-      status: route.status,
-      body: route.fixture === null ? null : loadFixture(route.fixture),
-    })
+    return respond(route.handler(request, params))
   }
 }
-
-export const mockRoutes = ROUTES
