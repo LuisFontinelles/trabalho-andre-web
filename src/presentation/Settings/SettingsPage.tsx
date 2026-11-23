@@ -9,6 +9,7 @@ import {
   Modal,
   PageHeader,
   Panel,
+  PasswordField,
   TextField,
 } from '@/designSystem/components'
 import { NetworkError } from '@/data/network/httpClient'
@@ -219,9 +220,8 @@ export function SettingsPage() {
             </>
           }
         >
-          <TextField
+          <PasswordField
             label={text.deletePasswordLabel}
-            type="password"
             autoComplete="current-password"
             value={password}
             onChange={setPassword}

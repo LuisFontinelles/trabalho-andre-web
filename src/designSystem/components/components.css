@@ -239,6 +239,32 @@
   box-shadow: inset 0 0 0 1px var(--cb-danger);
 }
 .cb-field--disabled .cb-field__box { background: var(--cb-disabled-background); }
+.cb-field__box--readonly,
+.cb-field__box--readonly:focus-within {
+  border-style: dashed;
+  border-color: var(--cb-border);
+  box-shadow: none;
+  background: transparent;
+}
+.cb-field__box--readonly .cb-field__input { color: var(--cb-text-secondary); cursor: default; }
+.cb-field__lock { display: inline-flex; flex: none; }
+.cb-field__toggle { margin-right: -6px; color: var(--cb-text-secondary); }
+.cb-password-rules {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px var(--cb-space-md);
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.cb-password-rules__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: var(--cb-font-caption);
+  color: var(--cb-text-tertiary);
+}
+.cb-password-rules__item--met { color: var(--cb-brand-strong); }
 .cb-field__input {
   flex: 1;
   min-width: 0;

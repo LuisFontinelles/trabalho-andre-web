@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { rememberedRegistration, useDependencies, useSession } from '@/app/session'
-import { Banner, Button, TextField } from '@/designSystem/components'
+import { Banner, Button, PasswordField, TextField } from '@/designSystem/components'
 import { NetworkError } from '@/data/network/httpClient'
 import { WrongProfileError } from '@/domain/entities'
 import { ValidationError } from '@/domain/useCases'
@@ -85,10 +85,9 @@ export function LoginPage() {
           onChange={setEmail}
           errorMessage={emailError}
         />
-        <TextField
+        <PasswordField
           label={strings.login.passwordLabel}
           placeholder={strings.login.passwordPlaceholder}
-          type="password"
           autoComplete="current-password"
           value={password}
           onChange={setPassword}

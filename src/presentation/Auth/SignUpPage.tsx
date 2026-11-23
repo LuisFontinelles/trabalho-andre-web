@@ -1,11 +1,17 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { rememberRegistration, useDependencies, useSession } from '@/app/session'
-import { Banner, Button, SelectField, TextField } from '@/designSystem/components'
+import { Banner, Button, PasswordField, SelectField, TextField } from '@/designSystem/components'
 import { NetworkError } from '@/data/network/httpClient'
 import { EMPTY_CATALOG, emptySignUpDraft, type Catalog, type SignUpDraft } from '@/domain/entities'
-import { ValidationError, type ValidationCode } from '@/domain/useCases'
+import {
+  signUpErrors,
+  validationMessage,
+  ValidationError,
+  type ValidationCode,
+} from '@/domain/useCases'
 import { AuthCard } from '@/presentation/Auth/AuthCard'
+import { ruleList } from '@/presentation/Auth/passwordRules'
 import { strings } from '@/resources/strings'
 
 type FieldErrors = Partial<Record<ValidationCode, string>>
@@ -44,25 +50,38 @@ export function SignUpPage() {
     }
   }, [dependencies])
 
-  function update(patch: Partial<SignUpDraft>) {
+  /** Mexer num campo apaga so o erro dele; os outros continuam a vista. */
+  function update(patch: Partial<SignUpDraft>, clears: ValidationCode[]) {
     setDraft((current) => ({ ...current, ...patch }))
-    setErrors({})
+    setErrors((current) => {
+      const next = { ...current }
+      for (const code of clears) delete next[code]
+      return next
+    })
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    setErrors({})
     setFormError(null)
+    // A tela nova nao repete a senha nem tem caixa de termos: criar a conta
+    // ja e o aceite, como o texto acima do botao avisa.
+    const payload: SignUpDraft = {
+      ...draft,
+      profile: 'PROFISSIONAL',
+      confirmPassword: draft.password,
+      acceptedTerms: true,
+    }
+    const codes = signUpErrors(payload)
+    setErrors(Object.fromEntries(codes.map((code) => [code, validationMessage(code)])))
+    if (codes.length > 0) {
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>('.cb-auth__form [aria-invalid="true"]')?.focus()
+      })
+      return
+    }
     setSubmitting(true)
     try {
-      // A tela nova nao repete a senha nem tem caixa de termos: criar a conta
-      // ja e o aceite, como o texto acima do botao avisa.
-      const pending = await dependencies.signUp({
-        ...draft,
-        profile: 'PROFISSIONAL',
-        confirmPassword: draft.password,
-        acceptedTerms: true,
-      })
+      const pending = await dependencies.signUp(payload)
       const council = catalog.councils.find((item) => item.id === draft.professional.councilId)
       const state = catalog.states.find((item) => item.id === draft.professional.stateId)
       const registration = `${council?.label ?? ''}/${state?.label ?? ''} ${draft.professional.number.trim()}`
@@ -104,7 +123,7 @@ export function SignUpPage() {
           placeholder={strings.signUp.namePlaceholder}
           autoComplete="name"
           value={draft.name}
-          onChange={(name) => update({ name })}
+          onChange={(name) => update({ name }, ['nameRequired'])}
           errorMessage={errors.nameRequired}
         />
         <TextField
@@ -113,7 +132,7 @@ export function SignUpPage() {
           type="email"
           autoComplete="email"
           value={draft.email}
-          onChange={(email) => update({ email })}
+          onChange={(email) => update({ email }, ['emailRequired', 'emailInvalid'])}
           errorMessage={errors.emailRequired ?? errors.emailInvalid}
         />
         <div className="cb-row cb-row--compact">
@@ -123,7 +142,7 @@ export function SignUpPage() {
             options={catalog.councils.map((item) => ({ value: item.id, label: item.label }))}
             value={draft.professional.councilId}
             onChange={(councilId) =>
-              update({ professional: { ...draft.professional, councilId } })
+              update({ professional: { ...draft.professional, councilId } }, ['councilRequired'])
             }
             errorMessage={errors.councilRequired}
           />
@@ -132,7 +151,9 @@ export function SignUpPage() {
             placeholder={strings.common.select}
             options={catalog.states.map((item) => ({ value: item.id, label: item.label }))}
             value={draft.professional.stateId}
-            onChange={(stateId) => update({ professional: { ...draft.professional, stateId } })}
+            onChange={(stateId) =>
+              update({ professional: { ...draft.professional, stateId } }, ['stateRequired'])
+            }
             errorMessage={errors.stateRequired}
           />
         </div>
@@ -141,7 +162,12 @@ export function SignUpPage() {
           placeholder={strings.signUp.registrationPlaceholder}
           inputMode="numeric"
           value={draft.professional.number}
-          onChange={(number) => update({ professional: { ...draft.professional, number } })}
+          onChange={(number) =>
+            update({ professional: { ...draft.professional, number } }, [
+              'registrationRequired',
+              'registrationInvalid',
+            ])
+          }
           errorMessage={errors.registrationRequired ?? errors.registrationInvalid}
         />
         <SelectField
@@ -149,7 +175,9 @@ export function SignUpPage() {
           placeholder={strings.common.select}
           options={catalog.specialties.map((item) => ({ value: item.id, label: item.label }))}
           value={draft.professional.specialtyId}
-          onChange={(specialtyId) => update({ professional: { ...draft.professional, specialtyId } })}
+          onChange={(specialtyId) =>
+            update({ professional: { ...draft.professional, specialtyId } }, ['specialtyRequired'])
+          }
           errorMessage={errors.specialtyRequired}
         />
         <TextField
@@ -157,17 +185,19 @@ export function SignUpPage() {
           placeholder={strings.signUp.workplacePlaceholder}
           autoComplete="organization"
           value={draft.professional.workplace}
-          onChange={(workplace) => update({ professional: { ...draft.professional, workplace } })}
+          onChange={(workplace) =>
+            update({ professional: { ...draft.professional, workplace } }, ['workplaceRequired'])
+          }
           errorMessage={errors.workplaceRequired}
         />
-        <TextField
+        <PasswordField
           label={strings.signUp.passwordLabel}
           placeholder={strings.signUp.passwordPlaceholder}
-          type="password"
           autoComplete="new-password"
           value={draft.password}
-          onChange={(password) => update({ password })}
+          onChange={(password) => update({ password }, ['passwordRequired', 'passwordWeak'])}
           errorMessage={errors.passwordRequired ?? errors.passwordWeak}
+          rules={ruleList(draft.password)}
         />
         <p className="cb-auth__caption">{strings.signUp.terms}</p>
         {formError && <Banner message={formError} tone="danger" />}

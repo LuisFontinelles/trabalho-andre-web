@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDependencies } from '@/app/session'
-import { Banner, Button, CodeField, TextField } from '@/designSystem/components'
+import { Banner, Button, CodeField, PasswordField, TextField } from '@/designSystem/components'
 import { NetworkError } from '@/data/network/httpClient'
 import { RESET_CODE_LENGTH, ValidationError } from '@/domain/useCases'
 import { AuthCard } from '@/presentation/Auth/AuthCard'
 import type { LoginHandoff } from '@/presentation/Auth/LoginPage'
+import { ruleList } from '@/presentation/Auth/passwordRules'
 import { useCountdown } from '@/presentation/Auth/useCountdown'
 import { strings } from '@/resources/strings'
 
@@ -77,14 +78,14 @@ function NewPasswordForm({ email, onResend }: { email: string; onResend: () => P
           onChange={setCode}
           label={strings.recover.codeLabel}
         />
-        <TextField
+        <PasswordField
           label={strings.recover.passwordLabel}
           placeholder={strings.recover.passwordPlaceholder}
-          type="password"
           autoComplete="new-password"
           value={password}
           onChange={setPassword}
           errorMessage={passwordError}
+          rules={ruleList(password)}
         />
         {error && <Banner message={error} tone="danger" />}
         {notice && <Banner message={notice} tone="success" />}
