@@ -263,13 +263,13 @@ describe('Passo 2, condicoes de acesso', () => {
     expect(codeOf(() => validateAccess(draft))).toBe('closesBeforeOpens')
   })
 
-  it('inicio e encerramento no mesmo dia e aceito', () => {
+  it('encerramento no mesmo dia do inicio e recusado: o contrato pede depois', () => {
     const draft = {
       ...validOpportunityDraft(),
       opensAt: '2026-11-01',
       closesAt: '2026-11-01',
     }
-    expect(() => validateAccess(draft)).not.toThrow()
+    expect(codeOf(() => validateAccess(draft))).toBe('closesBeforeOpens')
   })
 })
 

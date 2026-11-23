@@ -36,7 +36,7 @@ Três passos, validados um de cada vez. O rascunho inteiro vive em um estado só
 
 `src/presentation/Requests/RequestsPage.tsx`
 
-Chips de filtro com a contagem de cada status, calculada por `countByFilter`. A coluna "Recebida" mostra tempo relativo — "Hoje", "Ontem", "3 dias" — produzido por `relativeDay`, que trata data inválida e data no futuro sem quebrar.
+Chips de filtro, Todas e um por estado, com a contagem calculada por `countByFilter`. A coluna "Recebida" mostra tempo relativo — "Hoje", "Ontem", "3 dias" — produzido por `relativeDay`, que trata data inválida e data no futuro sem quebrar.
 
 O botão da linha muda conforme o caso: "Mensagem", com um ponto quando há mensagem não lida, ou "Ver".
 
@@ -46,6 +46,6 @@ O botão da linha muda conforme o caso: "Mensagem", com um ponto quando há mens
 
 Duas colunas. À esquerda as respostas da triagem e os documentos; à direita a decisão e a conversa.
 
-A decisão aceita três status, e "Nova" não aparece entre as escolhas: é um estado que o sistema atribui, não algo que o profissional escolhe. Aprovar libera a conversa com o paciente, recusar fecha.
+A solicitação tem os 6 estados do contrato, os mesmos do app do paciente: Recebida, Em análise, Aguardando informações, Aprovada, Recusada e Cancelada. A decisão é só aprovar ou recusar, e não volta atrás. Aprovar leva o combinado (`quando`, `onde`, `levar`) e libera a conversa; recusar exige o motivo. Cancelada é o paciente que desistiu: tom neutro e nenhuma ação.
 
 Abaixo de 1040px as colunas viram uma só.

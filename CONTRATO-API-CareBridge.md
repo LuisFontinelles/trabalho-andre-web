@@ -1,10 +1,10 @@
-# CareBridge · Contrato da API
+# CareBridge · Contrato da API (versão 2)
 
-Este documento descreve a API que o aplicativo iOS já consome. Enquanto o servidor não existe, o app intercepta as próprias requisições e responde com os JSONs que estão aqui. Isso significa que **o contrato já está exercitado de ponta a ponta**: montagem da requisição, código de status, decodificação e tratamento de erro.
+Versão 2, de 19/11/2026. Substitui a versão de 21/10, que usava `/v1` e nomes em inglês.
 
-Para o backend, a consequência prática é boa. Quando um endpoint real passar a responder no mesmo formato, basta apontar o app para ele e o fluxo funciona sem mudança no cliente. Os JSONs abaixo não são exemplo ilustrativo: são exatamente o que o app espera receber hoje.
+A API segue o desenho do `carebridge-api` (Spring Boot): caminhos sem prefixo, nomes em português, perfil `PROFISSIONAL_SAUDE`. O app iOS e o painel web foram ajustados a este formato, e os servidores simulados dos dois respondem exatamente como está aqui. Quando uma rota real passar a responder igual, o cliente aponta para ela sem mudar código de tela.
 
-Qualquer divergência de nome de campo, tipo ou formato quebra a decodificação no cliente. Se algum ponto precisar mudar, melhor avisar antes de implementar, que eu ajusto o app junto.
+Cada rota diz se **já existe** no backend, se **existe com outro formato** ou se é **nova**. A ordem de implementação sugerida está no fim.
 
 ---
 
@@ -12,1047 +12,519 @@ Qualquer divergência de nome de campo, tipo ou formato quebra a decodificação
 
 | Item | Valor |
 | --- | --- |
-| Caminho base | `/v1` |
-| Formato | JSON, UTF-8 |
-| Autenticação | Token no cabeçalho, em todas as rotas exceto as de `/auth` |
-| Cabeçalhos enviados | `Accept: application/json` sempre, `Content-Type: application/json` quando há corpo |
-| Datas | ISO 8601 em UTC, como `2026-10-05T14:00:00Z` |
-| Identificadores | String, não inteiro |
+| Caminho base | raiz, sem prefixo (`https://carebridge-api-2.onrender.com/oportunidades`) |
+| Formato | JSON, UTF-8. Cadastro de profissional em `multipart/form-data` |
+| Autenticação | `Authorization: Bearer <token>` em toda rota marcada com 🔒 |
+| Datas com hora | ISO 8601 com fuso, como `2026-11-11T17:32:00Z` (`Instant`) |
+| Datas sem hora | `aaaa-mm-dd` (`LocalDate`) |
+| Identificadores | texto opaco; o backend usa UUID |
+| Valores fechados | em MAIÚSCULAS com `_`, como os enums Java (`PRECO_SOCIAL`) |
+| Especialidade | identificador do catálogo em minúsculas (`cardiologia`, `clinica-geral`) |
+| Lista paginada | `Page` do Spring: `{content, number, size, totalPages, totalElements}`, `number` começa em 0 |
+| Parâmetros de página | `page` (começa em 0) e `size` |
+| CORS | liberar `https://luisfontinelles.github.io` e `http://localhost:5173` |
 
-### Códigos de status acordados
+### Status
 
-| Código | Quando usar |
+| Código | Quando |
 | --- | --- |
-| 200 | Sucesso com corpo |
-| 201 | Recurso criado |
-| 204 | Sucesso sem corpo |
-| 400 | Requisição malformada |
-| 401 | Não autenticado ou credencial inválida |
-| 404 | Recurso inexistente |
-| 409 | Conflito, como e-mail já cadastrado |
-| 422 | Requisição válida que fere regra de negócio |
-| 500 | Erro inesperado |
+| 200 | sucesso com corpo |
+| 201 | criado |
+| 202 | pedido aceito para processar depois (cópia dos dados) |
+| 204 | sucesso sem corpo |
+| 400 | corpo ou parâmetro inválido |
+| 401 | sem token, token inválido ou vencido, **senha errada** |
+| 403 | autenticado, mas sem permissão para aquilo |
+| 404 | não existe ou não pertence a quem pediu |
+| 409 | conflito: e-mail já cadastrado, pedido em dobro, sem vagas, estado que não permite a ação |
+| 429 | login bloqueado depois de 5 senhas erradas seguidas, por 15 minutos |
+| 500 | erro inesperado |
+
+Os clientes tratam 401 como sessão vencida: pedem login de novo e guardam o rascunho. Por isso 401 e 403 precisam ser distintos.
 
 ### Corpo de erro
 
-Todo erro responde com este mesmo formato, em qualquer rota. O app já trata assim.
+Todo erro, em qualquer rota, tem pelo menos `status` e `message`. Os campos padrão do Spring podem vir junto.
 
 ```json
 {
-  "statusCode": 404,
-  "message": "Not Found: user not found",
-  "error": "Not Found",
-  "requestId": "ddfd6adc-59d5-4ef0-a1f1-7bc904c9b17e"
+  "status": 409,
+  "message": "Já existe um usuário cadastrado com este e-mail.",
+  "error": "Conflict",
+  "path": "/paciente/cadastro",
+  "timestamp": "2026-11-19T02:52:06Z"
 }
 ```
 
-| Campo | Tipo | Observação |
-| --- | --- | --- |
-| `statusCode` | int | Repete o status HTTP |
-| `message` | string | Texto legível. O app pode mostrar ao usuário |
-| `error` | string? | Nome do tipo de erro |
-| `requestId` | string? | Para rastrear no log do servidor |
+`message` é mostrada ao usuário em parte dos casos, então vai em português e sem detalhe técnico.
 
 ---
 
-## 2. Autenticação
+## 2. Valores fechados
 
-### POST /v1/auth/login
-
-Requisição:
-
-```json
-{
-  "email": "paciente@teste.com",
-  "password": "Paciente@2026"
-}
-```
-
-Resposta 200: o objeto de sessão da seção 2.5. Resposta 401 quando a credencial não confere.
-
-O app normaliza o e-mail antes de enviar: remove espaços nas pontas e converte para minúsculas. O servidor pode assumir que chega normalizado, mas é mais seguro normalizar de novo.
-
-### POST /v1/auth/google
-
-Requisição: corpo vazio `{}` por enquanto. Quando o login social for implementado de verdade, o app vai enviar o token do provedor. Resposta 200 com o mesmo objeto de sessão.
-
-### POST /v1/auth/signup
-
-Requisição de paciente:
-
-```json
-{
-  "username": "Joana Lima",
-  "email": "joana.lima@teste.com",
-  "password": "Paciente@2026",
-  "profile": "PACIENTE",
-  "acceptedTerms": true,
-  "professional": null
-}
-```
-
-Requisição de profissional de saúde:
-
-```json
-{
-  "username": "Helena Souza",
-  "email": "helena.souza@clinica.com",
-  "password": "Profissa@2026",
-  "profile": "PROFISSIONAL",
-  "acceptedTerms": true,
-  "professional": {
-    "council": "CRM",
-    "state": "DF",
-    "number": "123456"
-  }
-}
-```
-
-**O cadastro não devolve sessão.** Ele devolve o desafio de verificação, e a sessão só nasce depois que o código é conferido. Resposta 201:
-
-```json
-{
-  "email": "paciente@teste.com",
-  "profile": "PACIENTE",
-  "codeLength": 4
-}
-```
-
-Respostas de erro esperadas: 409 se o e-mail já existe, 422 se `acceptedTerms` vier `false`.
-
-O campo `profile` aceita `PACIENTE` ou `PROFISSIONAL`. O bloco `professional` só vem preenchido quando o perfil é profissional, e nesse caso os três campos são obrigatórios.
-
-### POST /v1/auth/verify
-
-Requisição:
-
-```json
-{
-  "email": "joana.lima@teste.com",
-  "code": "0000"
-}
-```
-
-Resposta 200 com o objeto de sessão, 401 quando o código está incorreto ou expirou.
-
-O app envia apenas dígitos: ele filtra o que não é número antes de mandar. O tamanho do código vem do `codeLength` devolvido no cadastro, hoje 4.
-
-A sessão devolvida precisa refletir **quem se cadastrou**, não uma conta fixa: o `profile` e o `email` do usuário que acabou de verificar.
-
-### POST /v1/auth/resend-code
-
-Requisição `{ "email": "joana.lima@teste.com" }`. Resposta 204, sem corpo.
-
-### POST /v1/auth/password-reset
-
-Requisição `{ "email": "joana.lima@teste.com" }`. Resposta 204, sem corpo, exista ou não uma conta com esse e-mail: a resposta não pode revelar quem tem cadastro. O link enviado vale por 30 minutos.
-
-### POST /v1/auth/refresh
-
-Requisição `{ "refreshToken": "..." }`.
-
-| Situação | Resposta |
+| Campo | Valores |
 | --- | --- |
-| Token válido | 200 com objeto de sessão |
-| Token revogado ou inexistente | 204, sem corpo |
-| Token ausente ou vazio | 400 com corpo de erro |
+| `tipoPerfil` | `PACIENTE`, `PROFISSIONAL_SAUDE`, `ADMIN` |
+| `situacaoRegistro` | `EM_VERIFICACAO`, `VERIFICADO`, `RECUSADO` |
+| `tipoServico` | `CONSULTA`, `EXAME`, `TERAPIA`, `PROCEDIMENTO`, `GRUPO` |
+| `modalidade` | `PRESENCIAL`, `ONLINE`, `HIBRIDO` |
+| `modalidadeAcesso` | `GRATUITO`, `SUS`, `PRECO_SOCIAL`, `PESQUISA` |
+| `publicoAlvo` (lista) | `CRIANCAS`, `ADOLESCENTES`, `ADULTOS`, `IDOSOS`, `GESTANTES` |
+| `formaContato` | `PLATAFORMA`, `TELEFONE`, `EMAIL` |
+| `status` da oportunidade | `RASCUNHO`, `ATIVA`, `ENCERRADA` |
+| `status` da inscrição | `RECEBIDA`, `EM_ANALISE`, `AGUARDANDO_INFORMACOES`, `APROVADA`, `RECUSADA`, `CANCELADA` |
+| `triagem.modo` | `PADRAO`, `PERSONALIZADO` |
+| `pergunta.tipo` | `TEXTO_CURTO`, `TEXTO_LONGO`, `SIM_NAO`, `MULTIPLA` |
+| `mensagem.autor` | `PACIENTE`, `PROFISSIONAL_SAUDE` |
 
-### GET /v1/auth/professional-catalog
-
-Conselhos e UFs aceitos no cadastro profissional. O app monta os dois seletores a partir desta resposta, então acrescentar um conselho no servidor já aparece no app sem precisar de nova versão.
-
-```json
-{
-  "councils": [
-    {
-      "id": "CRM",
-      "label": "CRM"
-    },
-    {
-      "id": "COREN",
-      "label": "COREN"
-    },
-    {
-      "id": "CRO",
-      "label": "CRO"
-    },
-    {
-      "id": "CRP",
-      "label": "CRP"
-    },
-    {
-      "id": "CREFITO",
-      "label": "CREFITO"
-    },
-    {
-      "id": "CREF",
-      "label": "CREF"
-    }
-  ],
-  "states": [
-    {
-      "id": "DF",
-      "label": "DF"
-    },
-    {
-      "id": "MG",
-      "label": "MG"
-    },
-    {
-      "id": "RJ",
-      "label": "RJ"
-    },
-    {
-      "id": "SP",
-      "label": "SP"
-    },
-    {
-      "id": "GO",
-      "label": "GO"
-    },
-    {
-      "id": "PR",
-      "label": "PR"
-    },
-    {
-      "id": "MT",
-      "label": "MT"
-    }
-  ]
-}
-```
-
-### 2.5 Objeto de sessão
-
-Devolvido por login, google, verify e refresh.
-
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fixture.medhub",
-  "expiresIn": 3600,
-  "user": {
-    "username": "Ana Paula Ribeiro",
-    "email": "paciente@teste.com",
-    "enabled": true,
-    "profile": "PACIENTE",
-    "address": {
-      "street": "Rua das Flores",
-      "neighborhood": "Centro",
-      "zipCode": "01001-000",
-      "number": "123",
-      "complement": "Apartamento 201",
-      "city": "São Paulo",
-      "state": "SP"
-    },
-    "birthday": "15/05/1990",
-    "income": 2500.0,
-    "concern": [
-      "Acompanhamento preventivo",
-      "Orientação nutricional"
-    ],
-    "accessConditions": [
-      "Disponibilidade no período da manhã"
-    ],
-    "healthHistory": "Dados fictícios para teste. Sem histórico de doenças crônicas.",
-    "serviceRequests": [
-      "Consulta clínica geral",
-      "Avaliação nutricional"
-    ]
-  }
-}
-```
-
-Exemplo com perfil profissional:
-
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fixture.medhub.pro",
-  "expiresIn": 3600,
-  "user": {
-    "username": "Marcos Vieira",
-    "email": "profissional@teste.com",
-    "enabled": true,
-    "profile": "PROFISSIONAL",
-    "address": {
-      "street": "SGAS 915",
-      "neighborhood": "Asa Sul",
-      "zipCode": "70390-150",
-      "number": "915",
-      "complement": "Bloco C, sala 204",
-      "city": "Brasília",
-      "state": "DF"
-    },
-    "birthday": "02/11/1984",
-    "income": null,
-    "concern": null,
-    "accessConditions": null,
-    "healthHistory": null,
-    "serviceRequests": null
-  }
-}
-```
-
-| Campo | Tipo | Observação |
-| --- | --- | --- |
-| `token` | string | Token de acesso |
-| `expiresIn` | int | Segundos até expirar |
-| `user.username` | string | Nome completo |
-| `user.email` | string | |
-| `user.enabled` | bool | |
-| `user.profile` | string | `PACIENTE` ou `PROFISSIONAL` |
-| `user.address` | objeto? | Pode ser nulo |
-| `user.birthday` | string? | |
-| `user.income` | number? | |
-| `user.concern` | array? | |
-| `user.accessConditions` | array? | |
-| `user.healthHistory` | string? | |
-| `user.serviceRequests` | array? | |
-
-Os campos marcados com `?` podem vir nulos ou ausentes. O app trata os dois casos.
+Valor desconhecido não quebra os clientes: cada um cai num padrão seguro. Mesmo assim, valor novo precisa ser combinado antes.
 
 ---
 
-## 3. Oportunidades
+## 3. Acesso
 
-### GET /v1/opportunities
+### POST /user/login · existe com outro formato
 
-Busca paginada. Parâmetros enviados na query:
+```json
+{ "email": "paciente@teste.com", "password": "Senha2026" }
+```
 
-| Parâmetro | Tipo | Observação |
-| --- | --- | --- |
-| `page` | int | Sempre enviado, começa em 1 |
-| `q` | string | Termo livre, só quando preenchido |
-| `specialty` | string | Ids separados por vírgula |
-| `modality` | string | Ids separados por vírgula |
-| `offerType` | string | Ids separados por vírgula |
-| `distance` | string | Id da faixa, como `5` |
-
-Exemplo: `/v1/opportunities?modality=online&page=2&specialty=cardiologia,psicologia`
-
-A query vai sempre com as chaves em ordem alfabética e os valores de lista ordenados, o que facilita cache no servidor.
-
-**Hoje a filtragem e a paginação acontecem no cliente**, sobre o conjunto completo que o mock devolve. Quando o backend existir, isso passa a ser responsabilidade do servidor e eu removo a lógica do app. A página tem 6 itens.
-
-Resposta 200, com os dois primeiros itens como amostra:
+Resposta 200:
 
 ```json
 {
-  "items": [
-    {
-      "id": "op-001",
-      "title": "Psicologia online",
-      "specialty": "psicologia",
-      "modality": "online",
-      "offerType": "gratuita",
-      "vacancies": 3,
-      "provider": {
-        "id": "pr-001",
-        "name": "Clínica Saúde",
-        "kind": "INSTITUICAO",
-        "verified": true
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "Remoto",
-        "distanceKm": null
-      },
-      "summary": "Atendimento psicológico individual por videochamada, com agenda semanal.",
-      "requiredDocuments": [
-        "RG"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    },
-    {
-      "id": "op-002",
-      "title": "Ortopedia",
-      "specialty": "ortopedia",
-      "modality": "presencial",
-      "offerType": "social",
-      "vacancies": 8,
-      "provider": {
-        "id": "pr-002",
-        "name": "Boca Feliz",
-        "kind": "CLINICA",
-        "verified": true
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "QNM 34, Ceilândia",
-        "distanceKm": 1.0
-      },
-      "summary": "Consulta ortopédica com avaliação de exames prévios.",
-      "requiredDocuments": [
-        "RG",
-        "Encaminhamento médico"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    }
-  ],
-  "page": 1,
-  "totalPages": 3,
-  "totalItems": 14
+  "token": "eyJhbGciOi...",
+  "autenticado": true,
+  "tipoPerfil": "PACIENTE",
+  "validadoInstitucionalmente": false,
+  "expiraEmSegundos": 7200
 }
 ```
 
-### GET /v1/opportunities/{id}
+Muda: `expiraEmSegundos` é novo; senha errada passa a ser 401, e 429 depois de 5 erros seguidos.
 
-Detalhe de uma oportunidade. Resposta 200 com um objeto no mesmo formato dos itens da lista:
+### GET /user/me 🔒 · nova
+
+Os clientes chamam logo depois do login para ter nome e dados da tela de perfil.
 
 ```json
 {
-  "id": "op-004",
-  "title": "Cardiologia – vaga social",
-  "specialty": "cardiologia",
-  "modality": "online",
-  "offerType": "social",
-  "vacancies": 5,
-  "provider": {
-    "id": "pr-004",
-    "name": "Instituto movida",
-    "kind": "INSTITUICAO",
-    "verified": true
-  },
-  "location": {
-    "city": "Brasília",
-    "state": "DF",
-    "address": "Rua das Flores, 120",
-    "distanceKm": 4.8
-  },
-  "summary": "Avaliação cardiológica com ECG, voltada a pacientes sem convênio. Requer triagem prévia.",
-  "requiredDocuments": [
-    "RG"
-  ],
-  "updatedAt": "2026-10-05T14:00:00Z"
+  "id": "6f1c...",
+  "email": "paciente@teste.com",
+  "tipoPerfil": "PACIENTE",
+  "nome": "Ana Souza",
+  "dataNascimento": "1988-03-12",
+  "telefone": "61999990000",
+  "situacaoRegistro": null
 }
 ```
 
-### GET /v1/filters
-
-Catálogo que alimenta a tela de filtros. Os `id` daqui são os mesmos valores aceitos nos parâmetros de busca.
+Para `PROFISSIONAL_SAUDE`, o mesmo objeto traz o registro, que o painel mostra na barra lateral e na faixa de "cadastro em verificação":
 
 ```json
 {
-  "specialties": [
-    {
-      "id": "cardiologia",
-      "label": "Cardiologia"
-    },
-    {
-      "id": "ortopedia",
-      "label": "Ortopedia"
-    },
-    {
-      "id": "psicologia",
-      "label": "Psicologia"
-    },
-    {
-      "id": "clinica-geral",
-      "label": "Clínica geral"
-    },
-    {
-      "id": "fisioterapia",
-      "label": "Fisioterapia"
-    },
-    {
-      "id": "odontologia",
-      "label": "Odontologia"
-    },
-    {
-      "id": "terapia-ocupacional",
-      "label": "Terapia ocupacional"
-    }
-  ],
-  "modalities": [
-    {
-      "id": "presencial",
-      "label": "Presencial"
-    },
-    {
-      "id": "online",
-      "label": "Online"
-    }
-  ],
-  "distances": [
-    {
-      "id": "2",
-      "label": "Até 2km"
-    },
-    {
-      "id": "5",
-      "label": "Até 5km"
-    },
-    {
-      "id": "10",
-      "label": "Até 10km"
-    }
-  ],
-  "offerTypes": [
-    {
-      "id": "gratuita",
-      "label": "Gratuita"
-    },
-    {
-      "id": "social",
-      "label": "Social"
-    },
-    {
-      "id": "convenio",
-      "label": "Convênio"
-    }
-  ]
+  "id": "9b3d...",
+  "email": "profissional@teste.com",
+  "tipoPerfil": "PROFISSIONAL_SAUDE",
+  "nome": "Marcos Vieira",
+  "situacaoRegistro": "VERIFICADO",
+  "conselho": "CRM",
+  "uf": "DF",
+  "numeroRegistro": "123456",
+  "especialidade": "cardiologia",
+  "ondeAtende": "Instituto Movida"
 }
 ```
 
-### Campos de uma oportunidade
+`situacaoRegistro`, `conselho`, `uf`, `numeroRegistro`, `especialidade` e `ondeAtende` só vêm para `PROFISSIONAL_SAUDE`. `dataNascimento` e `telefone` só para `PACIENTE`. Campo que não se aplica vem nulo ou ausente.
 
-| Campo | Tipo | Observação |
-| --- | --- | --- |
-| `id` | string | |
-| `title` | string | |
-| `specialty` | string | Id do catálogo de especialidades |
-| `modality` | string | `presencial` ou `online` |
-| `offerType` | string | `gratuita`, `social` ou `convenio` |
-| `vacancies` | int | Zero significa sem vagas |
-| `provider.id` | string | |
-| `provider.name` | string | |
-| `provider.kind` | string | `INSTITUICAO` ou `PROFISSIONAL` |
-| `provider.verified` | bool | Mostra o selo de verificado no app |
-| `location.city` | string | |
-| `location.state` | string | |
-| `location.address` | string? | |
-| `location.distanceKm` | number? | Nulo quando a oferta é online |
-| `summary` | string? | |
-| `requiredDocuments` | array? | Nomes dos documentos exigidos |
-| `updatedAt` | string | ISO 8601 |
-
-Valores desconhecidos em `modality` e `offerType` não quebram o app: ele cai em um padrão seguro. Mesmo assim, melhor combinar antes de introduzir valor novo.
-
----
-
-## 4. Candidaturas
-
-### POST /v1/applications
-
-Requisição:
+### POST /paciente/cadastro · existe com outro formato
 
 ```json
 {
-  "opportunityId": "op-004",
-  "triage": {
-    "reason": "Ansiedade e insônia há três meses",
-    "hasDiagnosis": false,
-    "usesContinuousMedication": true,
-    "urgency": "medium"
-  },
-  "documentNames": ["RG_frente.jpg"]
+  "usuarioDto": { "email": "ana@email.com", "senha": "Senha2026", "tipoPerfil": "PACIENTE" },
+  "nome": "Ana Souza",
+  "dataNascimento": "1988-03-12",
+  "telefone": "61999990000",
+  "endereco": null,
+  "aceitouTermos": true
 }
 ```
-
-O campo `urgency` aceita `low`, `medium` ou `high`.
-
-Hoje o app envia apenas os **nomes** dos arquivos, porque a seleção real de arquivo ainda não está implementada. Quando o upload existir, provavelmente vira multipart ou um fluxo de duas etapas com URL assinada. Isso precisa ser combinado.
 
 Resposta 201:
 
 ```json
-{
-  "id": "app-20418",
-  "protocolNumber": "20418",
-  "opportunityId": "op-004",
-  "status": "EM_ANALISE",
-  "timeline": [
-    {
-      "title": "Recebida",
-      "detail": "Hoje, 14:32",
-      "done": true
-    },
-    {
-      "title": "Triagem concluída",
-      "detail": "Hoje, 14:32",
-      "done": true
-    },
-    {
-      "title": "Em análise",
-      "detail": "Prazo estimado: 48 h",
-      "done": false
-    },
-    {
-      "title": "Resposta do profissional",
-      "detail": "Você será notificado",
-      "done": false
-    }
-  ]
-}
+{ "email": "ana@email.com", "tipoPerfil": "PACIENTE", "exigeVerificacao": true, "tamanhoCodigo": 4 }
 ```
 
-### GET /v1/applications/{id}
+Regras: o servidor ignora o `tipoPerfil` enviado e grava sempre `PACIENTE` (hoje aceita `ADMIN`). 409 se o e-mail existe. 400 se `aceitouTermos` for falso ou se a pessoa tiver menos de 18 anos. `telefone` é opcional, só dígitos.
 
-Status e linha do tempo da candidatura. Resposta 200, mesmo formato:
+`exigeVerificacao: false` significa que a conta já nasce ativa: o cliente faz login direto. Enquanto o código por e-mail não existir, o backend devolve `false` (ou 201 sem corpo, que os clientes leem como `false`).
+
+### POST /profissional-saude/cadastro · existe com outro formato
+
+`multipart/form-data` com a parte `dados` (JSON, `Content-Type: application/json`) e até 2 arquivos na parte `documentos`.
 
 ```json
 {
-  "id": "app-20418",
-  "protocolNumber": "20418",
-  "opportunityId": "op-004",
-  "status": "EM_ANALISE",
-  "timeline": [
-    {
-      "title": "Recebida",
-      "detail": "Hoje, 14:32",
-      "done": true
-    },
-    {
-      "title": "Triagem concluída",
-      "detail": "Hoje, 14:32",
-      "done": true
-    },
-    {
-      "title": "Em análise",
-      "detail": "Prazo estimado: 48 h",
-      "done": false
-    },
-    {
-      "title": "Resposta do profissional",
-      "detail": "Você será notificado",
-      "done": false
-    }
-  ]
+  "usuarioDto": { "email": "mariana@clinica.com", "senha": "Senha2026", "tipoPerfil": "PROFISSIONAL_SAUDE" },
+  "nome": "Mariana Costa",
+  "conselho": "CRM",
+  "uf": "DF",
+  "numeroRegistro": "123456",
+  "especialidade": "cardiologia",
+  "ondeAtende": "Instituto Movida",
+  "biografiaOuDescricao": null,
+  "aceitouTermos": true
 }
 ```
 
-| Campo | Tipo | Observação |
-| --- | --- | --- |
-| `id` | string | |
-| `protocolNumber` | string | Mostrado ao usuário como protocolo |
-| `opportunityId` | string | |
-| `status` | string | O app ainda não usa, mas decodifica |
-| `timeline[].title` | string | |
-| `timeline[].detail` | string | Texto livre, mostrado abaixo do título |
-| `timeline[].done` | bool | Passos concluídos aparecem preenchidos |
+Resposta 201 igual à do paciente, com `"tipoPerfil": "PROFISSIONAL_SAUDE"`. O profissional nasce com `situacaoRegistro: EM_VERIFICACAO`.
 
-A linha do tempo é montada pelo servidor e renderizada como vem. O app não decide quais passos existem.
+Muda: `conselho`, `uf`, `numeroRegistro`, `especialidade` e `ondeAtende` substituem `documentosRegistro` (que hoje é descartado no serviço). `numeroRegistro` tem de 4 a 7 dígitos. 409 se o e-mail existe.
 
----
+### POST /user/verificacao · nova (etapa 4)
 
-## 5. Regras do mock, para comparação
+```json
+{ "email": "ana@email.com", "codigo": "0000" }
+```
 
-Estas regras existem só no simulador do app. Servem para você saber o que o cliente espera ver em cada situação.
+Resposta 200 igual à do login. 401 se o código está errado ou venceu.
 
-### Contas de teste
+### POST /user/verificacao/reenvio · nova (etapa 4)
 
-| E-mail | Perfil | Senha |
-| --- | --- | --- |
-| `paciente@teste.com` | PACIENTE | qualquer senha não vazia |
-| `profissional@teste.com` | PROFISSIONAL | qualquer senha não vazia |
+`{ "email": "ana@email.com" }` → 204.
 
-Qualquer outro e-mail responde 401, de propósito, para exercitar a tela de erro.
+### POST /user/senha/recuperacao · nova (etapa 4)
 
-### Código de verificação
-
-`0000` é aceito. Qualquer outro responde 401.
-
-### Cadastro de e-mail novo
-
-O mock guarda o cadastro em memória e a verificação devolve o perfil e o nome que foram cadastrados, não uma conta fixa.
-
-### Rotas de teste de erro
-
-Existem no app para exercitar o tratamento de falha. **Não precisa implementar no servidor.**
-
-| Rota | Status |
-| --- | --- |
-| `GET /v1/debug/no-content` | 204 |
-| `GET /v1/debug/bad-request` | 400 |
-| `GET /v1/debug/unauthorized` | 401 |
-| `GET /v1/debug/not-found` | 404 |
-| `GET /v1/debug/server-error` | 500 |
+`{ "email": "ana@email.com" }` → 204, exista ou não a conta (a resposta não pode revelar quem tem cadastro). O link vale 30 minutos.
 
 ---
 
-## 6. Sugestão de ordem de implementação
+## 4. Catálogo
 
-Como o app funciona sobre o mock, dá para integrar endpoint por endpoint, sem big bang.
-
-1. `GET /v1/filters` e `GET /v1/opportunities`. São as duas rotas que não dependem de autenticação e já dão para ver a tela de busca com dados reais.
-2. `GET /v1/opportunities/{id}`.
-3. `POST /v1/auth/login`, para trocar o login simulado pelo real.
-4. `POST /v1/auth/signup`, `POST /v1/auth/verify` e `POST /v1/auth/resend-code`, junto com o envio de e-mail.
-5. `GET /v1/auth/professional-catalog`.
-6. `POST /v1/applications` e `GET /v1/applications/{id}`.
-7. `POST /v1/auth/refresh`.
-
-A cada endpoint pronto, me avisa que eu aponto aquela chamada do app para o servidor e testo.
-
----
-
-## 7. Anexo: catálogo completo de oportunidades
-
-Os 14 itens que o mock devolve hoje. Servem de carga inicial para o banco.
+### GET /catalogos · nova, pública, pode ser estática
 
 ```json
 {
-  "items": [
-    {
-      "id": "op-001",
-      "title": "Psicologia online",
-      "specialty": "psicologia",
-      "modality": "online",
-      "offerType": "gratuita",
-      "vacancies": 3,
-      "provider": {
-        "id": "pr-001",
-        "name": "Clínica Saúde",
-        "kind": "INSTITUICAO",
-        "verified": true
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "Remoto",
-        "distanceKm": null
-      },
-      "summary": "Atendimento psicológico individual por videochamada, com agenda semanal.",
-      "requiredDocuments": [
-        "RG"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    },
-    {
-      "id": "op-002",
-      "title": "Ortopedia",
-      "specialty": "ortopedia",
-      "modality": "presencial",
-      "offerType": "social",
-      "vacancies": 8,
-      "provider": {
-        "id": "pr-002",
-        "name": "Boca Feliz",
-        "kind": "CLINICA",
-        "verified": true
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "QNM 34, Ceilândia",
-        "distanceKm": 1.0
-      },
-      "summary": "Consulta ortopédica com avaliação de exames prévios.",
-      "requiredDocuments": [
-        "RG",
-        "Encaminhamento médico"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    },
-    {
-      "id": "op-003",
-      "title": "Avaliação odontológica",
-      "specialty": "odontologia",
-      "modality": "presencial",
-      "offerType": "gratuita",
-      "vacancies": 8,
-      "provider": {
-        "id": "pr-003",
-        "name": "Espaço Cuidar",
-        "kind": "CLINICA",
-        "verified": false
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "SCS Quadra 2",
-        "distanceKm": 2.1
-      },
-      "summary": "Avaliação inicial e plano de tratamento em clínica-escola.",
-      "requiredDocuments": [
-        "RG",
-        "Comprovante de residência"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    },
-    {
-      "id": "op-004",
-      "title": "Cardiologia – vaga social",
-      "specialty": "cardiologia",
-      "modality": "online",
-      "offerType": "social",
-      "vacancies": 5,
-      "provider": {
-        "id": "pr-004",
-        "name": "Instituto movida",
-        "kind": "INSTITUICAO",
-        "verified": true
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "Rua das Flores, 120",
-        "distanceKm": 4.8
-      },
-      "summary": "Avaliação cardiológica com ECG, voltada a pacientes sem convênio. Requer triagem prévia.",
-      "requiredDocuments": [
-        "RG"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    },
-    {
-      "id": "op-005",
-      "title": "Psicologia Infantil",
-      "specialty": "psicologia",
-      "modality": "presencial",
-      "offerType": "social",
-      "vacancies": 5,
-      "provider": {
-        "id": "pr-005",
-        "name": "Faculdade Ensine",
-        "kind": "UNIVERSIDADE",
-        "verified": true
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "Campus Taguatinga",
-        "distanceKm": 12.3
-      },
-      "summary": "Acompanhamento psicológico infantil supervisionado por docentes.",
-      "requiredDocuments": [
-        "RG",
-        "Certidão de nascimento"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    },
-    {
-      "id": "op-006",
-      "title": "Fisioterapia respiratória",
-      "specialty": "fisioterapia",
-      "modality": "presencial",
-      "offerType": "gratuita",
-      "vacancies": 4,
-      "provider": {
-        "id": "pr-006",
-        "name": "Clínica-escola UCB",
-        "kind": "UNIVERSIDADE",
-        "verified": true
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "QS 07 Taguatinga",
-        "distanceKm": 8.2
-      },
-      "summary": "Sessões de fisioterapia respiratória com encaminhamento médico recente.",
-      "requiredDocuments": [
-        "RG",
-        "Encaminhamento médico"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    },
-    {
-      "id": "op-007",
-      "title": "Clínica geral – mutirão",
-      "specialty": "clinica-geral",
-      "modality": "presencial",
-      "offerType": "gratuita",
-      "vacancies": 12,
-      "provider": {
-        "id": "pr-007",
-        "name": "Secretaria de Saúde",
-        "kind": "PODER_PUBLICO",
-        "verified": true
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "UBS 2 Ceilândia",
-        "distanceKm": 6.4
-      },
-      "summary": "Mutirão de atendimento clínico com agendamento na própria UBS.",
-      "requiredDocuments": [
-        "Cartão SUS",
-        "RG"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    },
-    {
-      "id": "op-008",
-      "title": "Terapia ocupacional",
-      "specialty": "terapia-ocupacional",
-      "modality": "presencial",
-      "offerType": "convenio",
-      "vacancies": 2,
-      "provider": {
-        "id": "pr-008",
-        "name": "Centro Integrado",
-        "kind": "CLINICA",
-        "verified": false
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "Asa Sul",
-        "distanceKm": 9.7
-      },
-      "summary": "Atendimento em terapia ocupacional para adultos.",
-      "requiredDocuments": [
-        "RG"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    },
-    {
-      "id": "op-009",
-      "title": "Odontologia preventiva",
-      "specialty": "odontologia",
-      "modality": "presencial",
-      "offerType": "social",
-      "vacancies": 6,
-      "provider": {
-        "id": "pr-009",
-        "name": "Espaço Cuidar",
-        "kind": "CLINICA",
-        "verified": false
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "SCS Quadra 2",
-        "distanceKm": 2.1
-      },
-      "summary": "Profilaxia e orientação de higiene bucal.",
-      "requiredDocuments": [
-        "RG"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    },
-    {
-      "id": "op-010",
-      "title": "Psicologia adulto",
-      "specialty": "psicologia",
-      "modality": "online",
-      "offerType": "convenio",
-      "vacancies": 1,
-      "provider": {
-        "id": "pr-010",
-        "name": "Clínica Saúde",
-        "kind": "INSTITUICAO",
-        "verified": true
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "Remoto",
-        "distanceKm": null
-      },
-      "summary": "Psicoterapia para adultos em modalidade remota.",
-      "requiredDocuments": [
-        "RG"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    },
-    {
-      "id": "op-011",
-      "title": "Cardiologia preventiva",
-      "specialty": "cardiologia",
-      "modality": "presencial",
-      "offerType": "gratuita",
-      "vacancies": 7,
-      "provider": {
-        "id": "pr-011",
-        "name": "Instituto movida",
-        "kind": "INSTITUICAO",
-        "verified": true
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "Rua das Flores, 120",
-        "distanceKm": 4.8
-      },
-      "summary": "Triagem cardiológica preventiva com aferição e orientação.",
-      "requiredDocuments": [
-        "RG"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    },
-    {
-      "id": "op-012",
-      "title": "Ortopedia infantil",
-      "specialty": "ortopedia",
-      "modality": "presencial",
-      "offerType": "social",
-      "vacancies": 3,
-      "provider": {
-        "id": "pr-012",
-        "name": "Boca Feliz",
-        "kind": "CLINICA",
-        "verified": true
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "QNM 34, Ceilândia",
-        "distanceKm": 1.0
-      },
-      "summary": "Avaliação ortopédica pediátrica.",
-      "requiredDocuments": [
-        "RG",
-        "Certidão de nascimento"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    },
-    {
-      "id": "op-013",
-      "title": "Nutrição clínica",
-      "specialty": "clinica-geral",
-      "modality": "online",
-      "offerType": "gratuita",
-      "vacancies": 9,
-      "provider": {
-        "id": "pr-013",
-        "name": "Faculdade Ensine",
-        "kind": "UNIVERSIDADE",
-        "verified": true
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "Remoto",
-        "distanceKm": null
-      },
-      "summary": "Acompanhamento nutricional com estudantes supervisionados.",
-      "requiredDocuments": [
-        "RG"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    },
-    {
-      "id": "op-014",
-      "title": "Fisioterapia ortopédica",
-      "specialty": "fisioterapia",
-      "modality": "presencial",
-      "offerType": "social",
-      "vacancies": 4,
-      "provider": {
-        "id": "pr-014",
-        "name": "Clínica-escola UCB",
-        "kind": "UNIVERSIDADE",
-        "verified": true
-      },
-      "location": {
-        "city": "Brasília",
-        "state": "DF",
-        "address": "QS 07 Taguatinga",
-        "distanceKm": 8.2
-      },
-      "summary": "Reabilitação ortopédica pós-lesão.",
-      "requiredDocuments": [
-        "Encaminhamento médico"
-      ],
-      "updatedAt": "2026-10-05T14:00:00Z"
-    }
+  "especialidades": [
+    { "id": "cardiologia", "nome": "Cardiologia" },
+    { "id": "clinica-geral", "nome": "Clínica geral" },
+    { "id": "fisioterapia", "nome": "Fisioterapia" },
+    { "id": "fonoaudiologia", "nome": "Fonoaudiologia" },
+    { "id": "nutricao", "nome": "Nutrição" },
+    { "id": "odontologia", "nome": "Odontologia" },
+    { "id": "ortopedia", "nome": "Ortopedia" },
+    { "id": "psicologia", "nome": "Psicologia" },
+    { "id": "terapia-ocupacional", "nome": "Terapia ocupacional" }
   ],
-  "page": 1,
-  "totalPages": 3,
-  "totalItems": 14
+  "conselhos": [
+    { "sigla": "CRM", "profissao": "Medicina" },
+    { "sigla": "COREN", "profissao": "Enfermagem" },
+    { "sigla": "CRO", "profissao": "Odontologia" },
+    { "sigla": "CRP", "profissao": "Psicologia" },
+    { "sigla": "CREFITO", "profissao": "Fisioterapia e TO" },
+    { "sigla": "CRN", "profissao": "Nutrição" },
+    { "sigla": "CRF", "profissao": "Farmácia" },
+    { "sigla": "CREFONO", "profissao": "Fonoaudiologia" },
+    { "sigla": "CRESS", "profissao": "Serviço social" },
+    { "sigla": "CREF", "profissao": "Educação física" },
+    { "sigla": "CRBM", "profissao": "Biomedicina" }
+  ],
+  "ufs": ["AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA", "MG", "MS", "MT", "PA", "PB", "PE", "PI", "PR", "RJ", "RN", "RO", "RR", "RS", "SC", "SE", "SP", "TO"],
+  "distanciasKm": [2, 5, 10]
 }
 ```
+
+---
+
+## 5. Oportunidades
+
+### Objeto `Oportunidade`
+
+```json
+{
+  "id": "op-004",
+  "titulo": "Cardiologia, vaga social",
+  "descricao": "Avaliação cardiológica com ECG, voltada a pacientes sem convênio. Requer triagem prévia.",
+  "tipoServico": "CONSULTA",
+  "especialidade": "cardiologia",
+  "modalidade": "HIBRIDO",
+  "modalidadeAcesso": "PRECO_SOCIAL",
+  "preco": 40.0,
+  "publicoAlvo": ["ADULTOS"],
+  "publicoAlvoObservacao": "Adultos sem convênio",
+  "vagasTotais": 10,
+  "vagasPreenchidas": 5,
+  "cep": "70000-000",
+  "endereco": "Rua das Flores, 120",
+  "cidade": "Brasília",
+  "uf": "DF",
+  "distanciaKm": 4.8,
+  "inscricoesDe": "2026-11-01",
+  "inscricoesAte": "2026-12-15",
+  "criteriosElegibilidade": "Adultos sem convênio, moradores do DF.",
+  "semRestricoes": false,
+  "formaContato": "PLATAFORMA",
+  "prazoRespostaDias": 15,
+  "status": "ATIVA",
+  "ultimaAtualizacao": "2026-11-08T15:00:00Z",
+  "ofertante": {
+    "id": "pr-004",
+    "nome": "Dra. Mariana Costa",
+    "conselho": "CRM",
+    "uf": "DF",
+    "numeroRegistro": "123456",
+    "ondeAtende": "Instituto Movida",
+    "verificado": true
+  },
+  "triagem": {
+    "modo": "PADRAO",
+    "perguntas": [ "... ver seção 6 ..." ],
+    "documentosExigidos": [
+      { "id": "rg", "rotulo": "RG" },
+      { "id": "encaminhamento", "rotulo": "Encaminhamento médico" }
+    ]
+  },
+  "totalInscricoes": 4
+}
+```
+
+| Campo | Regra |
+| --- | --- |
+| `preco` | só em `PRECO_SOCIAL`, maior que zero; nulo nas outras |
+| `cep`, `endereco` | obrigatórios em `PRESENCIAL` e `HIBRIDO`, nulos em `ONLINE` |
+| `cidade`, `uf` | opcionais; o app mostra a cidade quando não há distância |
+| `distanciaKm` | calculada para quem busca; pode vir nula (online, ou sem localização) |
+| `descricao` | 40 a 600 caracteres |
+| `vagasTotais` | 1 ou mais; vagas restantes = `vagasTotais - vagasPreenchidas` |
+| `inscricoesAte` | depois de `inscricoesDe` |
+| `criteriosElegibilidade` | obrigatório, a menos que `semRestricoes` seja verdadeiro |
+| `prazoRespostaDias` | 15 por padrão |
+| `ofertante.verificado` | igual a `validadoInstitucionalmente`; o selo de verificado só aparece com ele |
+| `totalInscricoes` | só nas rotas do profissional dono; nulo na busca pública |
+
+### GET /oportunidades · existe com outro formato
+
+Pública (hoje exige token). Só oportunidades `ATIVA`, mais recentes primeiro.
+
+| Parâmetro | Exemplo | Regra |
+| --- | --- | --- |
+| `q` | `psico` | procura em título, especialidade, nome do ofertante, `ondeAtende`, cidade e endereço, sem acento e sem caixa |
+| `tipoServico` | `EXAME` | um valor |
+| `especialidade` | `cardiologia,psicologia` | lista separada por vírgula |
+| `modalidade` | `ONLINE` | um valor |
+| `distanciaMaxKm` | `5` | `ONLINE` passa em qualquer raio |
+| `modalidadeAcesso` | `GRATUITO,PRECO_SOCIAL` | lista |
+| `publicoAlvo` | `ADULTOS,IDOSOS` | lista; casa quando há interseção |
+| `page`, `size` | `0`, `6` | os clientes pedem 6 por página |
+
+Resposta 200:
+
+```json
+{ "content": [ "... Oportunidade ..." ], "number": 0, "size": 6, "totalPages": 3, "totalElements": 14 }
+```
+
+### GET /oportunidades/{id} · existe com outro formato
+
+Pública. 404 se não existe. Rascunho só aparece para o dono.
+
+### GET /profissional-saude/oportunidades 🔒 · nova
+
+"Minhas oportunidades": todas as do profissional logado, nos três estados, com `totalInscricoes`. Array, mais recentes primeiro.
+
+### POST /oportunidades 🔒 · existe com outro formato
+
+Profissional validado. Corpo = o objeto `Oportunidade` sem `id`, `ofertante`, `vagasPreenchidas`, `distanciaKm`, `ultimaAtualizacao` e `totalInscricoes`. `status` vai `RASCUNHO` (salvar rascunho) ou `ATIVA` (publicar). Rascunho aceita campos vazios; publicar valida tudo da tabela acima. Resposta 201 com a `Oportunidade`.
+
+Profissional `EM_VERIFICACAO` pode criar `RASCUNHO`, mas não publicar: 403 com mensagem.
+
+### PUT /oportunidades/{id} 🔒 · existe com outro formato
+
+Mesmo corpo. Só o dono. 409 se a oportunidade está `ENCERRADA`.
+
+### POST /oportunidades/{id}/encerrar 🔒 · nova
+
+Só o dono, só `ATIVA`. Resposta 204. As inscrições abertas continuam até a decisão.
+
+### DELETE /oportunidades/{id} 🔒 · existe
+
+Só o dono e só `RASCUNHO` (409 nos outros estados). Resposta 204.
+
+---
+
+## 6. Triagem
+
+O profissional escolhe o modo no passo 3 da criação. `PADRAO` usa o formulário abaixo, igual para todas as oportunidades. `PERSONALIZADO` usa as perguntas que ele escreveu. O app do paciente desenha qualquer um dos dois a partir de `triagem.perguntas`.
+
+### Objeto `Pergunta`
+
+| Campo | Tipo | Regra |
+| --- | --- | --- |
+| `id` | texto | único na oportunidade |
+| `rotulo` | texto | a pergunta como aparece na tela |
+| `tipo` | enum | `TEXTO_CURTO`, `TEXTO_LONGO`, `SIM_NAO`, `MULTIPLA` |
+| `obrigatoria` | booleano | |
+| `opcoes` | lista de texto | só em `MULTIPLA`, 2 ou mais |
+| `permiteVarias` | booleano | só em `MULTIPLA`: aceita mais de uma opção |
+| `minCaracteres`, `maxCaracteres` | int, opcionais | só em texto |
+| `ajuda` | texto, opcional | linha de apoio abaixo da pergunta |
+| `dependeDe` | `{perguntaId, resposta}`, opcional | a pergunta só aparece (e só é exigida) quando a outra tem aquela resposta |
+
+### Formulário padrão
+
+```json
+[
+  { "id": "motivo", "rotulo": "Qual o motivo principal?", "tipo": "TEXTO_LONGO", "obrigatoria": true, "minCaracteres": 10, "maxCaracteres": 300 },
+  { "id": "tempo", "rotulo": "Há quanto tempo?", "tipo": "MULTIPLA", "obrigatoria": true, "opcoes": ["Menos de 1 semana", "De 1 a 4 semanas", "De 1 a 6 meses", "Mais de 6 meses"] },
+  { "id": "diagnostico", "rotulo": "Já tem diagnóstico?", "tipo": "SIM_NAO", "obrigatoria": true },
+  { "id": "qual-diagnostico", "rotulo": "Qual diagnóstico?", "tipo": "TEXTO_CURTO", "obrigatoria": true, "dependeDe": { "perguntaId": "diagnostico", "resposta": "Sim" } },
+  { "id": "medicacao", "rotulo": "Usa medicação contínua?", "tipo": "SIM_NAO", "obrigatoria": true },
+  { "id": "quais-medicacoes", "rotulo": "Quais medicações?", "tipo": "TEXTO_CURTO", "obrigatoria": true, "dependeDe": { "perguntaId": "medicacao", "resposta": "Sim" } },
+  { "id": "urgencia", "rotulo": "Urgência percebida", "tipo": "MULTIPLA", "obrigatoria": true, "opcoes": ["Baixa", "Média", "Alta"], "ajuda": "Alta: atrapalha suas atividades do dia a dia." },
+  { "id": "horario", "rotulo": "Melhor horário", "tipo": "MULTIPLA", "obrigatoria": false, "opcoes": ["Manhã", "Tarde", "Noite"], "permiteVarias": true }
+]
+```
+
+`SIM_NAO` responde `"Sim"` ou `"Não"`. `MULTIPLA` responde a opção escolhida; com `permiteVarias`, as opções separadas por `", "` na ordem da lista.
+
+### Documentos exigidos
+
+Lista de `{id, rotulo}`. Os do catálogo do painel: `rg` RG, `cpf` CPF, `sus` Cartão do SUS, `encaminhamento` Encaminhamento médico, `residencia` Comprovante de residência, `renda` Comprovante de renda, `exames` Exames anteriores. Documento escrito pelo profissional ganha um `id` próprio (`outro-1`).
+
+---
+
+## 7. Inscrições (solicitação de vaga)
+
+### Objeto `Inscricao`
+
+O mesmo objeto atende paciente e profissional. `mensagensNaoLidas` conta as não lidas por quem pediu.
+
+```json
+{
+  "id": "app-20377",
+  "protocolo": "20377",
+  "status": "AGUARDANDO_INFORMACOES",
+  "oportunidade": { "id": "op-006", "titulo": "Fisioterapia ortopédica", "especialidade": "fisioterapia" },
+  "ofertante": { "nome": "Dra. Camila Torres", "ondeAtende": "Boca Feliz" },
+  "paciente": { "nome": "Ana Souza" },
+  "dataInscricao": "2026-10-28T13:15:00Z",
+  "prazoResposta": "2026-11-12T13:15:00Z",
+  "decididaEm": null,
+  "motivoDecisao": null,
+  "pedidoInformacao": { "texto": "Pode enviar o raio X mais recente do joelho?", "prazo": "2026-11-15T02:59:00Z" },
+  "combinado": null,
+  "respostasTriagem": [
+    { "perguntaId": "motivo", "pergunta": "Qual o motivo principal?", "resposta": "Dor no joelho direito ao caminhar" },
+    { "perguntaId": "tempo", "pergunta": "Há quanto tempo?", "resposta": "De 1 a 6 meses" }
+  ],
+  "documentos": [
+    { "id": "doc-1", "documentoId": "rg", "nomeArquivo": "RG.jpg", "tamanhoBytes": 1200000, "enviadoEm": "2026-10-28T13:15:00Z" }
+  ],
+  "consentimentoDadosSaudeEm": "2026-10-28T13:15:00Z",
+  "mensagensNaoLidas": 0,
+  "ultimaMensagem": null,
+  "podeTrocarMensagens": false,
+  "mensagens": null
+}
+```
+
+| Campo | Regra |
+| --- | --- |
+| `protocolo` | número sequencial legível, único |
+| `prazoResposta` | `dataInscricao` + `prazoRespostaDias` da oportunidade |
+| "Atrasada" | não é estado: os clientes mostram quando `status` é `RECEBIDA` ou `EM_ANALISE` e passou do `prazoResposta` |
+| `motivoDecisao` | obrigatório em `RECUSADA` |
+| `combinado` | `{quando, onde, levar}`, preenchido na aprovação; pode ser "A combinar" |
+| `podeTrocarMensagens` | verdadeiro só em `APROVADA` |
+| `respostasTriagem` | o texto da pergunta vai junto, para a resposta continuar legível se a oportunidade mudar |
+| `mensagens` | lista só no detalhe (`GET .../{id}`); nula nas listas |
+
+### Paciente
+
+| Rota | Estado | Corpo | Resposta |
+| --- | --- | --- | --- |
+| `GET /paciente/inscricoes` 🔒 | nova | | array de `Inscricao`, mais recentes primeiro |
+| `GET /paciente/inscricoes/{id}` 🔒 | nova | | `Inscricao` com `mensagens`; 404 se não é dela |
+| `POST /paciente/inscricoes` 🔒 | nova | ver abaixo | 201 `Inscricao` com `status: EM_ANALISE` |
+| `POST /paciente/inscricoes/{id}/cancelar` 🔒 | nova | | 204; apaga documentos e respostas; 409 se já decidida |
+| `POST /paciente/inscricoes/{id}/resposta` 🔒 | nova | `{texto, anexo: {nomeArquivo, tamanhoBytes} ou null}` | `Inscricao`, volta a `EM_ANALISE`; 409 se não há pedido de informação |
+| `GET /paciente/inscricoes/{id}/mensagens` 🔒 | nova | | array de `Mensagem`; marca como lidas |
+| `POST /paciente/inscricoes/{id}/mensagens` 🔒 | nova | `{texto}` | 201 `Mensagem`; 409 se não está `APROVADA` |
+| `DELETE /paciente/inscricoes/{id}/documentos` 🔒 | nova | | 204 |
+
+Corpo de `POST /paciente/inscricoes`:
+
+```json
+{
+  "oportunidadeId": "op-006",
+  "respostasTriagem": [
+    { "perguntaId": "motivo", "pergunta": "Qual o motivo principal?", "resposta": "Dor no joelho direito ao caminhar" }
+  ],
+  "documentos": [
+    { "documentoId": "rg", "nomeArquivo": "RG.jpg", "tamanhoBytes": 1200000 }
+  ],
+  "consentimentoDadosSaudeEm": "2026-10-28T13:15:00Z"
+}
+```
+
+Erros: 404 oportunidade inexistente; 409 sem vagas, encerrada ou com inscrição aberta da mesma pessoa; 400 se falta resposta obrigatória, documento exigido ou consentimento. Hoje só os metadados do arquivo trafegam; o envio do arquivo (multipart em `POST /paciente/inscricoes/{id}/documentos`) é a etapa 4.
+
+### Profissional
+
+| Rota | Estado | Corpo | Resposta |
+| --- | --- | --- | --- |
+| `GET /profissional-saude/inscricoes` 🔒 | nova | `?status=` opcional | array de `Inscricao` das oportunidades dele |
+| `GET /profissional-saude/inscricoes/{id}` 🔒 | nova | | `Inscricao` com `mensagens` |
+| `POST /profissional-saude/inscricoes/{id}/decisao` 🔒 | nova | `{status: "APROVADA" ou "RECUSADA", motivo, combinado}` | `Inscricao`; 400 recusa sem motivo; 409 se já decidida |
+| `POST /profissional-saude/inscricoes/{id}/pedido-informacao` 🔒 | nova | `{texto}` | `Inscricao` em `AGUARDANDO_INFORMACOES`, prazo de 3 dias |
+| `POST /profissional-saude/inscricoes/{id}/mensagens` 🔒 | nova | `{texto}` | 201 `Mensagem`; 409 se não está `APROVADA` |
+
+Aprovar soma 1 em `vagasPreenchidas`. Decisão final não volta atrás.
+
+### Objeto `Mensagem`
+
+```json
+{ "id": "msg-1", "autor": "PROFISSIONAL_SAUDE", "nomeAutor": "Dra. Juliana Prado", "texto": "Olá Ana, podemos marcar na terça às 10h?", "enviadaEm": "2026-11-11T15:45:00Z" }
+```
+
+---
+
+## 8. Conta do paciente (LGPD)
+
+| Rota | Estado | Corpo | Resposta |
+| --- | --- | --- | --- |
+| `POST /paciente/exportacao-dados` 🔒 | nova | | 202; cópia por e-mail em até 15 dias |
+| `DELETE /paciente/documentos` 🔒 | nova | | 204; apaga os arquivos de todas as inscrições |
+| `DELETE /paciente/conta` 🔒 | nova | `{senha}` | 204; 401 se a senha não confere; cancela as inscrições abertas |
+
+---
+
+## 9. Rotas de ADMIN (já existem, sem cliente)
+
+`GET /user/profissionais/pendentes` e `PATCH /user/profissionais/{id}/aprovar`. Aprovar passa `situacaoRegistro` a `VERIFICADO`. Para a apresentação é preciso um ADMIN no banco (migração com um usuário de demonstração, por exemplo).
+
+---
+
+## 10. Servidor simulado dos clientes
+
+Os dois clientes respondem este contrato em memória enquanto a API não tem a rota.
+
+| Item | Valor |
+| --- | --- |
+| Paciente de teste | `paciente@teste.com`, qualquer senha não vazia, com as inscrições 20418, 20377, 20311 e 20102 |
+| Profissional de teste | `profissional@teste.com`, qualquer senha não vazia |
+| Código de verificação | `0000` |
+| Bloqueio | 5 senhas erradas seguidas → 429 por 15 minutos |
+| Token | `mock.<email>`; `expired` devolve 401 |
+
+---
+
+## 11. Ordem sugerida
+
+| Etapa | Rotas |
+| --- | --- |
+| 1 | CORS; 401 e 403 separados; `message` em todo erro; `GET /oportunidades` público; `GET /user/me`; `expiraEmSegundos`; perfil fixo no cadastro de paciente; registro estruturado no cadastro de profissional |
+| 2 | campos novos da oportunidade, três estados, busca com filtros e página, minhas oportunidades, encerrar, triagem e documentos exigidos; `GET /catalogos` |
+| 3 | inscrições do paciente e do profissional, decisão, pedido de informação e resposta |
+| 4 | mensagens, envio de arquivos, código por e-mail, recuperar senha, rotas de LGPD |

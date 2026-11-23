@@ -1,0 +1,511 @@
+[
+  {
+    "id": "req-001",
+    "protocolo": "20418",
+    "status": "APROVADA",
+    "oportunidade": {
+      "id": "op-101",
+      "titulo": "Cardiologia - vaga social",
+      "especialidade": "cardiologia"
+    },
+    "ofertante": {
+      "nome": "Marcos Vieira",
+      "ondeAtende": "Espaço Cuidar"
+    },
+    "paciente": {
+      "nome": "Ana Souza"
+    },
+    "dataInscricao": "2026-10-21T09:12:00Z",
+    "prazoResposta": "2026-11-05T09:12:00Z",
+    "decididaEm": "2026-10-21T12:30:00Z",
+    "motivoDecisao": null,
+    "pedidoInformacao": null,
+    "combinado": {
+      "quando": "A combinar",
+      "onde": "Rua das Flores, 120, Brasília",
+      "levar": "RG, Encaminhamento médico"
+    },
+    "respostasTriagem": [
+      {
+        "perguntaId": "motivo",
+        "pergunta": "Qual o motivo principal?",
+        "resposta": "Dor no peito ao esforço"
+      },
+      {
+        "perguntaId": "tempo",
+        "pergunta": "Há quanto tempo?",
+        "resposta": "De 1 a 6 meses"
+      },
+      {
+        "perguntaId": "diagnostico",
+        "pergunta": "Já tem diagnóstico?",
+        "resposta": "Sim"
+      },
+      {
+        "perguntaId": "qual-diagnostico",
+        "pergunta": "Qual diagnóstico?",
+        "resposta": "Hipertensão"
+      },
+      {
+        "perguntaId": "medicacao",
+        "pergunta": "Usa medicação contínua?",
+        "resposta": "Sim"
+      },
+      {
+        "perguntaId": "quais-medicacoes",
+        "pergunta": "Quais medicações?",
+        "resposta": "Losartana"
+      },
+      {
+        "perguntaId": "urgencia",
+        "pergunta": "Urgência percebida",
+        "resposta": "Média"
+      },
+      {
+        "perguntaId": "horario",
+        "pergunta": "Melhor horário",
+        "resposta": "Manhã, Tarde"
+      }
+    ],
+    "documentos": [
+      {
+        "id": "doc-20418-1",
+        "documentoId": "rg",
+        "nomeArquivo": "RG_frente.jpg",
+        "tamanhoBytes": 430080,
+        "enviadoEm": "2026-10-21T09:12:00Z"
+      },
+      {
+        "id": "doc-20418-2",
+        "documentoId": "encaminhamento",
+        "nomeArquivo": "Encaminhamento.pdf",
+        "tamanhoBytes": 131072,
+        "enviadoEm": "2026-10-21T09:12:00Z"
+      }
+    ],
+    "consentimentoDadosSaudeEm": "2026-10-21T09:12:00Z",
+    "mensagensNaoLidas": 1,
+    "ultimaMensagem": {
+      "id": "msg-2",
+      "autor": "PROFISSIONAL_SAUDE",
+      "nomeAutor": "Marcos Vieira",
+      "texto": "Bom dia, pode sim!",
+      "enviadaEm": "2026-10-21T12:46:00Z"
+    },
+    "podeTrocarMensagens": true,
+    "mensagens": [
+      {
+        "id": "msg-1",
+        "autor": "PACIENTE",
+        "nomeAutor": "Ana Souza",
+        "texto": "Olá, posso levar os exames antigos?",
+        "enviadaEm": "2026-10-21T12:45:00Z"
+      },
+      {
+        "id": "msg-2",
+        "autor": "PROFISSIONAL_SAUDE",
+        "nomeAutor": "Marcos Vieira",
+        "texto": "Bom dia, pode sim!",
+        "enviadaEm": "2026-10-21T12:46:00Z"
+      }
+    ]
+  },
+  {
+    "id": "req-002",
+    "protocolo": "20419",
+    "status": "EM_ANALISE",
+    "oportunidade": {
+      "id": "op-102",
+      "titulo": "Fisioterapia ortopédica",
+      "especialidade": "fisioterapia"
+    },
+    "ofertante": {
+      "nome": "Marcos Vieira",
+      "ondeAtende": "Espaço Cuidar"
+    },
+    "paciente": {
+      "nome": "Carlos Lima"
+    },
+    "dataInscricao": "2026-10-20T15:40:00Z",
+    "prazoResposta": "2026-11-04T15:40:00Z",
+    "decididaEm": null,
+    "motivoDecisao": null,
+    "pedidoInformacao": null,
+    "combinado": null,
+    "respostasTriagem": [
+      {
+        "perguntaId": "motivo",
+        "pergunta": "Qual o motivo principal?",
+        "resposta": "Dor no joelho direito ao caminhar"
+      },
+      {
+        "perguntaId": "tempo",
+        "pergunta": "Há quanto tempo?",
+        "resposta": "De 1 a 4 semanas"
+      },
+      {
+        "perguntaId": "diagnostico",
+        "pergunta": "Já tem diagnóstico?",
+        "resposta": "Não"
+      },
+      {
+        "perguntaId": "medicacao",
+        "pergunta": "Usa medicação contínua?",
+        "resposta": "Não"
+      },
+      {
+        "perguntaId": "urgencia",
+        "pergunta": "Urgência percebida",
+        "resposta": "Média"
+      },
+      {
+        "perguntaId": "horario",
+        "pergunta": "Melhor horário",
+        "resposta": "Tarde"
+      }
+    ],
+    "documentos": [
+      {
+        "id": "doc-20419-1",
+        "documentoId": "rg",
+        "nomeArquivo": "RG.jpg",
+        "tamanhoBytes": 1200128,
+        "enviadoEm": "2026-10-20T15:40:00Z"
+      },
+      {
+        "id": "doc-20419-2",
+        "documentoId": "exames",
+        "nomeArquivo": "Raio_X_joelho.pdf",
+        "tamanhoBytes": 880640,
+        "enviadoEm": "2026-10-20T15:40:00Z"
+      }
+    ],
+    "consentimentoDadosSaudeEm": "2026-10-20T15:40:00Z",
+    "mensagensNaoLidas": 0,
+    "ultimaMensagem": null,
+    "podeTrocarMensagens": false,
+    "mensagens": []
+  },
+  {
+    "id": "req-003",
+    "protocolo": "20420",
+    "status": "APROVADA",
+    "oportunidade": {
+      "id": "op-101",
+      "titulo": "Cardiologia - vaga social",
+      "especialidade": "cardiologia"
+    },
+    "ofertante": {
+      "nome": "Marcos Vieira",
+      "ondeAtende": "Espaço Cuidar"
+    },
+    "paciente": {
+      "nome": "Beatriz Alves"
+    },
+    "dataInscricao": "2026-10-19T11:05:00Z",
+    "prazoResposta": "2026-11-03T11:05:00Z",
+    "decididaEm": "2026-10-20T10:00:00Z",
+    "motivoDecisao": null,
+    "pedidoInformacao": null,
+    "combinado": {
+      "quando": "A combinar",
+      "onde": "Rua das Flores, 120, Brasília",
+      "levar": "RG, Encaminhamento médico"
+    },
+    "respostasTriagem": [
+      {
+        "perguntaId": "motivo",
+        "pergunta": "Qual o motivo principal?",
+        "resposta": "Palpitações à noite"
+      },
+      {
+        "perguntaId": "tempo",
+        "pergunta": "Há quanto tempo?",
+        "resposta": "Mais de 6 meses"
+      },
+      {
+        "perguntaId": "diagnostico",
+        "pergunta": "Já tem diagnóstico?",
+        "resposta": "Não"
+      },
+      {
+        "perguntaId": "medicacao",
+        "pergunta": "Usa medicação contínua?",
+        "resposta": "Não"
+      },
+      {
+        "perguntaId": "urgencia",
+        "pergunta": "Urgência percebida",
+        "resposta": "Baixa"
+      }
+    ],
+    "documentos": [
+      {
+        "id": "doc-20420-1",
+        "documentoId": "rg",
+        "nomeArquivo": "RG_frente.jpg",
+        "tamanhoBytes": 430080,
+        "enviadoEm": "2026-10-19T11:05:00Z"
+      },
+      {
+        "id": "doc-20420-2",
+        "documentoId": "encaminhamento",
+        "nomeArquivo": "Encaminhamento.pdf",
+        "tamanhoBytes": 131072,
+        "enviadoEm": "2026-10-19T11:05:00Z"
+      }
+    ],
+    "consentimentoDadosSaudeEm": "2026-10-19T11:05:00Z",
+    "mensagensNaoLidas": 0,
+    "ultimaMensagem": null,
+    "podeTrocarMensagens": true,
+    "mensagens": []
+  },
+  {
+    "id": "req-004",
+    "protocolo": "20421",
+    "status": "RECUSADA",
+    "oportunidade": {
+      "id": "op-102",
+      "titulo": "Fisioterapia ortopédica",
+      "especialidade": "fisioterapia"
+    },
+    "ofertante": {
+      "nome": "Marcos Vieira",
+      "ondeAtende": "Espaço Cuidar"
+    },
+    "paciente": {
+      "nome": "João Santos"
+    },
+    "dataInscricao": "2026-10-18T16:20:00Z",
+    "prazoResposta": "2026-11-02T16:20:00Z",
+    "decididaEm": "2026-10-19T09:00:00Z",
+    "motivoDecisao": "As vagas desta turma são para recuperação pós-cirúrgica.",
+    "pedidoInformacao": null,
+    "combinado": null,
+    "respostasTriagem": [
+      {
+        "perguntaId": "motivo",
+        "pergunta": "Qual o motivo principal?",
+        "resposta": "Dor lombar ao levantar peso"
+      },
+      {
+        "perguntaId": "tempo",
+        "pergunta": "Há quanto tempo?",
+        "resposta": "Mais de 6 meses"
+      },
+      {
+        "perguntaId": "diagnostico",
+        "pergunta": "Já tem diagnóstico?",
+        "resposta": "Sim"
+      },
+      {
+        "perguntaId": "qual-diagnostico",
+        "pergunta": "Qual diagnóstico?",
+        "resposta": "Hérnia de disco"
+      },
+      {
+        "perguntaId": "medicacao",
+        "pergunta": "Usa medicação contínua?",
+        "resposta": "Não"
+      },
+      {
+        "perguntaId": "urgencia",
+        "pergunta": "Urgência percebida",
+        "resposta": "Alta"
+      }
+    ],
+    "documentos": [
+      {
+        "id": "doc-20421-1",
+        "documentoId": "rg",
+        "nomeArquivo": "RG.pdf",
+        "tamanhoBytes": 317440,
+        "enviadoEm": "2026-10-18T16:20:00Z"
+      }
+    ],
+    "consentimentoDadosSaudeEm": "2026-10-18T16:20:00Z",
+    "mensagensNaoLidas": 0,
+    "ultimaMensagem": null,
+    "podeTrocarMensagens": false,
+    "mensagens": []
+  },
+  {
+    "id": "req-005",
+    "protocolo": "20422",
+    "status": "RECEBIDA",
+    "oportunidade": {
+      "id": "op-105",
+      "titulo": "Psicologia adulto",
+      "especialidade": "psicologia"
+    },
+    "ofertante": {
+      "nome": "Marcos Vieira",
+      "ondeAtende": "Espaço Cuidar"
+    },
+    "paciente": {
+      "nome": "Paulo Mendes"
+    },
+    "dataInscricao": "2026-10-21T08:05:00Z",
+    "prazoResposta": "2026-11-05T08:05:00Z",
+    "decididaEm": null,
+    "motivoDecisao": null,
+    "pedidoInformacao": null,
+    "combinado": null,
+    "respostasTriagem": [
+      {
+        "perguntaId": "motivo",
+        "pergunta": "Qual o motivo principal?",
+        "resposta": "Ansiedade que atrapalha o trabalho"
+      },
+      {
+        "perguntaId": "tempo",
+        "pergunta": "Há quanto tempo?",
+        "resposta": "De 1 a 6 meses"
+      },
+      {
+        "perguntaId": "diagnostico",
+        "pergunta": "Já tem diagnóstico?",
+        "resposta": "Não"
+      },
+      {
+        "perguntaId": "medicacao",
+        "pergunta": "Usa medicação contínua?",
+        "resposta": "Não"
+      },
+      {
+        "perguntaId": "urgencia",
+        "pergunta": "Urgência percebida",
+        "resposta": "Alta"
+      },
+      {
+        "perguntaId": "horario",
+        "pergunta": "Melhor horário",
+        "resposta": "Noite"
+      }
+    ],
+    "documentos": [
+      {
+        "id": "doc-20422-1",
+        "documentoId": "rg",
+        "nomeArquivo": "RG_frente.jpg",
+        "tamanhoBytes": 524288,
+        "enviadoEm": "2026-10-21T08:05:00Z"
+      }
+    ],
+    "consentimentoDadosSaudeEm": "2026-10-21T08:05:00Z",
+    "mensagensNaoLidas": 0,
+    "ultimaMensagem": null,
+    "podeTrocarMensagens": false,
+    "mensagens": []
+  },
+  {
+    "id": "req-006",
+    "protocolo": "20423",
+    "status": "AGUARDANDO_INFORMACOES",
+    "oportunidade": {
+      "id": "op-106",
+      "titulo": "Avaliação odontológica",
+      "especialidade": "odontologia"
+    },
+    "ofertante": {
+      "nome": "Marcos Vieira",
+      "ondeAtende": "Espaço Cuidar"
+    },
+    "paciente": {
+      "nome": "Luiza Fernandes"
+    },
+    "dataInscricao": "2026-10-20T10:30:00Z",
+    "prazoResposta": "2026-11-04T10:30:00Z",
+    "decididaEm": null,
+    "motivoDecisao": null,
+    "pedidoInformacao": {
+      "texto": "Pode enviar a foto do Cartão do SUS? O arquivo veio cortado.",
+      "prazo": "2026-10-23T23:59:00Z"
+    },
+    "combinado": null,
+    "respostasTriagem": [
+      {
+        "perguntaId": "motivo",
+        "pergunta": "Qual o motivo principal?",
+        "resposta": "Sangramento na gengiva ao escovar"
+      },
+      {
+        "perguntaId": "tempo",
+        "pergunta": "Há quanto tempo?",
+        "resposta": "De 1 a 4 semanas"
+      },
+      {
+        "perguntaId": "diagnostico",
+        "pergunta": "Já tem diagnóstico?",
+        "resposta": "Não"
+      },
+      {
+        "perguntaId": "medicacao",
+        "pergunta": "Usa medicação contínua?",
+        "resposta": "Não"
+      },
+      {
+        "perguntaId": "urgencia",
+        "pergunta": "Urgência percebida",
+        "resposta": "Média"
+      },
+      {
+        "perguntaId": "horario",
+        "pergunta": "Melhor horário",
+        "resposta": "Manhã"
+      }
+    ],
+    "documentos": [
+      {
+        "id": "doc-20423-1",
+        "documentoId": "rg",
+        "nomeArquivo": "RG.jpg",
+        "tamanhoBytes": 655360,
+        "enviadoEm": "2026-10-20T10:30:00Z"
+      },
+      {
+        "id": "doc-20423-2",
+        "documentoId": "sus",
+        "nomeArquivo": "Cartao_SUS.jpg",
+        "tamanhoBytes": 97280,
+        "enviadoEm": "2026-10-20T10:30:00Z"
+      }
+    ],
+    "consentimentoDadosSaudeEm": "2026-10-20T10:30:00Z",
+    "mensagensNaoLidas": 0,
+    "ultimaMensagem": null,
+    "podeTrocarMensagens": false,
+    "mensagens": []
+  },
+  {
+    "id": "req-007",
+    "protocolo": "20424",
+    "status": "CANCELADA",
+    "oportunidade": {
+      "id": "op-105",
+      "titulo": "Psicologia adulto",
+      "especialidade": "psicologia"
+    },
+    "ofertante": {
+      "nome": "Marcos Vieira",
+      "ondeAtende": "Espaço Cuidar"
+    },
+    "paciente": {
+      "nome": "Rafael Costa"
+    },
+    "dataInscricao": "2026-10-19T14:10:00Z",
+    "prazoResposta": "2026-11-03T14:10:00Z",
+    "decididaEm": "2026-10-20T08:15:00Z",
+    "motivoDecisao": null,
+    "pedidoInformacao": null,
+    "combinado": null,
+    "respostasTriagem": [],
+    "documentos": [],
+    "consentimentoDadosSaudeEm": "2026-10-19T14:10:00Z",
+    "mensagensNaoLidas": 0,
+    "ultimaMensagem": null,
+    "podeTrocarMensagens": false,
+    "mensagens": []
+  }
+]

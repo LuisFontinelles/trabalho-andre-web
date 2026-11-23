@@ -21,13 +21,17 @@ export type IconName =
   | 'image'
   | 'inbox'
   | 'info'
+  | 'lock'
   | 'logout'
   | 'mark_email_read'
   | 'medical_services'
   | 'menu'
   | 'more_vert'
+  | 'radio_button_unchecked'
   | 'send'
   | 'settings'
+  | 'visibility'
+  | 'visibility_off'
 
 export type IconTone =
   | 'primary'
