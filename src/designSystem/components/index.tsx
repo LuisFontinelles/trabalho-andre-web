@@ -387,6 +387,9 @@ interface SelectFieldBase {
   options: readonly SelectOption[]
   errorMessage?: string | null
   isEnabled?: boolean
+  /** Texto do menu aberto sem opcoes (carregando ou falhou). */
+  emptyMessage?: string
+  onOpen?: () => void
 }
 
 type SelectFieldProps = SelectFieldBase &
@@ -401,7 +404,7 @@ type SelectFieldProps = SelectFieldBase &
  * escolhas separadas por virgula.
  */
 export function SelectField(props: SelectFieldProps) {
-  const { label, placeholder, options, errorMessage, isEnabled = true } = props
+  const { label, placeholder, options, errorMessage, isEnabled = true, emptyMessage, onOpen } = props
   const id = useId()
   const [isOpen, setOpen] = useState(false)
   const [active, setActive] = useState(0)
@@ -478,7 +481,10 @@ export function SelectField(props: SelectFieldProps) {
           aria-controls={`${id}-list`}
           aria-invalid={errorMessage ? true : undefined}
           disabled={!isEnabled}
-          onClick={() => setOpen((current) => !current)}
+          onClick={() => {
+            if (!isOpen) onOpen?.()
+            setOpen((current) => !current)
+          }}
           onKeyDown={onKeyDown}
         >
           <span className={cx('cb-select__value', text === '' && 'cb-select__value--empty')}>
@@ -493,6 +499,11 @@ export function SelectField(props: SelectFieldProps) {
             role="listbox"
             aria-multiselectable={props.multiple || undefined}
           >
+            {options.length === 0 && emptyMessage && (
+              <li className="cb-select__empty" role="presentation">
+                {emptyMessage}
+              </li>
+            )}
             {options.map((option, index) => {
               const isSelected = selected.includes(option.value)
               return (
