@@ -150,6 +150,7 @@ export function SignUpPage() {
           options={catalog.specialties.map((item) => ({ value: item.id, label: item.label }))}
           value={draft.professional.specialtyId}
           onChange={(specialtyId) => update({ professional: { ...draft.professional, specialtyId } })}
+          errorMessage={errors.specialtyRequired}
         />
         <TextField
           label={strings.signUp.workplaceLabel}
@@ -157,6 +158,7 @@ export function SignUpPage() {
           autoComplete="organization"
           value={draft.professional.workplace}
           onChange={(workplace) => update({ professional: { ...draft.professional, workplace } })}
+          errorMessage={errors.workplaceRequired}
         />
         <TextField
           label={strings.signUp.passwordLabel}

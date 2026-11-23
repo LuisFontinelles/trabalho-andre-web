@@ -166,13 +166,16 @@ describe('Validacao do cadastro', () => {
     expect(() => validateSignUp(draft)).not.toThrow()
   })
 
-  it('especialidade e local de atendimento sao opcionais', () => {
+  it('especialidade e obrigatoria, como na API', () => {
     const base = validProfessionalDraft()
-    const draft = {
-      ...base,
-      professional: { ...base.professional, specialtyId: null, workplace: '' },
-    }
-    expect(() => validateSignUp(draft)).not.toThrow()
+    const draft = { ...base, professional: { ...base.professional, specialtyId: null } }
+    expect(() => validateSignUp(draft)).toThrow(expect.objectContaining({ code: 'specialtyRequired' }))
+  })
+
+  it('local de atendimento e obrigatorio, como na API', () => {
+    const base = validProfessionalDraft()
+    const draft = { ...base, professional: { ...base.professional, workplace: '  ' } }
+    expect(() => validateSignUp(draft)).toThrow(expect.objectContaining({ code: 'workplaceRequired' }))
   })
 
   it('o erro apontado e o do primeiro campo da tela', () => {

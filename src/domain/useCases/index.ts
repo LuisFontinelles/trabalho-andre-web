@@ -21,7 +21,10 @@ export type ValidationCode =
   | 'stateRequired'
   | 'registrationRequired'
   | 'registrationInvalid'
+  | 'specialtyRequired'
+  | 'workplaceRequired'
   | 'codeIncomplete'
+  | 'newPasswordWeak'
 
 const VALIDATION_MESSAGE: Record<ValidationCode, string> = {
   emailRequired: strings.login.emailRequired,
@@ -35,7 +38,10 @@ const VALIDATION_MESSAGE: Record<ValidationCode, string> = {
   stateRequired: strings.signUp.stateRequired,
   registrationRequired: strings.signUp.registrationRequired,
   registrationInvalid: strings.signUp.registrationInvalid,
+  specialtyRequired: strings.signUp.specialtyRequired,
+  workplaceRequired: strings.signUp.workplaceRequired,
   codeIncomplete: strings.verification.incomplete,
+  newPasswordWeak: strings.recover.passwordRule,
 }
 
 export class ValidationError extends Error {
@@ -85,6 +91,8 @@ export function validateSignUp(draft: SignUpDraft): void {
     if (number === '') throw new ValidationError('registrationRequired')
     // O contrato aceita de 4 a 7 digitos no numero do registro.
     if (!REGISTRATION_PATTERN.test(number)) throw new ValidationError('registrationInvalid')
+    if (draft.professional.specialtyId === null) throw new ValidationError('specialtyRequired')
+    if (draft.professional.workplace.trim() === '') throw new ValidationError('workplaceRequired')
   }
 
   validatePassword(draft.password, true)
@@ -122,7 +130,7 @@ export function makeVerifyCode(repository: AuthRepository) {
     email: string,
     code: string,
     length: number = DEFAULT_CODE_LENGTH,
-  ): Promise<Session> => {
+  ): Promise<Session | null> => {
     const digits = code.replace(/\D/g, '')
     if (digits.length !== length) throw new ValidationError('codeIncomplete')
     return repository.verify(email, digits)
@@ -137,6 +145,28 @@ export function makeRequestPasswordReset(repository: AuthRepository) {
   return async (email: string): Promise<void> => {
     validateEmail(email)
     await repository.requestPasswordReset(email.trim().toLowerCase())
+  }
+}
+
+export const RESET_CODE_LENGTH = 6
+
+/** Mesma regra da API para a nova senha: 8+, maiuscula, minuscula, numero e simbolo. */
+const STRONG_PASSWORD = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
+
+export function makeResetPassword(repository: AuthRepository) {
+  return async (email: string, code: string, newPassword: string): Promise<void> => {
+    const digits = code.replace(/\D/g, '')
+    if (digits.length !== RESET_CODE_LENGTH) throw new ValidationError('codeIncomplete')
+    if (newPassword === '') throw new ValidationError('passwordRequired')
+    if (!STRONG_PASSWORD.test(newPassword)) throw new ValidationError('newPasswordWeak')
+    await repository.resetPassword(email.trim().toLowerCase(), digits, newPassword)
+  }
+}
+
+export function makeDeleteAccount(repository: AuthRepository) {
+  return async (password: string): Promise<void> => {
+    if (password === '') throw new ValidationError('passwordRequired')
+    await repository.deleteAccount(password)
   }
 }
 

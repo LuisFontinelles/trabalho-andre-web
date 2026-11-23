@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { WrongProfileError } from '@/domain/entities'
 import { ValidationError } from '@/domain/useCases'
 import {
+  DEBUG_RESET_CODE,
   DEBUG_VERIFICATION_CODE,
   LOCK_MS,
   MAX_FAILED_LOGINS,
@@ -25,7 +26,7 @@ describe('Login', () => {
     const session = await deps().login('profissional@teste.com', 'Profissa@2026')
     expect(session.user.name).toBe('Marcos Vieira')
     expect(session.user.id).toBe('9b3d7e21-5c8f-4a06-b2d4-71e5a0c9f302')
-    expect(requestLog).toEqual(['POST /user/login', 'GET /user/me'])
+    expect(requestLog).toEqual(['POST /auth/login', 'GET /user/me'])
     expect(authorizationLog).toEqual([null, 'Bearer mock.profissional@teste.com'])
   })
 
@@ -124,7 +125,7 @@ describe('Cadastro e verificacao', () => {
       codeLength: 4,
       requiresCode: true,
     })
-    expect(requestLog).toEqual(['POST /profissional-saude/cadastro'])
+    expect(requestLog).toEqual(['POST /auth/register'])
   })
 
   it('o caso de uso normaliza o e-mail antes de enviar', async () => {
@@ -147,11 +148,12 @@ describe('Cadastro e verificacao', () => {
     expect(requestLog).toEqual([])
   })
 
-  it('o codigo de depuracao conclui a verificacao e devolve a sessao', async () => {
+  it('o codigo de depuracao conclui a verificacao e entra com a senha do cadastro', async () => {
     const dependencies = deps()
     const draft = { ...validProfessionalDraft(), name: 'Helena Souza' }
     const pending = await dependencies.signUp(draft)
-    const session = await dependencies.verifyCode(pending.email, DEBUG_VERIFICATION_CODE)
+    const session = (await dependencies.verifyCode(pending.email, DEBUG_VERIFICATION_CODE))!
+    expect(requestLog).toEqual(['POST /auth/register', 'POST /auth/verify', 'POST /auth/login', 'GET /user/me'])
     expect(session.user).toMatchObject({
       email: 'novo.medico@clinica.com',
       name: 'Helena Souza',
@@ -184,10 +186,10 @@ describe('Cadastro e verificacao', () => {
     })
   })
 
-  it.each(['1234', '0001', '9999'])('codigo errado %s devolve 401', async (code) => {
+  it.each(['1234', '0001', '9999'])('codigo errado %s devolve 400', async (code) => {
     await expect(deps().verifyCode('profissional@teste.com', code)).rejects.toMatchObject({
-      kind: 'unauthorized',
-      apiMessage: 'Código incorreto ou expirado.',
+      kind: 'badRequest',
+      apiMessage: 'Código inválido ou expirado.',
     })
   })
 
@@ -197,20 +199,20 @@ describe('Cadastro e verificacao', () => {
     )
   })
 
-  it('caracteres nao numericos sao descartados antes de contar', async () => {
-    const session = await deps().verifyCode('profissional@teste.com', '0-0 0a0')
-    expect(session.user.profile).toBe('PROFISSIONAL')
+  it('caracteres nao numericos sao descartados; sem a senha na memoria pede login', async () => {
+    await expect(deps().verifyCode('profissional@teste.com', '0-0 0a0')).resolves.toBeNull()
+    expect(requestLog).toEqual(['POST /auth/verify'])
   })
 
-  it('verificar e-mail sem cadastro responde 404', async () => {
+  it('verificar e-mail sem cadastro responde 400, sem revelar quem tem conta', async () => {
     await expect(deps().verifyCode('ninguem@teste.com', '0000')).rejects.toMatchObject({
-      kind: 'notFound',
+      kind: 'badRequest',
     })
   })
 
-  it('reenvio de codigo responde 204', async () => {
+  it('reenvio de codigo vai para /auth/resend-code', async () => {
     await expect(deps().resendCode('profissional@teste.com')).resolves.toBeUndefined()
-    expect(requestLog).toEqual(['POST /user/verificacao/reenvio'])
+    expect(requestLog).toEqual(['POST /auth/resend-code'])
   })
 })
 
@@ -240,7 +242,32 @@ describe('Catalogo', () => {
 describe('Recuperar senha', () => {
   it('envia o pedido com o e-mail normalizado', async () => {
     await expect(deps().requestPasswordReset('  Profissional@Teste.com ')).resolves.toBeUndefined()
-    expect(requestLog).toEqual(['POST /user/senha/recuperacao'])
+    expect(requestLog).toEqual(['POST /auth/password-reset'])
+  })
+
+  it('codigo certo e senha forte trocam a senha', async () => {
+    const dependencies = deps()
+    const draft = validProfessionalDraft()
+    await dependencies.signUp(draft)
+    await dependencies.verifyCode(draft.email, DEBUG_VERIFICATION_CODE)
+    await dependencies.resetPassword(draft.email, DEBUG_RESET_CODE, 'Nova@2026x')
+    await expect(dependencies.login(draft.email, 'Nova@2026x')).resolves.toBeTruthy()
+    await expect(dependencies.login(draft.email, draft.password)).rejects.toMatchObject({
+      kind: 'unauthorized',
+    })
+  })
+
+  it('codigo errado na troca chega como badRequest', async () => {
+    await expect(
+      deps().resetPassword('profissional@teste.com', '123456', 'Nova@2026x'),
+    ).rejects.toMatchObject({ kind: 'badRequest', apiMessage: 'Código inválido ou expirado.' })
+  })
+
+  it.each(['Nova2026x', 'nova@2026x', 'NOVA@2026X', 'Nv@1'])('senha %s nao passa da regra', async (password) => {
+    await expect(
+      deps().resetPassword('profissional@teste.com', DEBUG_RESET_CODE, password),
+    ).rejects.toMatchObject({ code: 'newPasswordWeak' })
+    expect(requestLog).toEqual([])
   })
 
   it('responde igual para e-mail sem conta, para nao revelar quem tem cadastro', async () => {
@@ -254,5 +281,52 @@ describe('Recuperar senha', () => {
     await expect(deps().requestPasswordReset('  ')).rejects.toMatchObject({
       code: 'emailRequired',
     })
+  })
+})
+
+describe('Minha conta (LGPD)', () => {
+  async function signedIn() {
+    const dependencies = deps()
+    const draft = validProfessionalDraft()
+    await dependencies.signUp(draft)
+    const session = (await dependencies.verifyCode(draft.email, DEBUG_VERIFICATION_CODE))!
+    dependencies.tokens.set(session.token)
+    return dependencies
+  }
+
+  it('exporta os dados da conta por POST /me/data-export', async () => {
+    const dependencies = await signedIn()
+    await expect(dependencies.exportMyData()).resolves.toMatchObject({
+      email: 'novo.medico@clinica.com',
+      emailVerificado: true,
+    })
+    expect(requestLog.at(-1)).toBe('POST /me/data-export')
+  })
+
+  it('senha errada na exclusao nao derruba a sessao', async () => {
+    const dependencies = await signedIn()
+    let expired = false
+    dependencies.tokens.onExpired(() => {
+      expired = true
+    })
+    await expect(dependencies.deleteAccount('errada')).rejects.toMatchObject({ kind: 'unauthorized' })
+    expect(expired).toBe(false)
+    expect(dependencies.tokens.get()).not.toBeNull()
+  })
+
+  it('senha certa exclui a conta e o login deixa de funcionar', async () => {
+    const dependencies = await signedIn()
+    const draft = validProfessionalDraft()
+    await dependencies.deleteAccount(draft.password)
+    expect(requestLog.at(-1)).toBe('DELETE /me')
+    await expect(dependencies.login(draft.email, draft.password)).rejects.toMatchObject({
+      kind: 'unauthorized',
+    })
+  })
+
+  it('senha vazia nem sai do navegador', async () => {
+    const dependencies = await signedIn()
+    await expect(dependencies.deleteAccount('')).rejects.toMatchObject({ code: 'passwordRequired' })
+    expect(requestLog.at(-1)).toBe('GET /user/me')
   })
 })

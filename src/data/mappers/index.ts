@@ -84,6 +84,7 @@ export function registrationFromMe(me: MeDTO | null): string | undefined {
 export function signUpDraftToDTO(draft: SignUpDraft): ProfissionalCadastroDTO {
   const { councilId, stateId, number, specialtyId, workplace } = draft.professional
   return {
+    tipoPerfil: 'PROFISSIONAL_SAUDE',
     usuarioDto: {
       email: draft.email,
       senha: draft.password,
@@ -97,6 +98,7 @@ export function signUpDraftToDTO(draft: SignUpDraft): ProfissionalCadastroDTO {
     ondeAtende: workplace.trim() === '' ? null : workplace.trim(),
     biografiaOuDescricao: null,
     aceitouTermos: draft.acceptedTerms,
+    acceptedTerms: draft.acceptedTerms,
   }
 }
 

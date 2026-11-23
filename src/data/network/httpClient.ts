@@ -12,6 +12,8 @@ export interface Endpoint {
    * servidor responde 401.
    */
   authenticated?: boolean
+  /** A rota confere a senha atual: 401 e senha errada, nao sessao vencida. */
+  checksPassword?: boolean
 }
 
 /**
@@ -187,7 +189,9 @@ export function createHttpClient(
     const api = parseApiError(body, response.status)
     const message = api?.message || `HTTP ${response.status}`
     const kind = kindForStatus(response.status)
-    if (kind === 'unauthorized' && endpoint.authenticated) options.onUnauthorized?.()
+    if (kind === 'unauthorized' && endpoint.authenticated && !endpoint.checksPassword) {
+      options.onUnauthorized?.()
+    }
     throw new NetworkError(kind, message, response.status, api)
   }
 

@@ -1,13 +1,14 @@
 import { createHttpClient } from '@/data/network/httpClient'
 import { BASE_URL, createMockFetch } from '@/data/network/mockBackend'
-import { createCareBridgeAuthRepository } from '@/data/carebridgeApi'
 import { createAuthRepository } from '@/data/repositories'
 import { createProfessionalRepository } from '@/data/professionalRepository'
 import {
+  makeDeleteAccount,
   makeLoadCatalog,
   makeLogin,
   makeRequestPasswordReset,
   makeResendCode,
+  makeResetPassword,
   makeSignUp,
   makeVerifyCode,
 } from '@/domain/useCases'
@@ -58,12 +59,9 @@ export function createDependencies(
 ) {
   const options = { getToken: tokens.get, onUnauthorized: tokens.expire }
   const mockClient = createHttpClient(BASE_URL, fetchImpl, options)
-  const mockAuthRepository = createAuthRepository(mockClient)
   const usesApi = apiUrl.trim() !== ''
   const client = usesApi ? createHttpClient(apiUrl, apiFetch, options) : mockClient
-  const authRepository = usesApi
-    ? createCareBridgeAuthRepository(createAuthRepository(client), mockAuthRepository)
-    : mockAuthRepository
+  const authRepository = createAuthRepository(client)
   const professionalRepository = createProfessionalRepository(client)
 
   return {
@@ -75,6 +73,9 @@ export function createDependencies(
     verifyCode: makeVerifyCode(authRepository),
     resendCode: makeResendCode(authRepository),
     requestPasswordReset: makeRequestPasswordReset(authRepository),
+    resetPassword: makeResetPassword(authRepository),
+    exportMyData: () => authRepository.exportMyData(),
+    deleteAccount: makeDeleteAccount(authRepository),
     loadCatalog: makeLoadCatalog(authRepository),
   }
 }

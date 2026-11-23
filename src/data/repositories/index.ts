@@ -34,47 +34,76 @@ function professionalOnly(session: Session): Session {
   return session
 }
 
-/** Acesso e catalogo, no formato do contrato v2 (secoes 3 e 4). */
+/** Acesso (/auth/*) e catalogo da carebridge-api. */
 export function createAuthRepository(client: HttpClient): AuthRepository {
   async function sessionFor(login: LoginResponseDTO, email: string): Promise<Session> {
     const me = await fetchMe(client, login.token)
     return professionalOnly(sessionFromDTO(login, me, email))
   }
 
+  // /auth/verify so confirma o e-mail e nao devolve token. A senha do cadastro
+  // fica so na memoria para entrar logo depois; recarregar a pagina a perde.
+  const pendingPasswords = new Map<string, string>()
+
+  async function login(email: string, password: string): Promise<Session> {
+    const dto = await client.send<LoginResponseDTO>({
+      path: 'auth/login',
+      method: 'POST',
+      body: { email, password },
+    })
+    return sessionFor(dto, email)
+  }
+
   return {
-    async login(email, password) {
-      const dto = await client.send<LoginResponseDTO>({
-        path: 'user/login',
-        method: 'POST',
-        body: { email, password },
-      })
-      return sessionFor(dto, email)
-    },
+    login,
 
     async signUp(draft) {
       const dto = await client.sendOptional<CadastroResponseDTO>({
-        path: 'profissional-saude/cadastro',
+        path: 'auth/register',
         method: 'POST',
         body: signUpForm(draft),
       })
-      return pendingVerificationFromDTO(dto, draft.email)
+      const pending = pendingVerificationFromDTO(dto, draft.email)
+      if (pending.requiresCode) pendingPasswords.set(pending.email, draft.password)
+      return pending
     },
 
     async verify(email, code) {
-      const dto = await client.send<LoginResponseDTO>({
-        path: 'user/verificacao',
-        method: 'POST',
-        body: { email, codigo: code },
-      })
-      return sessionFor(dto, email)
+      await client.sendVoid({ path: 'auth/verify', method: 'POST', body: { email, code } })
+      const password = pendingPasswords.get(email)
+      if (password === undefined) return null
+      pendingPasswords.delete(email)
+      return login(email, password)
     },
 
     async resendCode(email) {
-      await client.sendVoid({ path: 'user/verificacao/reenvio', method: 'POST', body: { email } })
+      await client.sendVoid({ path: 'auth/resend-code', method: 'POST', body: { email } })
     },
 
     async requestPasswordReset(email) {
-      await client.sendVoid({ path: 'user/senha/recuperacao', method: 'POST', body: { email } })
+      await client.sendVoid({ path: 'auth/password-reset', method: 'POST', body: { email } })
+    },
+
+    async resetPassword(email, code, newPassword) {
+      await client.sendVoid({
+        path: 'auth/password-reset',
+        method: 'POST',
+        body: { email, code, newPassword },
+      })
+    },
+
+    async exportMyData() {
+      return client.send<unknown>({ path: 'me/data-export', method: 'POST', authenticated: true })
+    },
+
+    async deleteAccount(password) {
+      await client.sendVoid({
+        path: 'me',
+        method: 'DELETE',
+        body: { password },
+        authenticated: true,
+        checksPassword: true,
+      })
     },
 
     async catalog() {

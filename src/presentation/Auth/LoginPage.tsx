@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { rememberedRegistration, useDependencies, useSession } from '@/app/session'
 import { Banner, Button, TextField } from '@/designSystem/components'
 import { NetworkError } from '@/data/network/httpClient'
@@ -8,12 +8,19 @@ import { ValidationError } from '@/domain/useCases'
 import { AuthCard } from '@/presentation/Auth/AuthCard'
 import { strings } from '@/resources/strings'
 
+/** Aviso que outra tela deixa ao voltar para o login (e-mail confirmado, senha trocada). */
+export interface LoginHandoff {
+  notice: string
+  email: string
+}
+
 export function LoginPage() {
   const dependencies = useDependencies()
   const session = useSession()
   const navigate = useNavigate()
+  const handoff = useLocation().state as LoginHandoff | null
 
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(handoff?.email ?? '')
   const [password, setPassword] = useState('')
   const [emailError, setEmailError] = useState<string | null>(null)
   const [passwordError, setPasswordError] = useState<string | null>(null)
@@ -68,6 +75,7 @@ export function LoginPage() {
   return (
     <AuthCard title={strings.login.title} subtitle={strings.login.subtitle}>
       <form className="cb-auth__form" onSubmit={submit} noValidate>
+        {handoff?.notice && formError === null && <Banner message={handoff.notice} tone="success" />}
         <TextField
           label={strings.login.emailLabel}
           placeholder={strings.login.emailPlaceholder}

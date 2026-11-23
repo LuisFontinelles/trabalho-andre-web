@@ -335,7 +335,10 @@ button.cb-menu__item:hover:not(:disabled) { background: var(--cb-surface-raised)
   gap: var(--cb-space-md);
 }
 .cb-code__digit {
-  width: 64px;
+  /* Cabe 4 ou 6 caixas no cartao, mesmo no celular. */
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 64px;
   height: 60px;
   padding: 0;
   border: var(--cb-border-width) solid var(--cb-border-focus);
