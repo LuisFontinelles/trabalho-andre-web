@@ -124,9 +124,10 @@ export function SettingsPage() {
       if (caught instanceof ValidationError) {
         setPasswordError(caught.message)
       } else if (caught instanceof NetworkError && caught.kind === 'unauthorized') {
-        setPasswordError(text.deleteWrongPassword)
+        // 401 aqui e senha errada ou sessao vencida; a mensagem da API diz qual.
+        setPasswordError(caught.apiMessage ?? text.deleteWrongPassword)
       } else {
-        setPasswordError(strings.common.failed)
+        setPasswordError(caught instanceof NetworkError && caught.apiMessage ? caught.apiMessage : strings.common.failed)
       }
     } finally {
       setBusy(false)
@@ -211,6 +212,7 @@ export function SettingsPage() {
               <Button
                 title={text.deleteConfirm}
                 kind="danger"
+                isEnabled={password !== ''}
                 isLoading={isBusy}
                 onClick={() => void deleteAccount()}
               />

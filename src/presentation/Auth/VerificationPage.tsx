@@ -10,7 +10,8 @@ import type { SignUpHandoff } from '@/presentation/Auth/SignUpPage'
 import { useCountdown } from '@/presentation/Auth/useCountdown'
 import { strings } from '@/resources/strings'
 
-const RESEND_SECONDS = 45
+// A API so aceita outro codigo 60 s depois do anterior.
+const RESEND_SECONDS = 60
 
 export function VerificationPage() {
   const dependencies = useDependencies()
@@ -50,7 +51,7 @@ export function VerificationPage() {
         error instanceof NetworkError &&
         (error.kind === 'unauthorized' || error.kind === 'badRequest')
       ) {
-        setCodeError(strings.verification.invalid)
+        setCodeError(error.apiMessage ?? strings.verification.invalid)
       } else {
         setCodeError(strings.common.failed)
       }
@@ -67,8 +68,8 @@ export function VerificationPage() {
       setCode('')
       setNotice(strings.verification.resent)
       restartCountdown()
-    } catch {
-      setCodeError(strings.common.failed)
+    } catch (error) {
+      setCodeError(error instanceof NetworkError && error.apiMessage ? error.apiMessage : strings.common.failed)
     } finally {
       setSubmitting(false)
     }

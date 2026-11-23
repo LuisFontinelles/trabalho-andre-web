@@ -39,6 +39,8 @@ function NewPasswordForm({ email, onResend }: { email: string; onResend: () => P
         setError(caught.message)
       } else if (caught instanceof NetworkError && caught.kind === 'badRequest') {
         setError(caught.apiMessage ?? strings.recover.invalidCode)
+      } else if (caught instanceof NetworkError && caught.apiMessage) {
+        setError(caught.apiMessage)
       } else {
         setError(strings.common.failed)
       }
@@ -55,8 +57,8 @@ function NewPasswordForm({ email, onResend }: { email: string; onResend: () => P
       setCode('')
       setNotice(strings.verification.resent)
       restartCountdown()
-    } catch {
-      setError(strings.common.failed)
+    } catch (caught) {
+      setError(caught instanceof NetworkError && caught.apiMessage ? caught.apiMessage : strings.common.failed)
     } finally {
       setBusy(false)
     }
@@ -130,6 +132,7 @@ export function RecoverPasswordPage() {
       setSentTo(email.trim().toLowerCase())
     } catch (error) {
       if (error instanceof ValidationError) setEmailError(error.message)
+      else if (error instanceof NetworkError && error.apiMessage) setFormError(error.apiMessage)
       else setFormError(strings.common.failed)
     } finally {
       setSubmitting(false)

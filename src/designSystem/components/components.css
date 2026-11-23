@@ -251,6 +251,13 @@
   color: var(--cb-text-primary);
   resize: none;
 }
+/*
+ * Quem ja desenha a propria borda de foco nao leva o anel global de
+ * :focus-visible, senao aparece um retangulo dentro da borda arredondada.
+ */
+.cb-field__input:focus-visible,
+.cb-select__trigger:focus-visible,
+.cb-code__digit:focus-visible { outline: none; }
 .cb-field__input::placeholder { color: var(--cb-text-tertiary); opacity: 1; }
 .cb-field__input:disabled { color: var(--cb-disabled-content); -webkit-text-fill-color: var(--cb-disabled-content); }
 .cb-field__help { font: var(--cb-font-caption); color: var(--cb-danger); }
