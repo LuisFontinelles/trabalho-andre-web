@@ -21,7 +21,10 @@ export type ValidationCode =
   | 'stateRequired'
   | 'registrationRequired'
   | 'registrationInvalid'
+  | 'specialtyRequired'
+  | 'workplaceRequired'
   | 'codeIncomplete'
+  | 'newPasswordWeak'
 
 const VALIDATION_MESSAGE: Record<ValidationCode, string> = {
   emailRequired: strings.login.emailRequired,
@@ -35,7 +38,10 @@ const VALIDATION_MESSAGE: Record<ValidationCode, string> = {
   stateRequired: strings.signUp.stateRequired,
   registrationRequired: strings.signUp.registrationRequired,
   registrationInvalid: strings.signUp.registrationInvalid,
+  specialtyRequired: strings.signUp.specialtyRequired,
+  workplaceRequired: strings.signUp.workplaceRequired,
   codeIncomplete: strings.verification.incomplete,
+  newPasswordWeak: strings.recover.passwordRule,
 }
 
 export class ValidationError extends Error {
@@ -58,14 +64,28 @@ export function validateEmail(email: string): void {
   if (!EMAIL_PATTERN.test(value)) throw new ValidationError('emailInvalid')
 }
 
+export type PasswordRuleId = 'length' | 'upper' | 'lower' | 'digit' | 'symbol'
+
+const PASSWORD_RULES: readonly { id: PasswordRuleId; test: (password: string) => boolean }[] = [
+  { id: 'length', test: (password) => password.length >= 8 },
+  { id: 'upper', test: (password) => /[A-Z]/.test(password) },
+  { id: 'lower', test: (password) => /[a-z]/.test(password) },
+  { id: 'digit', test: (password) => /\d/.test(password) },
+  { id: 'symbol', test: (password) => /[^A-Za-z0-9]/.test(password) },
+]
+
+/** A mesma regra no cadastro e na troca de senha, igual a da API na troca. */
+export function passwordRules(password: string): { id: PasswordRuleId; met: boolean }[] {
+  return PASSWORD_RULES.map((rule) => ({ id: rule.id, met: rule.test(password) }))
+}
+
+function isStrongPassword(password: string): boolean {
+  return PASSWORD_RULES.every((rule) => rule.test(password))
+}
+
 export function validatePassword(password: string, strict: boolean): void {
   if (password === '') throw new ValidationError('passwordRequired')
-  if (!strict) return
-  const hasUpper = /[A-Z]/.test(password)
-  const hasDigit = /[0-9]/.test(password)
-  if (password.length < 8 || !hasUpper || !hasDigit) {
-    throw new ValidationError('passwordWeak')
-  }
+  if (strict && !isStrongPassword(password)) throw new ValidationError('passwordWeak')
 }
 
 /**
@@ -73,24 +93,45 @@ export function validatePassword(password: string, strict: boolean): void {
  * mostrado ser o primeiro campo problematico.
  */
 export function validateSignUp(draft: SignUpDraft): void {
-  if (draft.name.trim() === '') throw new ValidationError('nameRequired')
-  validateEmail(draft.email)
+  const [first] = signUpErrors(draft)
+  if (first !== undefined) throw new ValidationError(first)
+}
 
-  if (requiresProfessionalData(draft)) {
-    if (draft.professional.councilId === null)
-      throw new ValidationError('councilRequired')
-    if (draft.professional.stateId === null)
-      throw new ValidationError('stateRequired')
-    const number = draft.professional.number.trim()
-    if (number === '') throw new ValidationError('registrationRequired')
-    // O contrato aceita de 4 a 7 digitos no numero do registro.
-    if (!REGISTRATION_PATTERN.test(number)) throw new ValidationError('registrationInvalid')
+/** Todos os problemas do cadastro de uma vez, na ordem dos campos na tela. */
+export function signUpErrors(draft: SignUpDraft): ValidationCode[] {
+  const errors: ValidationCode[] = []
+  const check = (run: () => void) => {
+    try {
+      run()
+    } catch (error) {
+      if (!(error instanceof ValidationError)) throw error
+      errors.push(error.code)
+    }
   }
 
-  validatePassword(draft.password, true)
-  if (draft.password !== draft.confirmPassword)
-    throw new ValidationError('passwordMismatch')
-  if (!draft.acceptedTerms) throw new ValidationError('termsNotAccepted')
+  if (draft.name.trim() === '') errors.push('nameRequired')
+  check(() => validateEmail(draft.email))
+
+  if (requiresProfessionalData(draft)) {
+    const { councilId, stateId, specialtyId, workplace } = draft.professional
+    if (councilId === null) errors.push('councilRequired')
+    if (stateId === null) errors.push('stateRequired')
+    const number = draft.professional.number.trim()
+    if (number === '') errors.push('registrationRequired')
+    // O contrato aceita de 4 a 7 digitos no numero do registro.
+    else if (!REGISTRATION_PATTERN.test(number)) errors.push('registrationInvalid')
+    if (specialtyId === null) errors.push('specialtyRequired')
+    if (workplace.trim() === '') errors.push('workplaceRequired')
+  }
+
+  check(() => validatePassword(draft.password, true))
+  if (draft.password !== draft.confirmPassword) errors.push('passwordMismatch')
+  if (!draft.acceptedTerms) errors.push('termsNotAccepted')
+  return errors
+}
+
+export function validationMessage(code: ValidationCode): string {
+  return VALIDATION_MESSAGE[code]
 }
 
 export function makeLogin(repository: AuthRepository) {
@@ -122,7 +163,7 @@ export function makeVerifyCode(repository: AuthRepository) {
     email: string,
     code: string,
     length: number = DEFAULT_CODE_LENGTH,
-  ): Promise<Session> => {
+  ): Promise<Session | null> => {
     const digits = code.replace(/\D/g, '')
     if (digits.length !== length) throw new ValidationError('codeIncomplete')
     return repository.verify(email, digits)
@@ -137,6 +178,25 @@ export function makeRequestPasswordReset(repository: AuthRepository) {
   return async (email: string): Promise<void> => {
     validateEmail(email)
     await repository.requestPasswordReset(email.trim().toLowerCase())
+  }
+}
+
+export const RESET_CODE_LENGTH = 6
+
+export function makeResetPassword(repository: AuthRepository) {
+  return async (email: string, code: string, newPassword: string): Promise<void> => {
+    const digits = code.replace(/\D/g, '')
+    if (digits.length !== RESET_CODE_LENGTH) throw new ValidationError('codeIncomplete')
+    if (newPassword === '') throw new ValidationError('passwordRequired')
+    if (!isStrongPassword(newPassword)) throw new ValidationError('newPasswordWeak')
+    await repository.resetPassword(email.trim().toLowerCase(), digits, newPassword)
+  }
+}
+
+export function makeDeleteAccount(repository: AuthRepository) {
+  return async (password: string): Promise<void> => {
+    if (password === '') throw new ValidationError('passwordRequired')
+    await repository.deleteAccount(password)
   }
 }
 

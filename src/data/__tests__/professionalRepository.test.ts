@@ -216,7 +216,7 @@ describe('Criar oportunidade', () => {
     const draft = validProfessionalDraft()
     await dependencies.signUp(draft)
     const session = await dependencies.verifyCode(draft.email, '0000')
-    dependencies.tokens.set(session.token)
+    dependencies.tokens.set(session!.token)
     const repository = dependencies.professionalRepository
 
     await expect(repository.createOpportunity(validOpportunityDraft())).rejects.toMatchObject({

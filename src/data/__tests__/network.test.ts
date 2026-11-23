@@ -75,7 +75,7 @@ describe('Montagem da requisicao', () => {
     const expired = vi.fn()
     await expect(
       client(null, expired).send({
-        path: 'user/login',
+        path: 'auth/login',
         method: 'POST',
         body: { email: 'ninguem@teste.com', password: 'x' },
       }),

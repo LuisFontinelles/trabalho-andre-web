@@ -33,6 +33,7 @@ export const TEST_ACCOUNTS = ['paciente@teste.com', 'profissional@teste.com'] as
 export type TestAccountEmail = (typeof TEST_ACCOUNTS)[number]
 
 export const DEBUG_VERIFICATION_CODE = '0000'
+export const DEBUG_RESET_CODE = '000000'
 /** Token que o servidor simulado trata como vencido. */
 export const EXPIRED_TOKEN = 'expired'
 export const MAX_FAILED_LOGINS = 5
@@ -310,7 +311,10 @@ const signUp: Handler = (request) => {
   if (body === null || typeof body !== 'object' || body.usuarioDto === undefined) {
     return failure(400, 'Corpo inválido.', request.path)
   }
-  if (body.aceitouTermos !== true) {
+  if (body.tipoPerfil !== 'PROFISSIONAL_SAUDE') {
+    return failure(400, 'Este painel cadastra só profissionais de saúde.', request.path)
+  }
+  if (body.acceptedTerms !== true && body.aceitouTermos !== true) {
     return failure(400, 'Aceite os Termos de Uso e a Política de Privacidade.', request.path)
   }
   if (!/^\d{4,7}$/.test(body.numeroRegistro ?? '')) {
@@ -322,7 +326,6 @@ const signUp: Handler = (request) => {
   }
   state.sequence += 1
   const id = `us-${String(state.sequence).padStart(4, '0')}`
-  // O perfil vem da rota, nunca do corpo.
   state.accounts.set(email, {
     me: {
       id,
@@ -357,16 +360,49 @@ const signUp: Handler = (request) => {
 }
 
 const verify: Handler = (request) => {
-  const body = request.body as { email?: string; codigo?: string } | null
+  const body = request.body as { email?: string; code?: string } | null
   if (body === null || typeof body !== 'object') return failure(400, 'Corpo inválido.', request.path)
-  if (body.codigo !== DEBUG_VERIFICATION_CODE) {
-    return failure(401, 'Código incorreto ou expirado.', request.path)
+  if (body.code !== DEBUG_VERIFICATION_CODE) {
+    return failure(400, 'Código inválido ou expirado.', request.path)
   }
-  const email = normalizeEmail(body.email)
-  const account = state.accounts.get(email)
-  if (account === undefined) return failure(404, 'Cadastro não encontrado.', request.path)
+  const account = state.accounts.get(normalizeEmail(body.email))
+  if (account === undefined) return failure(400, 'Código inválido ou expirado.', request.path)
   account.isVerified = true
-  return ok(loginResponse(account))
+  return ok({ message: 'E-mail verificado com sucesso.' })
+}
+
+const STRONG_PASSWORD = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
+
+/** Sem `code` pede o codigo; com `code` e `newPassword` troca a senha. */
+const passwordReset: Handler = (request) => {
+  const body = request.body as { email?: string; code?: string; newPassword?: string } | null
+  const email = normalizeEmail(body?.email)
+  if (email === '') return failure(400, 'Informe o e-mail.', request.path)
+  if (body?.code === undefined) {
+    return ok({ message: 'Se o e-mail estiver cadastrado, você receberá um código.' })
+  }
+  const account = state.accounts.get(email)
+  if (body.code !== DEBUG_RESET_CODE || account === undefined) {
+    return failure(400, 'Código inválido ou expirado.', request.path)
+  }
+  if (!STRONG_PASSWORD.test(body.newPassword ?? '')) {
+    return failure(400, 'A senha precisa ter 8 caracteres, maiúscula, minúscula, número e símbolo.', request.path)
+  }
+  account.password = body.newPassword ?? null
+  return ok({ message: 'Senha redefinida com sucesso.' })
+}
+
+const exportData = (_request: MockRequest, _params: string[], account: Account): MockResponse =>
+  ok({ ...account.me, emailVerificado: account.isVerified, exportadoEm: new Date(clock()).toISOString() })
+
+/** A API anonimiza; aqui a conta some. Senha errada e 401 sem derrubar a sessao. */
+const deleteAccount = (request: MockRequest, _params: string[], account: Account): MockResponse => {
+  const password = (request.body as { password?: string } | null)?.password ?? ''
+  if (password === '' || (account.password !== null && account.password !== password)) {
+    return failure(401, 'A senha atual está incorreta.', request.path)
+  }
+  state.accounts.delete(account.me.email)
+  return empty()
 }
 
 const emailOnly: Handler = (request) => {
@@ -704,18 +740,20 @@ const sendMessage = withRequest((request, item, account) => {
 
 const ROUTES: Route[] = [
   // Acesso
-  { method: 'POST', pattern: '/user/login', latencyMs: 400, handler: login },
+  { method: 'POST', pattern: '/auth/login', latencyMs: 400, handler: login },
   {
     method: 'GET',
     pattern: '/user/me',
     latencyMs: 200,
     handler: authenticated((_request, _params, account) => ok(account.me)),
   },
-  { method: 'POST', pattern: '/profissional-saude/cadastro', latencyMs: 600, handler: signUp },
-  { method: 'POST', pattern: '/user/verificacao', latencyMs: 400, handler: verify },
-  { method: 'POST', pattern: '/user/verificacao/reenvio', latencyMs: 350, handler: emailOnly },
+  { method: 'POST', pattern: '/auth/register', latencyMs: 600, handler: signUp },
+  { method: 'POST', pattern: '/auth/verify', latencyMs: 400, handler: verify },
+  { method: 'POST', pattern: '/auth/resend-code', latencyMs: 350, handler: emailOnly },
   // Responde igual exista ou nao a conta, para nao revelar quem tem cadastro.
-  { method: 'POST', pattern: '/user/senha/recuperacao', latencyMs: 400, handler: emailOnly },
+  { method: 'POST', pattern: '/auth/password-reset', latencyMs: 400, handler: passwordReset },
+  { method: 'POST', pattern: '/me/data-export', latencyMs: 300, handler: authenticated(exportData) },
+  { method: 'DELETE', pattern: '/me', latencyMs: 400, handler: authenticated(deleteAccount) },
 
   // Catalogo
   { method: 'GET', pattern: '/catalogos', latencyMs: 200, handler: () => ok(loadFixture('catalogos')) },

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  passwordRules,
+  signUpErrors,
   ValidationError,
   validateEmail,
   validatePassword,
@@ -166,13 +168,16 @@ describe('Validacao do cadastro', () => {
     expect(() => validateSignUp(draft)).not.toThrow()
   })
 
-  it('especialidade e local de atendimento sao opcionais', () => {
+  it('especialidade e obrigatoria, como na API', () => {
     const base = validProfessionalDraft()
-    const draft = {
-      ...base,
-      professional: { ...base.professional, specialtyId: null, workplace: '' },
-    }
-    expect(() => validateSignUp(draft)).not.toThrow()
+    const draft = { ...base, professional: { ...base.professional, specialtyId: null } }
+    expect(() => validateSignUp(draft)).toThrow(expect.objectContaining({ code: 'specialtyRequired' }))
+  })
+
+  it('local de atendimento e obrigatorio, como na API', () => {
+    const base = validProfessionalDraft()
+    const draft = { ...base, professional: { ...base.professional, workplace: '  ' } }
+    expect(() => validateSignUp(draft)).toThrow(expect.objectContaining({ code: 'workplaceRequired' }))
   })
 
   it('o erro apontado e o do primeiro campo da tela', () => {
@@ -205,5 +210,51 @@ describe('Validacao do cadastro', () => {
     } catch (error) {
       expect((error as ValidationError).code).toBe('stateRequired')
     }
+  })
+})
+
+describe('Todos os erros do cadastro', () => {
+  it('lista cada campo com problema, na ordem da tela', () => {
+    const base = validProfessionalDraft()
+    const draft = {
+      ...base,
+      name: ' ',
+      email: 'sem-arroba',
+      password: 'fraca',
+      confirmPassword: 'fraca',
+      professional: { ...base.professional, councilId: null, number: '12', workplace: '' },
+    }
+    expect(signUpErrors(draft)).toEqual([
+      'nameRequired',
+      'emailInvalid',
+      'councilRequired',
+      'registrationInvalid',
+      'workplaceRequired',
+      'passwordWeak',
+    ])
+  })
+
+  it('cadastro valido nao tem erro', () => {
+    expect(signUpErrors(validProfessionalDraft())).toEqual([])
+  })
+})
+
+describe('Regras da senha', () => {
+  it('marca cada regra cumprida', () => {
+    expect(passwordRules('abcDEF12')).toEqual([
+      { id: 'length', met: true },
+      { id: 'upper', met: true },
+      { id: 'lower', met: true },
+      { id: 'digit', met: true },
+      { id: 'symbol', met: false },
+    ])
+  })
+
+  it.each(['Senha123', 'senha@123', 'SENHA@123', 'Sn@1'])('%s nao passa no cadastro', (password) => {
+    expect(() => validatePassword(password, true)).toThrow(expect.objectContaining({ code: 'passwordWeak' }))
+  })
+
+  it('senha com as cinco regras passa', () => {
+    expect(() => validatePassword('Senha@123', true)).not.toThrow()
   })
 })

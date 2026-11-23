@@ -9,13 +9,13 @@ export type TipoPerfil = 'PACIENTE' | 'PROFISSIONAL_SAUDE' | 'ADMIN'
 /** `situacaoRegistro`, so do profissional. */
 export type SituacaoRegistro = 'EM_VERIFICACAO' | 'VERIFICADO' | 'RECUSADO'
 
-/** POST /user/login */
+/** POST /auth/login */
 export interface LoginRequestDTO {
   email: string
   password: string
 }
 
-/** Resposta de POST /user/login e de POST /user/verificacao. */
+/** Resposta de POST /auth/login. */
 export interface LoginResponseDTO {
   token: string
   autenticado: boolean
@@ -48,8 +48,13 @@ export interface UsuarioDTO {
   tipoPerfil: TipoPerfil
 }
 
-/** Parte `dados` (JSON) do multipart de POST /profissional-saude/cadastro. */
+/**
+ * Parte `dados` (JSON) do multipart de POST /auth/register. O `tipoPerfil` da
+ * raiz escolhe o tipo do cadastro. Os termos vao nos dois nomes: a API le
+ * `acceptedTerms`, e `aceitouTermos` e o nome do contrato.
+ */
 export interface ProfissionalCadastroDTO {
+  tipoPerfil: 'PROFISSIONAL_SAUDE'
   usuarioDto: UsuarioDTO
   nome: string
   conselho: string
@@ -59,6 +64,7 @@ export interface ProfissionalCadastroDTO {
   ondeAtende: string | null
   biografiaOuDescricao: string | null
   aceitouTermos: boolean
+  acceptedTerms: boolean
 }
 
 /** Resposta 201 do cadastro. Pode vir vazia: os clientes leem como sem codigo. */
@@ -69,15 +75,27 @@ export interface CadastroResponseDTO {
   tamanhoCodigo?: number | null
 }
 
-/** POST /user/verificacao */
+/** POST /auth/verify */
 export interface VerificacaoRequestDTO {
   email: string
-  codigo: string
+  code: string
 }
 
-/** POST /user/verificacao/reenvio e POST /user/senha/recuperacao */
+/** POST /auth/resend-code e primeiro passo de POST /auth/password-reset */
 export interface EmailRequestDTO {
   email: string
+}
+
+/** Segundo passo de POST /auth/password-reset */
+export interface RedefinirSenhaRequestDTO {
+  email: string
+  code: string
+  newPassword: string
+}
+
+/** Resposta de /auth/verify e /auth/password-reset. */
+export interface MensagemDTO {
+  message: string
 }
 
 /** GET /catalogos */

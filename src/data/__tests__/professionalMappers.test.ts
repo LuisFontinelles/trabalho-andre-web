@@ -104,6 +104,7 @@ describe('Acesso', () => {
   it('a parte dados do cadastro segue o contrato, sem documentosRegistro', () => {
     const dto = signUpDraftToDTO(validProfessionalDraft())
     expect(Object.keys(dto).sort()).toEqual([
+      'acceptedTerms',
       'aceitouTermos',
       'biografiaOuDescricao',
       'conselho',
@@ -111,6 +112,7 @@ describe('Acesso', () => {
       'nome',
       'numeroRegistro',
       'ondeAtende',
+      'tipoPerfil',
       'uf',
       'usuarioDto',
     ])
