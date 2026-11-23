@@ -15,6 +15,8 @@ export const strings = {
     showPassword: 'Mostrar senha',
     hidePassword: 'Ocultar senha',
     readOnly: 'Não editável aqui',
+    optionsLoading: 'Carregando opções… Na primeira visita o servidor pode levar até 1 minuto para responder.',
+    optionsFailed: 'Não foi possível carregar as opções. Feche e abra a lista para tentar de novo.',
     passwordRules: {
       length: '8 caracteres ou mais',
       upper: 'Uma letra maiúscula',

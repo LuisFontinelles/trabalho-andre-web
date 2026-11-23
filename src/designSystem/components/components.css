@@ -557,3 +557,9 @@ button.cb-menu__item:hover:not(:disabled) { background: var(--cb-surface-raised)
   .cb-state__actions { flex-direction: column; align-self: stretch; }
   .cb-skeleton { width: 90px !important; flex: 1 1 0; }
 }
+
+.cb-select__empty {
+  padding: var(--cb-space-md) 14px;
+  font: var(--cb-font-callout);
+  color: var(--cb-text-secondary);
+}

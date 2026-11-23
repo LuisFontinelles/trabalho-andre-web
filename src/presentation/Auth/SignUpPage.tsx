@@ -24,6 +24,9 @@ export interface SignUpHandoff {
   registration: string
 }
 
+const CATALOG_RETRIES = 6
+const CATALOG_RETRY_MS = 5000
+
 export function SignUpPage() {
   const dependencies = useDependencies()
   const session = useSession()
@@ -35,20 +38,39 @@ export function SignUpPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setSubmitting] = useState(false)
 
+  const [catalogStatus, setCatalogStatus] = useState<'loading' | 'ready' | 'failed'>('loading')
+  const [catalogAttempt, setCatalogAttempt] = useState(0)
+
+  // A API no Render dorme sem uso e leva ate ~1 min para acordar: tenta de
+  // novo algumas vezes antes de desistir, e abrir uma lista tenta outra vez.
   useEffect(() => {
     let active = true
-    dependencies
-      .loadCatalog()
-      .then((value) => {
-        if (active) setCatalog(value)
-      })
-      .catch(() => {
-        if (active) setCatalog(EMPTY_CATALOG)
-      })
+    let timer: ReturnType<typeof setTimeout> | undefined
+    async function load(attempt: number) {
+      try {
+        const value = await dependencies.loadCatalog()
+        if (!active) return
+        setCatalog(value)
+        setCatalogStatus('ready')
+      } catch {
+        if (!active) return
+        if (attempt < CATALOG_RETRIES) timer = setTimeout(() => void load(attempt + 1), CATALOG_RETRY_MS)
+        else setCatalogStatus('failed')
+      }
+    }
+    setCatalogStatus('loading')
+    void load(0)
     return () => {
       active = false
+      clearTimeout(timer)
     }
-  }, [dependencies])
+  }, [dependencies, catalogAttempt])
+
+  const catalogEmpty =
+    catalogStatus === 'failed' ? strings.common.optionsFailed : strings.common.optionsLoading
+  function retryCatalog() {
+    if (catalogStatus === 'failed') setCatalogAttempt((current) => current + 1)
+  }
 
   /** Mexer num campo apaga so o erro dele; os outros continuam a vista. */
   function update(patch: Partial<SignUpDraft>, clears: ValidationCode[]) {
@@ -139,6 +161,8 @@ export function SignUpPage() {
           <SelectField
             label={strings.signUp.councilLabel}
             placeholder={strings.common.select}
+            emptyMessage={catalogEmpty}
+            onOpen={retryCatalog}
             options={catalog.councils.map((item) => ({ value: item.id, label: item.label }))}
             value={draft.professional.councilId}
             onChange={(councilId) =>
@@ -149,6 +173,8 @@ export function SignUpPage() {
           <SelectField
             label={strings.signUp.stateLabel}
             placeholder={strings.common.select}
+            emptyMessage={catalogEmpty}
+            onOpen={retryCatalog}
             options={catalog.states.map((item) => ({ value: item.id, label: item.label }))}
             value={draft.professional.stateId}
             onChange={(stateId) =>
@@ -173,6 +199,8 @@ export function SignUpPage() {
         <SelectField
           label={strings.signUp.specialtyLabel}
           placeholder={strings.common.select}
+          emptyMessage={catalogEmpty}
+          onOpen={retryCatalog}
           options={catalog.specialties.map((item) => ({ value: item.id, label: item.label }))}
           value={draft.professional.specialtyId}
           onChange={(specialtyId) =>
