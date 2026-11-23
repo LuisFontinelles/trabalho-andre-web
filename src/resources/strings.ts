@@ -12,6 +12,16 @@ export const strings = {
     breadcrumbs: 'Você está em',
     select: 'Selecione',
     failed: 'Não foi possível concluir. Confira sua conexão e tente de novo.',
+    showPassword: 'Mostrar senha',
+    hidePassword: 'Ocultar senha',
+    readOnly: 'Não editável aqui',
+    passwordRules: {
+      length: '8 caracteres ou mais',
+      upper: 'Uma letra maiúscula',
+      lower: 'Uma letra minúscula',
+      digit: 'Um número',
+      symbol: 'Um símbolo (!@#…)',
+    },
   },
   app: {
     name: 'CareBridge',
@@ -44,6 +54,9 @@ export const strings = {
     emailRequired: 'Informe seu e-mail.',
     emailInvalid: 'E-mail inválido.',
     passwordRequired: 'Informe sua senha.',
+    notProfessional: 'Esta conta não é de profissional de saúde. Use o app CareBridge para pacientes.',
+    tooManyAttempts:
+      'Acesso bloqueado por 15 minutos depois de 5 senhas erradas seguidas. Tente de novo mais tarde.',
   },
   signUp: {
     title: 'Criar conta de profissional',
@@ -56,31 +69,38 @@ export const strings = {
     stateLabel: 'UF *',
     registrationLabel: 'Nº do registro *',
     registrationPlaceholder: 'Ex.: 123456',
+    specialtyLabel: 'Especialidade principal *',
+    workplaceLabel: 'Onde atende *',
+    workplacePlaceholder: 'Clínica, hospital ou instituição',
     passwordLabel: 'Senha *',
-    passwordPlaceholder: '8 caracteres ou mais, com letras e números',
+    passwordPlaceholder: 'Crie uma senha',
     terms: 'Ao criar a conta você aceita os Termos de Uso e a Política de Privacidade.',
     submit: 'Criar conta',
     hasAccount: 'Já tenho conta',
     nameRequired: 'Informe seu nome.',
-    passwordRule: 'A senha precisa ter 8 caracteres, 1 maiúscula e 1 número.',
+    passwordRule: 'A senha ainda não cumpre as regras abaixo.',
     passwordMismatch: 'As senhas não coincidem.',
     termsRequired: 'É preciso aceitar os termos para continuar.',
     councilRequired: 'Selecione o conselho.',
     stateRequired: 'Selecione a UF.',
     registrationRequired: 'Informe o número do registro.',
+    registrationInvalid: 'O número do registro tem de 4 a 7 dígitos.',
+    specialtyRequired: 'Selecione a especialidade.',
+    workplaceRequired: 'Informe onde você atende.',
     emailTaken: 'Este e-mail já está cadastrado.',
   },
   verification: {
     title: 'Confirme seu e-mail',
-    sentTo: (email: string) =>
-      `Enviamos um código de 4 dígitos para ${email}. Ele vale por 10 minutos.`,
+    sentTo: (email: string, length: number) =>
+      `Enviamos um código de ${length} dígitos para ${email}.`,
     submit: 'Verificar',
     resend: 'Reenviar código',
     resendIn: (seconds: number) => `Reenviar em ${seconds} s`,
     resent: 'Enviamos um novo código.',
     invalid: 'Código incorreto. Confira e tente de novo.',
-    incomplete: 'Digite os 4 dígitos do código.',
-    fieldLabel: 'Código de verificação, 4 dígitos',
+    incomplete: 'Digite todos os dígitos do código.',
+    fieldLabel: (length: number) => `Código de verificação, ${length} dígitos`,
+    confirmed: 'E-mail confirmado. Entre com a senha que você criou.',
   },
   underReview: {
     title: 'Cadastro em verificação',
@@ -93,15 +113,22 @@ export const strings = {
   },
   recover: {
     title: 'Recuperar senha',
-    subtitle: 'Informe o e-mail da sua conta e enviaremos um link para criar uma nova senha.',
+    subtitle: 'Informe o e-mail da sua conta e enviaremos um código para criar uma nova senha.',
     emailLabel: 'E-mail',
     emailPlaceholder: 'voce@exemplo.com',
-    submit: 'Enviar link',
+    submit: 'Enviar código',
     backToLogin: 'Voltar para o login',
-    sentTitle: 'Confira seu e-mail',
+    sentTitle: 'Crie a nova senha',
     sentMessage: (email: string) =>
-      `Enviamos um link para ${email}. Ele vale por 30 minutos. Se não chegar, veja a caixa de spam.`,
-    resend: 'Reenviar link',
+      `Se ${email} tiver conta, enviamos um código de 6 dígitos. Ele vale por 15 minutos. Se não chegar, veja a caixa de spam.`,
+    codeLabel: 'Código de 6 dígitos',
+    passwordLabel: 'Nova senha',
+    passwordPlaceholder: 'Crie a nova senha',
+    passwordRule: 'A nova senha ainda não cumpre as regras abaixo.',
+    save: 'Salvar nova senha',
+    invalidCode: 'Código incorreto ou vencido. Peça um novo.',
+    done: 'Senha alterada. Entre com a nova senha.',
+    resend: 'Reenviar código',
     resendIn: (seconds: number) => `Reenviar em ${seconds} s`,
   },
   myOpportunities: {
@@ -187,6 +214,9 @@ export const strings = {
     questions: 'Perguntas',
     required: 'Obrigatória',
     optional: 'Opcional',
+    conditional: 'Condicional',
+    conditionHint: (question: string, answer: string) =>
+      ` (aparece se "${question}" for "${answer}")`,
     edit: 'Editar',
     remove: 'Remover',
     addQuestion: '+ Adicionar pergunta',
@@ -247,6 +277,7 @@ export const strings = {
     triageTitle: 'Respostas da triagem',
     documentsTitle: 'Documentos',
     noDocuments: 'Nenhum documento enviado.',
+    noAnswers: 'Sem respostas para mostrar.',
     open: 'Abrir',
     decisionTitle: 'Decisão',
     pendingHint: (received: string, deadline: string) =>
@@ -263,7 +294,19 @@ export const strings = {
       date === ''
         ? 'Recusada por você. A decisão não pode ser desfeita.'
         : `Recusada por você em ${date}. A decisão não pode ser desfeita.`,
-    waitingNote: 'Aguardando a resposta do paciente, que tem 5 dias para enviar o que falta.',
+    waitingNote: (deadline: string) =>
+      deadline === ''
+        ? 'Aguardando a resposta do paciente.'
+        : `Aguardando a resposta do paciente até ${deadline}.`,
+    infoAsked: (text: string) => `Você pediu: "${text}"`,
+    cancelledNote: (date: string) =>
+      `O paciente cancelou esta solicitação${date === '' ? '' : ` em ${date}`}. Os documentos e as respostas foram apagados.`,
+    rejectedReason: (reason: string) => `Motivo: ${reason}`,
+    agreement: (when: string, where: string, bring: string) =>
+      [`Quando: ${when}`, `Onde: ${where}`, bring === '' ? '' : `Levar: ${bring}`]
+        .filter(Boolean)
+        .join(' · '),
+    toArrange: 'A combinar',
     messagesTitle: 'Mensagens',
     messagesLocked: 'As mensagens ficam disponíveis depois que você aprovar a solicitação.',
     messagePlaceholder: 'Escreva uma mensagem',
@@ -282,7 +325,7 @@ export const strings = {
     rejectConfirm: 'Recusar solicitação',
     infoTitle: 'Pedir informações',
     infoMessage:
-      'O paciente recebe o pedido e tem 5 dias para responder. A solicitação fica como "Aguardando informações".',
+      'O paciente recebe o pedido e tem 3 dias para responder. A solicitação fica como "Aguardando informações".',
     infoField: 'O que falta? *',
     infoPlaceholder: 'Ex.: pode enviar o raio X mais recente?',
     infoRequired: 'Escreva o que falta.',
@@ -326,6 +369,9 @@ export const strings = {
     downloadReady: 'Seus dados foram baixados.',
     deleteTitle: 'Excluir conta?',
     deleteMessage:
-      'A exclusão da conta ainda não está disponível pelo painel. Fale com o suporte para concluir o pedido.',
+      'Seus dados pessoais são anonimizados e você sai do painel. Oportunidades e conversas ficam sem o seu nome. Isso não pode ser desfeito.',
+    deletePasswordLabel: 'Senha atual',
+    deleteConfirm: 'Excluir conta',
+    deleteWrongPassword: 'Senha incorreta.',
   },
 } as const

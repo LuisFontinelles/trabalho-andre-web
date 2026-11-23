@@ -41,6 +41,8 @@ jobs:
         run: npm run build
         env:
           VITE_BASE: /${{ github.event.repository.name }}/
+          # Sem a variavel do repositorio, o site fala com a API do Render.
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://carebridge-api-2.onrender.com' }}
 
       - name: Preparar o Pages
         uses: actions/configure-pages@v5

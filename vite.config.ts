@@ -21,9 +21,25 @@ function spaFallback() {
 // Em producao o site vive em /trabalho-andre-web/; em desenvolvimento, na raiz.
 const base = process.env.VITE_BASE ?? '/'
 
+/**
+ * A API real ainda nao responde CORS, entao o navegador nao pode chamar o
+ * Render direto. Em desenvolvimento o Vite faz a ponte: /api/user/login vira
+ * <alvo>/user/login. Para usar, defina VITE_API_URL=/api (ver .env.example).
+ */
+const apiTarget = process.env.API_PROXY_TARGET ?? 'https://carebridge-api-2.onrender.com'
+
 export default defineConfig({
   base,
   plugins: [react(), spaFallback()],
+  server: {
+    proxy: {
+      '/api': {
+        target: apiTarget,
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+  },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
@@ -31,6 +47,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // Os testes nunca chamam a API real, mesmo com um .env local apontando para ela.
+    env: { VITE_API_URL: '' },
     coverage: {
       provider: 'v8',
       // Cobrimos dominio e dados. Componente de tela fica de fora por ora.

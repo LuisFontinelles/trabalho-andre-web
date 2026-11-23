@@ -253,7 +253,13 @@ export function TextField({
   const id = useId()
   return (
     <FieldShell label={label} htmlFor={id} errorMessage={errorMessage} isEnabled={isEnabled}>
-      <div className={cx('cb-field__box', errorMessage && 'cb-field__box--error')}>
+      <div
+        className={cx(
+          'cb-field__box',
+          isReadOnly && 'cb-field__box--readonly',
+          errorMessage && 'cb-field__box--error',
+        )}
+      >
         <input
           id={id}
           className="cb-field__input"
@@ -268,7 +274,76 @@ export function TextField({
           aria-invalid={errorMessage ? true : undefined}
           onChange={(event) => onChange(event.target.value)}
         />
+        {isReadOnly && (
+          <span className="cb-field__lock" title={strings.common.readOnly}>
+            <Icon name="lock" size={18} tone="tertiary" />
+          </span>
+        )}
       </div>
+    </FieldShell>
+  )
+}
+
+export interface PasswordRule {
+  label: string
+  met: boolean
+}
+
+/** Campo de senha com botao de mostrar e, se vier, a lista das regras marcada ao digitar. */
+export function PasswordField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  autoComplete = 'current-password',
+  errorMessage,
+  rules,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  autoComplete?: string
+  errorMessage?: string | null
+  rules?: readonly PasswordRule[]
+}) {
+  const id = useId()
+  const rulesId = useId()
+  const [isVisible, setVisible] = useState(false)
+  return (
+    <FieldShell label={label} htmlFor={id} errorMessage={errorMessage}>
+      <div className={cx('cb-field__box', errorMessage && 'cb-field__box--error')}>
+        <input
+          id={id}
+          className="cb-field__input"
+          type={isVisible ? 'text' : 'password'}
+          value={value}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          aria-invalid={errorMessage ? true : undefined}
+          aria-describedby={rules ? rulesId : undefined}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <button
+          type="button"
+          className="cb-icon-button cb-field__toggle"
+          aria-label={isVisible ? strings.common.hidePassword : strings.common.showPassword}
+          aria-pressed={isVisible}
+          onClick={() => setVisible((current) => !current)}
+        >
+          <Icon name={isVisible ? 'visibility_off' : 'visibility'} size={20} tone="secondary" />
+        </button>
+      </div>
+      {rules && (
+        <ul className="cb-password-rules" id={rulesId}>
+          {rules.map((rule) => (
+            <li key={rule.label} className={cx('cb-password-rules__item', rule.met && 'cb-password-rules__item--met')}>
+              <Icon name={rule.met ? 'check_circle' : 'radio_button_unchecked'} size={16} />
+              {rule.label}
+            </li>
+          ))}
+        </ul>
+      )}
     </FieldShell>
   )
 }

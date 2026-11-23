@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@/domain/entities'
 import { createDependencies, type Dependencies } from '@/app/dependencies'
 
@@ -26,9 +26,9 @@ export function useDependencies(): Dependencies {
 const SESSION_KEY = 'carebridge.session'
 
 /**
- * O que o painel mostra do registro profissional. A API de sessao ainda nao
- * devolve esses dados, entao eles vem do cadastro feito nesta sessao; quem
- * entra pelo login ja passou pela conferencia.
+ * O que o painel mostra do registro profissional. Vem do GET /user/me; quando
+ * a API ainda nao traz o registro, vale o que foi digitado no cadastro neste
+ * navegador.
  */
 export interface ProfessionalProfile {
   /** "CRM/DF 123456". Vazio quando nao se sabe. */
@@ -36,9 +36,36 @@ export interface ProfessionalProfile {
   isVerified: boolean
 }
 
+/** Perfil padrao quando nada foi informado: verificado, sem registro conhecido. */
 const VERIFIED_PROFILE: ProfessionalProfile = {
-  registration: 'CRM/DF 123456',
+  registration: '',
   isVerified: true,
+}
+
+const REGISTRATIONS_KEY = 'carebridge.registrations'
+
+/**
+ * O login da API real nao devolve o registro profissional. Guardamos o que a
+ * pessoa digitou no cadastro, por e-mail, para o painel poder mostra-lo nas
+ * proximas entradas neste navegador.
+ */
+export function rememberRegistration(email: string, registration: string): void {
+  try {
+    const all = JSON.parse(localStorage.getItem(REGISTRATIONS_KEY) ?? '{}') as Record<string, string>
+    all[email] = registration
+    localStorage.setItem(REGISTRATIONS_KEY, JSON.stringify(all))
+  } catch {
+    // Sem armazenamento o painel so nao mostra o numero do registro.
+  }
+}
+
+export function rememberedRegistration(email: string): string {
+  try {
+    const all = JSON.parse(localStorage.getItem(REGISTRATIONS_KEY) ?? '{}') as Record<string, string>
+    return all[email] ?? ''
+  } catch {
+    return ''
+  }
 }
 
 interface StoredSession {
@@ -86,7 +113,23 @@ interface SessionStore {
 const SessionContext = createContext<SessionStore | null>(null)
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [stored, setStored] = useState<StoredSession | null>(readStoredSession)
+  const { tokens } = useDependencies()
+  const [stored, setStored] = useState<StoredSession | null>(() => {
+    const restored = readStoredSession()
+    // O token vai no cabecalho das rotas autenticadas desde a primeira tela.
+    tokens.set(restored?.session.token ?? null)
+    return restored
+  })
+
+  // 401 numa rota autenticada: a sessao venceu e a pessoa entra de novo.
+  useEffect(
+    () =>
+      tokens.onExpired(() => {
+        writeStoredSession(null)
+        setStored(null)
+      }),
+    [tokens],
+  )
 
   const value = useMemo<SessionStore>(
     () => ({
@@ -95,15 +138,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isAuthenticated: stored !== null,
       signIn: (session: Session, profile: ProfessionalProfile = VERIFIED_PROFILE) => {
         const next = { session, profile }
+        tokens.set(session.token)
         writeStoredSession(next)
         setStored(next)
       },
       signOut: () => {
+        tokens.set(null)
         writeStoredSession(null)
         setStored(null)
       },
     }),
-    [stored],
+    [stored, tokens],
   )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

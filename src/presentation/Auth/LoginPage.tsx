@@ -1,18 +1,26 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useDependencies, useSession } from '@/app/session'
-import { Banner, Button, TextField } from '@/designSystem/components'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { rememberedRegistration, useDependencies, useSession } from '@/app/session'
+import { Banner, Button, PasswordField, TextField } from '@/designSystem/components'
 import { NetworkError } from '@/data/network/httpClient'
+import { WrongProfileError } from '@/domain/entities'
 import { ValidationError } from '@/domain/useCases'
 import { AuthCard } from '@/presentation/Auth/AuthCard'
 import { strings } from '@/resources/strings'
+
+/** Aviso que outra tela deixa ao voltar para o login (e-mail confirmado, senha trocada). */
+export interface LoginHandoff {
+  notice: string
+  email: string
+}
 
 export function LoginPage() {
   const dependencies = useDependencies()
   const session = useSession()
   const navigate = useNavigate()
+  const handoff = useLocation().state as LoginHandoff | null
 
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(handoff?.email ?? '')
   const [password, setPassword] = useState('')
   const [emailError, setEmailError] = useState<string | null>(null)
   const [passwordError, setPasswordError] = useState<string | null>(null)
@@ -20,10 +28,14 @@ export function LoginPage() {
   const [isSubmitting, setSubmitting] = useState(false)
 
   function messageFor(error: unknown): string {
+    if (error instanceof WrongProfileError) return strings.login.notProfessional
     if (error instanceof NetworkError) {
-      if (error.kind === 'unauthorized' || error.kind === 'notFound') {
+      // O contrato v2 responde 401 para senha errada; a API de hoje ainda
+      // responde 403 nessa rota publica, que so pode querer dizer o mesmo.
+      if (error.kind === 'unauthorized' || error.kind === 'forbidden' || error.kind === 'notFound') {
         return strings.login.invalidCredentials
       }
+      if (error.kind === 'tooManyAttempts') return strings.login.tooManyAttempts
       return strings.common.failed
     }
     return strings.login.invalidCredentials
@@ -37,8 +49,12 @@ export function LoginPage() {
     setSubmitting(true)
     try {
       const result = await dependencies.login(email, password)
-      session.signIn(result)
-      navigate('/oportunidades', { replace: true })
+      session.signIn(result, {
+        // O /user/me traz o registro; o guardado no cadastro cobre a API que ainda nao traz.
+        registration: result.registration ?? rememberedRegistration(result.user.email),
+        isVerified: result.isVerified,
+      })
+      navigate(result.isVerified ? '/oportunidades' : '/cadastro-em-verificacao', { replace: true })
     } catch (error) {
       if (error instanceof ValidationError) {
         if (error.code === 'emailRequired' || error.code === 'emailInvalid') {
@@ -59,6 +75,7 @@ export function LoginPage() {
   return (
     <AuthCard title={strings.login.title} subtitle={strings.login.subtitle}>
       <form className="cb-auth__form" onSubmit={submit} noValidate>
+        {handoff?.notice && formError === null && <Banner message={handoff.notice} tone="success" />}
         <TextField
           label={strings.login.emailLabel}
           placeholder={strings.login.emailPlaceholder}
@@ -68,10 +85,9 @@ export function LoginPage() {
           onChange={setEmail}
           errorMessage={emailError}
         />
-        <TextField
+        <PasswordField
           label={strings.login.passwordLabel}
           placeholder={strings.login.passwordPlaceholder}
-          type="password"
           autoComplete="current-password"
           value={password}
           onChange={setPassword}

@@ -1,198 +1,113 @@
 import type {
-  ApplicationDTO,
-  AuthResponseDTO,
-  FilterCatalogDTO,
-  OpportunityDTO,
-  PageDTO,
-  ProfessionalCatalogDTO,
-  VerificationChallengeDTO,
+  CadastroResponseDTO,
+  CatalogosDTO,
+  LoginResponseDTO,
+  MeDTO,
 } from '@/data/dto'
 import {
-  applicationFromDTO,
-  filterCatalogFromDTO,
-  opportunityFromDTO,
-  opportunityPageFromDTO,
+  catalogFromDTO,
   pendingVerificationFromDTO,
-  professionalCatalogFromDTO,
   sessionFromDTO,
-  signUpDraftToDTO,
+  signUpForm,
 } from '@/data/mappers'
-import type { HttpClient } from '@/data/network/httpClient'
-import {
-  queryItems,
-  type Application,
-  type FilterCatalog,
-  type Opportunity,
-  type OpportunityPage,
-  type PendingVerification,
-  type ProfessionalCatalog,
-  type SearchCriteria,
-  type Session,
-  type SignUpDraft,
-} from '@/domain/entities'
-import type {
-  ApplicationRepository,
-  AuthRepository,
-  OpportunityRepository,
-} from '@/domain/repositories'
+import { bearer, NetworkError, type HttpClient } from '@/data/network/httpClient'
+import { WrongProfileError, type Session } from '@/domain/entities'
+import type { AuthRepository } from '@/domain/repositories'
 
+/**
+ * GET /user/me logo depois do login, para ter o nome. A rota e nova no
+ * contrato: se a API ainda nao tem (404), barra (401/403) ou nao responde,
+ * o login segue com o nome tirado do e-mail.
+ */
+async function fetchMe(client: HttpClient, token: string): Promise<MeDTO | null> {
+  try {
+    return await client.send<MeDTO>({ path: 'user/me', headers: bearer(token) })
+  } catch (error) {
+    if (error instanceof NetworkError) return null
+    throw error
+  }
+}
+
+/** O painel e so do profissional; paciente e admin usam outros apps. */
+function professionalOnly(session: Session): Session {
+  if (session.user.profile !== 'PROFISSIONAL') throw new WrongProfileError(session.user.profile)
+  return session
+}
+
+/** Acesso (/auth/*) e catalogo da carebridge-api. */
 export function createAuthRepository(client: HttpClient): AuthRepository {
+  async function sessionFor(login: LoginResponseDTO, email: string): Promise<Session> {
+    const me = await fetchMe(client, login.token)
+    return professionalOnly(sessionFromDTO(login, me, email))
+  }
+
+  // /auth/verify so confirma o e-mail e nao devolve token. A senha do cadastro
+  // fica so na memoria para entrar logo depois; recarregar a pagina a perde.
+  const pendingPasswords = new Map<string, string>()
+
+  async function login(email: string, password: string): Promise<Session> {
+    const dto = await client.send<LoginResponseDTO>({
+      path: 'auth/login',
+      method: 'POST',
+      body: { email, password },
+    })
+    return sessionFor(dto, email)
+  }
+
   return {
-    async login(email, password): Promise<Session> {
-      const dto = await client.send<AuthResponseDTO>({
-        path: 'auth/login',
+    login,
+
+    async signUp(draft) {
+      const dto = await client.sendOptional<CadastroResponseDTO>({
+        path: 'auth/register',
         method: 'POST',
-        body: { email, password },
+        body: signUpForm(draft),
       })
-      return sessionFromDTO(dto)
+      const pending = pendingVerificationFromDTO(dto, draft.email)
+      if (pending.requiresCode) pendingPasswords.set(pending.email, draft.password)
+      return pending
     },
 
-    async loginWithGoogle(): Promise<Session> {
-      const dto = await client.send<AuthResponseDTO>({
-        path: 'auth/google',
-        method: 'POST',
-        body: {},
-      })
-      return sessionFromDTO(dto)
+    async verify(email, code) {
+      await client.sendVoid({ path: 'auth/verify', method: 'POST', body: { email, code } })
+      const password = pendingPasswords.get(email)
+      if (password === undefined) return null
+      pendingPasswords.delete(email)
+      return login(email, password)
     },
 
-    async signUp(draft: SignUpDraft): Promise<PendingVerification> {
-      const dto = await client.send<VerificationChallengeDTO>({
-        path: 'auth/signup',
-        method: 'POST',
-        body: signUpDraftToDTO(draft),
-      })
-      return pendingVerificationFromDTO(dto)
+    async resendCode(email) {
+      await client.sendVoid({ path: 'auth/resend-code', method: 'POST', body: { email } })
     },
 
-    async verify(email, code): Promise<Session> {
-      const dto = await client.send<AuthResponseDTO>({
-        path: 'auth/verify',
-        method: 'POST',
-        body: { email, code },
-      })
-      return sessionFromDTO(dto)
+    async requestPasswordReset(email) {
+      await client.sendVoid({ path: 'auth/password-reset', method: 'POST', body: { email } })
     },
 
-    async resendCode(email): Promise<void> {
-      await client.sendVoid({
-        path: 'auth/resend-code',
-        method: 'POST',
-        body: { email },
-      })
-    },
-
-    async requestPasswordReset(email): Promise<void> {
+    async resetPassword(email, code, newPassword) {
       await client.sendVoid({
         path: 'auth/password-reset',
         method: 'POST',
-        body: { email },
+        body: { email, code, newPassword },
       })
     },
 
-    async professionalCatalog(): Promise<ProfessionalCatalog> {
-      const dto = await client.send<ProfessionalCatalogDTO>({
-        path: 'auth/professional-catalog',
+    async exportMyData() {
+      return client.send<unknown>({ path: 'me/data-export', method: 'POST', authenticated: true })
+    },
+
+    async deleteAccount(password) {
+      await client.sendVoid({
+        path: 'me',
+        method: 'DELETE',
+        body: { password },
+        authenticated: true,
+        checksPassword: true,
       })
-      return professionalCatalogFromDTO(dto)
-    },
-  }
-}
-
-const PAGE_SIZE = 6
-
-function normalize(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-}
-
-/**
- * O backend ainda nao existe. A busca e a paginacao sao resolvidas no cliente
- * sobre o conjunto devolvido pela fixture, preservando o contrato de query que
- * o servidor vai implementar.
- */
-export function createOpportunityRepository(
-  client: HttpClient,
-): OpportunityRepository {
-  function applyFilters(
-    criteria: SearchCriteria,
-    items: readonly Opportunity[],
-  ): Opportunity[] {
-    const term = normalize(criteria.term)
-    return items.filter((item) => {
-      const haystack = normalize(
-        [item.title, item.provider.name, item.city, item.specialtyId].join(' '),
-      )
-      const matchesTerm = term === '' || haystack.includes(term)
-      const matchesSpecialty =
-        criteria.specialties.length === 0 ||
-        criteria.specialties.includes(item.specialtyId)
-      const matchesModality =
-        criteria.modalities.length === 0 || criteria.modalities.includes(item.modality)
-      const matchesOffer =
-        criteria.offerTypes.length === 0 || criteria.offerTypes.includes(item.offerType)
-      const limit = criteria.distance === null ? null : Number(criteria.distance)
-      const matchesDistance = limit === null || (item.distanceKm ?? 0) <= limit
-      return (
-        matchesTerm &&
-        matchesSpecialty &&
-        matchesModality &&
-        matchesOffer &&
-        matchesDistance
-      )
-    })
-  }
-
-  function paginate(items: Opportunity[], page: number): OpportunityPage {
-    if (items.length === 0) {
-      return { items: [], page: 1, totalPages: 1, totalItems: 0 }
-    }
-    const totalPages = Math.ceil(items.length / PAGE_SIZE)
-    const current = Math.min(Math.max(page, 1), totalPages)
-    const start = (current - 1) * PAGE_SIZE
-    return {
-      items: items.slice(start, start + PAGE_SIZE),
-      page: current,
-      totalPages,
-      totalItems: items.length,
-    }
-  }
-
-  return {
-    async search(criteria): Promise<OpportunityPage> {
-      const dto = await client.send<PageDTO<OpportunityDTO>>({
-        path: 'opportunities',
-        query: queryItems(criteria),
-      })
-      const page = opportunityPageFromDTO(dto)
-      return paginate(applyFilters(criteria, page.items), criteria.page)
     },
 
-    async detail(id): Promise<Opportunity> {
-      const dto = await client.send<OpportunityDTO>({ path: `opportunities/${id}` })
-      const detail = opportunityFromDTO(dto)
-      if (detail.id === id) return detail
-      const all = await client.send<PageDTO<OpportunityDTO>>({ path: 'opportunities' })
-      const found = all.items.find((item) => item.id === id)
-      return found ? opportunityFromDTO(found) : detail
-    },
-
-    async filters(): Promise<FilterCatalog> {
-      const dto = await client.send<FilterCatalogDTO>({ path: 'filters' })
-      return filterCatalogFromDTO(dto)
-    },
-  }
-}
-
-export function createApplicationRepository(
-  client: HttpClient,
-): ApplicationRepository {
-  return {
-    async status(id): Promise<Application> {
-      const dto = await client.send<ApplicationDTO>({ path: `applications/${id}` })
-      return applicationFromDTO(dto)
+    async catalog() {
+      return catalogFromDTO(await client.send<CatalogosDTO>({ path: 'catalogos' }))
     },
   }
 }

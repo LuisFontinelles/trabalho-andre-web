@@ -10,8 +10,9 @@ import {
   Stepper,
   type Crumb,
 } from '@/designSystem/components'
+import { NetworkError } from '@/data/network/httpClient'
 import { draftFromManagedOpportunity } from '@/data/professionalMappers'
-import { EMPTY_FILTER_CATALOG, type FilterCatalog } from '@/domain/entities'
+import { EMPTY_CATALOG, type Catalog } from '@/domain/entities'
 import {
   DRAFT_STEPS,
   DRAFT_STEP_LABEL,
@@ -31,6 +32,16 @@ import { strings } from '@/resources/strings'
 
 const text = strings.newOpportunity
 
+/**
+ * Recusa com motivo (400, 403, 409): a `message` do servidor vem em
+ * portugues e explica o que fazer. Falha de rede usa o texto da tela.
+ */
+function serverMessage(error: unknown): string | null {
+  if (!(error instanceof NetworkError)) return null
+  const explains = ['badRequest', 'forbidden', 'conflict'].includes(error.kind)
+  return explains ? error.apiMessage : null
+}
+
 /** "2026-12-10" vira "10/12/2026", como a tela de publicada mostra. */
 function longDate(iso: string): string {
   const day = shortDate(iso)
@@ -47,7 +58,7 @@ export function NewOpportunityPage() {
   const [draft, setDraft] = useState<OpportunityDraft>(emptyOpportunityDraft)
   const [original, setOriginal] = useState<ManagedOpportunity | null>(null)
   const [step, setStep] = useState<DraftStep>('DADOS')
-  const [catalog, setCatalog] = useState<FilterCatalog>(EMPTY_FILTER_CATALOG)
+  const [catalog, setCatalog] = useState<Catalog>(EMPTY_CATALOG)
   const [errors, setErrors] = useState<DraftErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'publish' | 'draft' | null>(null)
@@ -79,12 +90,12 @@ export function NewOpportunityPage() {
   useEffect(() => {
     let active = true
     dependencies
-      .loadFilters()
+      .loadCatalog()
       .then((value) => {
         if (active) setCatalog(value)
       })
       .catch(() => {
-        if (active) setCatalog(EMPTY_FILTER_CATALOG)
+        if (active) setCatalog(EMPTY_CATALOG)
       })
     return () => {
       active = false
@@ -136,8 +147,8 @@ export function NewOpportunityPage() {
         return
       }
       setPublished(saved)
-    } catch {
-      setFormError(text.failed)
+    } catch (error) {
+      setFormError(serverMessage(error) ?? text.failed)
     } finally {
       setBusy(null)
     }
@@ -160,8 +171,8 @@ export function NewOpportunityPage() {
         replace: true,
         state: { notice: strings.myOpportunities.draftSaved },
       })
-    } catch {
-      setFormError(strings.common.failed)
+    } catch (error) {
+      setFormError(serverMessage(error) ?? strings.common.failed)
     } finally {
       setBusy(null)
     }

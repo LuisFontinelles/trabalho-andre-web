@@ -19,7 +19,7 @@ Repositórios irmãos: [mobile](https://github.com/LuisFontinelles/trabalho-andr
 
 ## Estado atual
 
-O backend ainda não existe. A aplicação roda inteira sobre um servidor simulado por fixtures, exercitando o caminho real de rede: montagem da URL, código de status, decodificação e tratamento de erro. Apontar para a API de verdade é não instalar o interceptador.
+O painel fala o [contrato da API, versão 2](CONTRATO-API-CareBridge.md): caminhos sem `/v1`, nomes em português, valores fechados em MAIÚSCULAS e erro `{status, message}`, igual ao app iOS. Login e cadastro já vão para a API real quando `VITE_API_URL` está definido; o resto roda sobre um servidor simulado que responde exatamente o contrato, exercitando o caminho real de rede: URL, token, código de status, decodificação e tratamento de erro.
 
 | Área | Situação |
 |---|---|
@@ -34,9 +34,11 @@ O backend ainda não existe. A aplicação roda inteira sobre um servidor simula
 | Salvar rascunho e tela de oportunidade publicada | Pronto |
 | Editar oportunidade | Pronto |
 | Triagem: perguntas com tipo de resposta e documentos exigidos | Pronto |
-| Solicitações recebidas, com filtro por status | Pronto |
+| Triagem padrão do contrato: 8 perguntas, com as condicionais de diagnóstico e medicação | Pronto |
+| Solicitações recebidas, com os 6 estados e filtro por estado | Pronto |
 | Detalhe da solicitação: triagem, documentos, decisão e mensagens | Pronto |
 | Aprovar, recusar com motivo e pedir informações | Pronto |
+| Combinado da aprovação (quando, onde, levar) | **Automático**: a tela ainda não pergunta; vai "A combinar", o endereço (ou a modalidade, se online) e os documentos exigidos |
 | Abrir documento anexado | Pronto, com a pré-visualização do protótipo |
 | Baixar documento anexado | **Desativado e marcado** |
 | Configurações: perfil, tema claro e escuro, avisos e dados da conta | Pronto |
@@ -68,7 +70,27 @@ Qualquer outro e-mail é recusado com 401, de propósito, para exercitar o estad
 
 **Código de verificação:** `0000`. Qualquer outro devolve 401.
 
-O cadastro aceita e-mails novos: o registro fica guardado em memória e a verificação devolve o perfil e o nome cadastrados.
+O painel é só do profissional: a conta de paciente entra no servidor, mas o painel recusa o perfil. Cinco senhas erradas seguidas no mesmo e-mail bloqueiam o login por 15 minutos (429).
+
+O cadastro aceita e-mails novos: a conta fica em memória, nasce em verificação (salva rascunho, não publica) e entra com a senha cadastrada depois do código.
+
+### Login e cadastro com a API real
+
+Login e cadastro do profissional já falam com a [carebridge-api](https://github.com/Joao-Victor-Medeiros/carebridge-api) (Swagger em <https://carebridge-api-2.onrender.com/swagger-ui/index.html>). O restante do painel continua no backend de fixtures.
+
+```bash
+cp .env.example .env.local   # VITE_API_URL=/api
+npm run dev
+```
+
+A API ainda não libera CORS, então o navegador não chama o Render direto: o `npm run dev` repassa `/api/*` para lá. Para apontar para a API rodando na sua máquina, defina `API_PROXY_TARGET=http://localhost:8080` no `.env.local`. Sem `VITE_API_URL` (e no GitHub Pages) tudo segue no mock.
+
+| Tela | Rota da API | Observação |
+|---|---|---|
+| Login | `POST /user/login` e, logo depois, `GET /user/me` | O nome vem do `/user/me`. Enquanto a API não tem essa rota (404, 401, 403, 5xx ou erro de rede), o nome sai do e-mail. Conta de paciente é recusada. |
+| Cadastro | `POST /profissional-saude/cadastro` (multipart, parte `dados`) | `conselho`, `uf`, `numeroRegistro`, `especialidade`, `ondeAtende` e `aceitouTermos`, como no contrato. 201 sem corpo ou `exigeVerificacao: false` entra direto e cai em "Cadastro em verificação". |
+
+Recuperar senha, código por e-mail, catálogo, oportunidades e solicitações ainda não existem na API e continuam no simulado, já no formato do contrato. O token do login real vai junto, então trocar cada rota é só mudar o cliente HTTP do repositório em `src/app/dependencies.ts`.
 
 ## Scripts
 
@@ -82,18 +104,20 @@ O cadastro aceita e-mails novos: o registro fica guardado em memória e a verifi
 
 ## Testes
 
-332 testes em Vitest, com **97,6% de cobertura de linhas** em domínio e camada de dados.
+454 testes em Vitest, com **98,1% de cobertura de linhas** em domínio e camada de dados.
 
 | Suíte | O que cobre |
 |---|---|
 | `validation` | E-mail, senha e as regras do cadastro, na ordem dos campos |
-| `entities` | Vagas, critérios de busca, perfis e valores desconhecidos |
-| `professional` | Status, ações permitidas por status, resumo do painel, filtros e tempo relativo |
+| `entities` | Perfis e cadastro |
+| `professional` | Os 6 estados, atrasada, ações por status, resumo, filtros, combinado e tempo relativo |
 | `opportunityDraft` | Os três passos do formulário, campo a campo |
-| `triage` | Modos da triagem, perguntas e documentos exigidos |
-| `network` | Montagem de URL, casamento de rotas e cada código de erro |
-| `repositories` | Login, cadastro, verificação, busca e candidatura |
-| `professionalRepository` | Criar, editar, encerrar, excluir, decidir e responder |
+| `triage` | Formulário padrão do contrato, condicionais, perguntas e documentos exigidos |
+| `network` | URL sem `/v1`, token Bearer, 401 que encerra a sessão, cada código de erro e as fixtures |
+| `repositories` | Login com `/user/me`, bloqueio por tentativas, cadastro, verificação e catálogo |
+| `carebridgeApi` | Login e cadastro na API real, com o nome tirado do e-mail quando `/user/me` falha |
+| `professionalMappers` | Ida e volta entre o domínio e o contrato, com as fixtures |
+| `professionalRepository` | Criar, editar, encerrar, excluir, decidir, pedir informação e mensagens, com as regras de 400, 403 e 409 |
 
 O estado do mock é reiniciado antes e depois de cada teste, então nenhum teste depende do que outro deixou.
 
@@ -117,7 +141,7 @@ src/
 └── resources/        textos e fixtures JSON
 ```
 
-O domínio não importa React. Quando uma decisão visual depende de uma regra, o domínio expõe um conceito próprio e o design system faz a tradução, como em `vacancyLevel`, que devolve um nível e não uma cor.
+O domínio não importa React. Quando uma decisão visual depende de uma regra, o domínio expõe um conceito próprio e o design system faz a tradução, como em `REQUEST_STATUS_TONE`, que devolve um tom e não uma cor.
 
 ### Design system
 
@@ -130,20 +154,27 @@ Os tokens espelham os do aplicativo iOS, então as duas interfaces falam a mesma
 
 ### Camada de rede
 
-O corpo de erro é o mesmo acordado com o backend:
+Só a camada de dados fala português: os DTOs (`src/data/dto`, `src/data/professionalDto.ts`) espelham o contrato, e os mappers traduzem para o domínio, que segue em inglês. Valor fechado vai em MAIÚSCULAS no fio e em minúsculas no domínio (`PRECO_SOCIAL` ↔ `preco-social`).
+
+As rotas com cadeado levam `Authorization: Bearer <token>`. Um 401 numa delas encerra a sessão e volta para o login; 403 é falta de permissão e não desloga.
+
+O corpo de erro é o do contrato, com os campos do Spring junto:
 
 ```json
 {
-  "statusCode": 404,
-  "message": "Not Found: user not found",
-  "error": "Not Found",
-  "requestId": "ddfd6adc-59d5-4ef0-a1f1-7bc904c9b17e"
+  "status": 409,
+  "message": "Já existe um usuário cadastrado com este e-mail.",
+  "error": "Conflict",
+  "path": "/profissional-saude/cadastro",
+  "timestamp": "2026-11-19T02:52:06Z"
 }
 ```
 
-Rotas dedicadas a exercitar o tratamento de erro: `/v1/debug/no-content` (204), `/v1/debug/bad-request` (400), `/v1/debug/unauthorized` (401), `/v1/debug/not-found` (404) e `/v1/debug/server-error` (500).
+O `NetworkError` separa `unauthorized` (401), `forbidden` (403), `notFound` (404), `conflict` (409), `tooManyAttempts` (429), `badRequest` (400) e `server`, e as telas mostram a `message` quando ela explica o que fazer.
 
-O contrato completo da API está documentado em `CONTRATO-API-CareBridge.md`, na raiz do projeto.
+Rotas dedicadas a exercitar o tratamento de erro: `/debug/no-content` (204), `/debug/bad-request` (400), `/debug/unauthorized` (401), `/debug/forbidden` (403), `/debug/not-found` (404), `/debug/conflict` (409), `/debug/too-many` (429) e `/debug/server-error` (500).
+
+O contrato completo está em `CONTRATO-API-CareBridge.md`, na raiz do projeto.
 
 ## Integração contínua
 

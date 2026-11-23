@@ -1,0 +1,120 @@
+{
+  "especialidades": [
+    {
+      "id": "cardiologia",
+      "nome": "Cardiologia"
+    },
+    {
+      "id": "clinica-geral",
+      "nome": "Clínica geral"
+    },
+    {
+      "id": "fisioterapia",
+      "nome": "Fisioterapia"
+    },
+    {
+      "id": "fonoaudiologia",
+      "nome": "Fonoaudiologia"
+    },
+    {
+      "id": "nutricao",
+      "nome": "Nutrição"
+    },
+    {
+      "id": "odontologia",
+      "nome": "Odontologia"
+    },
+    {
+      "id": "ortopedia",
+      "nome": "Ortopedia"
+    },
+    {
+      "id": "psicologia",
+      "nome": "Psicologia"
+    },
+    {
+      "id": "terapia-ocupacional",
+      "nome": "Terapia ocupacional"
+    }
+  ],
+  "conselhos": [
+    {
+      "sigla": "CRM",
+      "profissao": "Medicina"
+    },
+    {
+      "sigla": "COREN",
+      "profissao": "Enfermagem"
+    },
+    {
+      "sigla": "CRO",
+      "profissao": "Odontologia"
+    },
+    {
+      "sigla": "CRP",
+      "profissao": "Psicologia"
+    },
+    {
+      "sigla": "CREFITO",
+      "profissao": "Fisioterapia e TO"
+    },
+    {
+      "sigla": "CRN",
+      "profissao": "Nutrição"
+    },
+    {
+      "sigla": "CRF",
+      "profissao": "Farmácia"
+    },
+    {
+      "sigla": "CREFONO",
+      "profissao": "Fonoaudiologia"
+    },
+    {
+      "sigla": "CRESS",
+      "profissao": "Serviço social"
+    },
+    {
+      "sigla": "CREF",
+      "profissao": "Educação física"
+    },
+    {
+      "sigla": "CRBM",
+      "profissao": "Biomedicina"
+    }
+  ],
+  "ufs": [
+    "AC",
+    "AL",
+    "AM",
+    "AP",
+    "BA",
+    "CE",
+    "DF",
+    "ES",
+    "GO",
+    "MA",
+    "MG",
+    "MS",
+    "MT",
+    "PA",
+    "PB",
+    "PE",
+    "PI",
+    "PR",
+    "RJ",
+    "RN",
+    "RO",
+    "RR",
+    "RS",
+    "SC",
+    "SE",
+    "SP",
+    "TO"
+  ],
+  "distanciasKm": [
+    2,
+    5,
+    10
+  ]
+}

@@ -1,3 +1,5 @@
+import type { TriageQuestion } from '@/domain/opportunityDraft'
+
 /**
  * Dominio do profissional: o que ele publica e os pedidos que recebe.
  * Como no resto do dominio, nada aqui conhece React, rede ou DTO, e as
@@ -128,6 +130,16 @@ export function contactMethodFrom(raw: string | null | undefined): ContactMethod
   return CONTACT_METHODS.find((item) => item === raw) ?? null
 }
 
+/**
+ * Triagem da oportunidade, como foi salva. Os tipos de pergunta e documento
+ * moram no rascunho (opportunityDraft), que e quem os edita.
+ */
+export interface OpportunityTriage {
+  readonly mode: 'PADRAO' | 'PERSONALIZADO'
+  readonly questions: readonly TriageQuestion[]
+  readonly documents: readonly { readonly id: string; readonly label: string }[]
+}
+
 /** So a modalidade de preco social admite valor. Sem escolha, nao admite. */
 export function allowsPrice(mode: AccessMode | null): boolean {
   return mode === 'preco-social'
@@ -155,6 +167,12 @@ export interface ManagedOpportunity {
   readonly hasNoRestrictions: boolean
   readonly contactMethod: ContactMethod | null
   readonly updatedAt: string
+  /** Dados que o formulario nao edita, mas que a edicao precisa devolver. */
+  readonly city: string | null
+  readonly state: string | null
+  readonly audienceNote: string | null
+  readonly responseDays: number
+  readonly triage: OpportunityTriage
 }
 
 export function vacancySummary(item: ManagedOpportunity): string {
@@ -204,42 +222,48 @@ export function summarize(
   }
 }
 
+/** Os 6 estados da solicitacao, os mesmos do app do paciente. */
 export type RequestStatus =
-  | 'NOVA'
+  | 'RECEBIDA'
   | 'EM_ANALISE'
-  | 'AGUARDANDO_INFO'
+  | 'AGUARDANDO_INFORMACOES'
   | 'APROVADA'
   | 'RECUSADA'
+  | 'CANCELADA'
 
+export const REQUEST_STATUSES: readonly RequestStatus[] = [
+  'RECEBIDA',
+  'EM_ANALISE',
+  'AGUARDANDO_INFORMACOES',
+  'APROVADA',
+  'RECUSADA',
+  'CANCELADA',
+]
+
+/** Valor desconhecido cai em Recebida: o pedido aparece e pode ser analisado. */
 export function requestStatusFrom(raw: string): RequestStatus {
-  if (
-    raw === 'EM_ANALISE' ||
-    raw === 'AGUARDANDO_INFO' ||
-    raw === 'APROVADA' ||
-    raw === 'RECUSADA'
-  ) {
-    return raw
-  }
-  return 'NOVA'
+  return REQUEST_STATUSES.find((item) => item === raw) ?? 'RECEBIDA'
 }
 
 export const REQUEST_STATUS_LABEL: Record<RequestStatus, string> = {
-  NOVA: 'Nova',
+  RECEBIDA: 'Recebida',
   EM_ANALISE: 'Em análise',
-  AGUARDANDO_INFO: 'Aguardando informações',
+  AGUARDANDO_INFORMACOES: 'Aguardando informações',
   APROVADA: 'Aprovada',
   RECUSADA: 'Recusada',
+  CANCELADA: 'Cancelada',
 }
 
 /** O tom do selo de cada status, como conceito e nao como cor. */
 export type StatusTone = 'neutral' | 'success' | 'warning' | 'danger'
 
 export const REQUEST_STATUS_TONE: Record<RequestStatus, StatusTone> = {
-  NOVA: 'neutral',
+  RECEBIDA: 'neutral',
   EM_ANALISE: 'warning',
-  AGUARDANDO_INFO: 'warning',
+  AGUARDANDO_INFORMACOES: 'warning',
   APROVADA: 'success',
   RECUSADA: 'danger',
+  CANCELADA: 'neutral',
 }
 
 export const OPPORTUNITY_STATUS_TONE: Record<OpportunityStatus, StatusTone> = {
@@ -255,13 +279,16 @@ export function isValidReason(text: string): boolean {
   return text.trim().length >= MIN_REASON_LENGTH
 }
 
-/** Prazo que o profissional tem para responder a uma solicitacao. */
+/** Prazo padrao para responder, quando a oportunidade nao diz outro. */
 export const RESPONSE_DEADLINE_DAYS = 15
 
-export function responseDeadline(receivedAt: string): Date | null {
+export function responseDeadline(
+  receivedAt: string,
+  days: number = RESPONSE_DEADLINE_DAYS,
+): Date | null {
   const received = new Date(receivedAt)
   if (Number.isNaN(received.getTime())) return null
-  return new Date(received.getTime() + RESPONSE_DEADLINE_DAYS * DAY_MS)
+  return new Date(received.getTime() + days * DAY_MS)
 }
 
 export function shortDate(value: Date | string | null): string {
@@ -275,45 +302,64 @@ export function shortDate(value: Date | string | null): string {
   }).format(date)
 }
 
-/** Os status que o profissional pode escolher na tela de decisao. */
-export const DECIDABLE_STATUSES: readonly RequestStatus[] = [
-  'EM_ANALISE',
-  'APROVADA',
-  'RECUSADA',
-]
+/** A decisao final que o profissional registra. Ela nao volta atras. */
+export type Decision = 'APROVADA' | 'RECUSADA'
 
+export const DECIDABLE_STATUSES: readonly Decision[] = ['APROVADA', 'RECUSADA']
+
+/**
+ * Pedido encerrado: aprovado, recusado ou cancelado pelo paciente. Nenhum
+ * dos tres aceita aprovar, recusar ou pedir informacao.
+ */
 export function isDecided(status: RequestStatus): boolean {
-  return status === 'APROVADA' || status === 'RECUSADA'
+  return status === 'APROVADA' || status === 'RECUSADA' || status === 'CANCELADA'
+}
+
+/** O pedido ainda espera o profissional, e o prazo de resposta conta. */
+export function awaitsProfessional(status: RequestStatus): boolean {
+  return status === 'RECEBIDA' || status === 'EM_ANALISE'
+}
+
+/**
+ * "Atrasada" nao e estado: e Recebida ou Em analise depois do prazo de
+ * resposta, como o contrato define.
+ */
+export function isOverdue(
+  item: { status: RequestStatus; deadline: string | null },
+  now: Date = new Date(),
+): boolean {
+  if (!awaitsProfessional(item.status) || item.deadline === null) return false
+  const deadline = new Date(item.deadline).getTime()
+  return !Number.isNaN(deadline) && deadline < now.getTime()
 }
 
 export interface ReceivedRequest {
   readonly id: string
+  readonly protocol: string
   readonly patientName: string
   readonly opportunityId: string
   readonly opportunityTitle: string
   readonly receivedAt: string
+  /** Prazo de resposta do profissional. */
+  readonly deadline: string | null
   readonly status: RequestStatus
   readonly hasUnreadMessage: boolean
   readonly canMessage: boolean
 }
 
-/** Os filtros da lista. Quem aguarda informacoes aparece em Todas. */
-export type RequestFilter = 'TODAS' | Exclude<RequestStatus, 'AGUARDANDO_INFO'>
+/** Os filtros da lista: Todas e um por estado. */
+export type RequestFilter = 'TODAS' | RequestStatus
 
-export const REQUEST_FILTERS: readonly RequestFilter[] = [
-  'TODAS',
-  'NOVA',
-  'EM_ANALISE',
-  'APROVADA',
-  'RECUSADA',
-]
+export const REQUEST_FILTERS: readonly RequestFilter[] = ['TODAS', ...REQUEST_STATUSES]
 
 export const REQUEST_FILTER_LABEL: Record<RequestFilter, string> = {
   TODAS: 'Todas',
-  NOVA: 'Novas',
+  RECEBIDA: 'Recebidas',
   EM_ANALISE: 'Em análise',
-  APROVADA: 'Aprovada',
-  RECUSADA: 'Recusada',
+  AGUARDANDO_INFORMACOES: 'Aguardando informações',
+  APROVADA: 'Aprovadas',
+  RECUSADA: 'Recusadas',
+  CANCELADA: 'Canceladas',
 }
 
 export function filterRequests(
@@ -347,12 +393,15 @@ export function relativeDay(iso: string, now: Date = new Date()): string {
 }
 
 export interface TriageAnswer {
+  readonly questionId: string
   readonly question: string
   readonly answer: string
 }
 
 export interface RequestDocument {
   readonly id: string
+  /** Qual dos documentos exigidos este arquivo atende (`rg`, `outro-1`). */
+  readonly documentId: string
   readonly name: string
   readonly sizeKb: number
   readonly sentAt: string | null
@@ -380,6 +429,7 @@ export type MessageAuthor = 'PACIENTE' | 'PROFISSIONAL'
 export interface RequestMessage {
   readonly id: string
   readonly author: MessageAuthor
+  readonly authorName: string
   readonly text: string
   readonly sentAt: string
 }
@@ -398,17 +448,46 @@ export function messageTime(iso: string): string {
   }).format(date)
 }
 
-export interface RequestDetail {
-  readonly id: string
-  readonly patientName: string
-  readonly opportunityId: string
-  readonly opportunityTitle: string
-  readonly receivedAt: string
-  readonly status: RequestStatus
-  readonly protocol: string
-  /** Quando a decisao foi tomada, para o aviso de aprovada. */
+/** O que fica combinado com o paciente na aprovacao. */
+export interface Agreement {
+  readonly when: string
+  readonly where: string
+  readonly bring: string
+}
+
+export interface InfoRequest {
+  readonly text: string
+  readonly deadline: string | null
+}
+
+export interface RequestDetail extends ReceivedRequest {
+  /** Quando a decisao foi tomada (ou o pedido cancelado). */
   readonly decidedAt: string | null
+  readonly decisionReason: string | null
+  readonly infoRequest: InfoRequest | null
+  readonly agreement: Agreement | null
   readonly triage: readonly TriageAnswer[]
   readonly documents: readonly RequestDocument[]
   readonly messages: readonly RequestMessage[]
+}
+
+/**
+ * A tela de aprovar nao pergunta quando, onde e o que levar. Ate perguntar,
+ * a aprovacao combina "A combinar", o local da oportunidade (ou a
+ * modalidade, se for online) e os documentos exigidos.
+ */
+export function defaultAgreement(
+  opportunity: ManagedOpportunity | null,
+  toArrange: string = 'A combinar',
+): Agreement {
+  if (opportunity === null) return { when: toArrange, where: toArrange, bring: '' }
+  const where =
+    requiresAddress(opportunity.modality) && (opportunity.address ?? '').trim() !== ''
+      ? (opportunity.address ?? '').trim()
+      : CARE_MODALITY_LABEL[opportunity.modality]
+  return {
+    when: toArrange,
+    where,
+    bring: opportunity.triage.documents.map((item) => item.label).join(', '),
+  }
 }
