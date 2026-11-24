@@ -3,13 +3,16 @@ import {
   offerTypeFrom,
   authProfileFrom,
   userProfileFrom,
+  FALLBACK_PROFESSIONAL_CATALOG,
   type Application,
+  type CurrentUser,
   type FilterCatalog,
   type LoginResult,
   type FilterOption,
   type Opportunity,
   type OpportunityPage,
   type PendingVerification,
+  type PendingProfessional,
   type ProfessionalCatalog,
   type Provider,
   type Session,
@@ -19,11 +22,13 @@ import {
 import type {
   ApplicationDTO,
   AuthResponseDTO,
+  CurrentUserDTO,
   FilterCatalogDTO,
   FilterOptionDTO,
   LoginResponseDTO,
   OpportunityDTO,
   PageDTO,
+  PendingProfessionalDTO,
   ProfessionalCatalogDTO,
   ProfessionalHealthSignupDTO,
   ProviderDTO,
@@ -62,25 +67,61 @@ export function loginResultFromDTO(
   return { status, data: dto }
 }
 
+export function currentUserFromDTO(dto: CurrentUserDTO): CurrentUser {
+  const status =
+    dto.situacaoRegistro === 'EM_VERIFICACAO' ||
+    dto.situacaoRegistro === 'VERIFICADO' ||
+    dto.situacaoRegistro === 'RECUSADO'
+      ? dto.situacaoRegistro
+      : null
+  return {
+    id: dto.id,
+    email: dto.email,
+    tipoPerfil: authProfileFrom(dto.tipoPerfil),
+    nome: dto.nome,
+    situacaoRegistro: status,
+    conselho: dto.conselho ?? null,
+    uf: dto.uf ?? null,
+    numeroRegistro: dto.numeroRegistro ?? null,
+    especialidade: dto.especialidade ?? null,
+    ondeAtende: dto.ondeAtende ?? null,
+  }
+}
+
+export function pendingProfessionalFromDTO(
+  dto: PendingProfessionalDTO,
+): PendingProfessional {
+  return {
+    id: dto.id,
+    email: dto.email,
+    name: dto.nome,
+    council: dto.conselho ?? '',
+    state: dto.uf ?? '',
+    registrationNumber: dto.numeroRegistro ?? '',
+    specialty: dto.especialidade ?? '',
+    workplace: dto.ondeAtende ?? '',
+  }
+}
+
 export function providerFromDTO(dto: ProviderDTO): Provider {
-  return { id: dto.id, name: dto.name, isVerified: dto.verified }
+  return { id: dto.id, name: dto.nome, isVerified: dto.verificado }
 }
 
 export function opportunityFromDTO(dto: OpportunityDTO): Opportunity {
   return {
     id: dto.id,
-    title: dto.title,
-    specialtyId: dto.specialty,
-    modality: modalityFrom(dto.modality),
-    offerType: offerTypeFrom(dto.offerType),
-    vacancies: dto.vacancies,
-    provider: providerFromDTO(dto.provider),
-    city: dto.location.city,
-    address: dto.location.address,
-    distanceKm: dto.location.distanceKm,
-    summary: dto.summary ?? '',
-    requiredDocuments: dto.requiredDocuments ?? [],
-    updatedAt: dto.updatedAt,
+    title: dto.titulo,
+    specialtyId: dto.especialidade,
+    modality: modalityFrom(dto.modalidade),
+    offerType: offerTypeFrom(dto.modalidadeAcesso),
+    vacancies: Math.max(dto.vagasTotais - dto.vagasPreenchidas, 0),
+    provider: providerFromDTO(dto.ofertante),
+    city: dto.cidade ?? '',
+    address: dto.endereco ?? null,
+    distanceKm: dto.distanciaKm ?? null,
+    summary: dto.descricao ?? '',
+    requiredDocuments: dto.triagem?.documentosExigidos?.map((item) => item.rotulo) ?? [],
+    updatedAt: dto.ultimaAtualizacao,
   }
 }
 
@@ -88,10 +129,10 @@ export function opportunityPageFromDTO(
   dto: PageDTO<OpportunityDTO>,
 ): OpportunityPage {
   return {
-    items: dto.items.map(opportunityFromDTO),
-    page: dto.page,
+    items: dto.content.map(opportunityFromDTO),
+    page: dto.number + 1,
     totalPages: dto.totalPages,
-    totalItems: dto.totalItems,
+    totalItems: dto.totalElements,
   }
 }
 
@@ -101,19 +142,43 @@ export function filterOptionFromDTO(dto: FilterOptionDTO): FilterOption {
 
 export function filterCatalogFromDTO(dto: FilterCatalogDTO): FilterCatalog {
   return {
-    specialties: dto.specialties.map(filterOptionFromDTO),
-    modalities: dto.modalities.map(filterOptionFromDTO),
-    distances: dto.distances.map(filterOptionFromDTO),
-    offerTypes: dto.offerTypes.map(filterOptionFromDTO),
+    specialties: dto.especialidades.map((item) => ({ id: item.id, label: item.nome })),
+    modalities: [
+      { id: 'presencial', label: 'Presencial' },
+      { id: 'online', label: 'Online' },
+      { id: 'hibrido', label: 'Híbrido' },
+    ],
+    distances: dto.distanciasKm.map((item) => ({ id: String(item), label: `Até ${item} km` })),
+    offerTypes: [
+      { id: 'gratuita', label: 'Gratuito' },
+      { id: 'sus', label: 'SUS' },
+      { id: 'social', label: 'Preço social' },
+      { id: 'pesquisa', label: 'Pesquisa' },
+    ],
   }
 }
 
 export function professionalCatalogFromDTO(
   dto: ProfessionalCatalogDTO,
 ): ProfessionalCatalog {
+  const councils =
+    dto.conselhos?.map((item) => ({
+      id: item.sigla,
+      label: item.profissao ? `${item.sigla} — ${item.profissao}` : item.sigla,
+    })) ?? dto.councils?.map(filterOptionFromDTO) ?? []
+  const states =
+    dto.ufs?.map((item) => ({ id: item, label: item })) ??
+    dto.states?.map(filterOptionFromDTO) ??
+    []
+  const specialties =
+    dto.especialidades?.map((item) => ({ id: item.id, label: item.nome })) ?? []
+
   return {
-    councils: dto.councils.map(filterOptionFromDTO),
-    states: dto.states.map(filterOptionFromDTO),
+    councils:
+      councils.length > 0 ? councils : FALLBACK_PROFESSIONAL_CATALOG.councils,
+    states: states.length > 0 ? states : FALLBACK_PROFESSIONAL_CATALOG.states,
+    specialties:
+      specialties.length > 0 ? specialties : FALLBACK_PROFESSIONAL_CATALOG.specialties,
   }
 }
 
@@ -122,8 +187,8 @@ export function pendingVerificationFromDTO(
 ): PendingVerification {
   return {
     email: dto.email,
-    profile: userProfileFrom(dto.profile),
-    codeLength: dto.codeLength,
+    profile: userProfileFrom(dto.tipoPerfil ?? dto.profile ?? ''),
+    codeLength: dto.tamanhoCodigo ?? dto.codeLength ?? 6,
   }
 }
 
@@ -165,13 +230,19 @@ export function professionalHealthSignupToDTO(
 ): ProfessionalHealthSignupDTO {
   const { councilId, stateId, number } = draft.professional
   return {
+    tipoPerfil: 'PROFISSIONAL_SAUDE',
     usuarioDto: {
       email: draft.email,
       senha: draft.password,
       tipoPerfil: 'PROFISSIONAL_SAUDE',
     },
     nome: draft.name,
-    documentosRegistro: [`${councilId ?? ''}/${stateId ?? ''} ${number}`.trim()],
-    biografiaOuDescricao: biographyOrDescription,
+    conselho: councilId ?? '',
+    uf: stateId ?? '',
+    numeroRegistro: number,
+    especialidade: draft.professional.specialtyId ?? '',
+    ondeAtende: draft.professional.workplace,
+    biografiaOuDescricao: biographyOrDescription || null,
+    acceptedTerms: draft.acceptedTerms,
   }
 }

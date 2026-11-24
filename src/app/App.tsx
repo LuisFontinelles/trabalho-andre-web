@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/app/AppShell'
+import { AdminShell } from '@/app/AdminShell'
 import { useSession } from '@/app/session'
 import { LoginPage } from '@/presentation/Auth/LoginPage'
 import { RecoverPasswordPage } from '@/presentation/Auth/RecoverPasswordPage'
@@ -11,12 +12,19 @@ import { NewOpportunityPage } from '@/presentation/NewOpportunity/NewOpportunity
 import { RequestDetailPage } from '@/presentation/Requests/RequestDetailPage'
 import { RequestsPage } from '@/presentation/Requests/RequestsPage'
 import { SettingsPage } from '@/presentation/Settings/SettingsPage'
+import { AdminProfessionalsPage } from '@/presentation/Admin/AdminProfessionalsPage'
 import type { ReactNode } from 'react'
 import '@/app/layout.css'
 
-function RequireSession({ children }: { children: ReactNode }) {
+function RequireProfessional({ children }: { children: ReactNode }) {
   const session = useSession()
   if (!session.canAccessOpportunities) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
+function RequireAdmin({ children }: { children: ReactNode }) {
+  const session = useSession()
+  if (!session.canAccessAdmin) return <Navigate to="/" replace />
   return <>{children}</>
 }
 
@@ -24,6 +32,7 @@ function RequireSession({ children }: { children: ReactNode }) {
 function GuestOnly({ children }: { children: ReactNode }) {
   const session = useSession()
   if (session.canAccessOpportunities) return <Navigate to="/oportunidades" replace />
+  if (session.canAccessAdmin) return <Navigate to="/admin/profissionais" replace />
   return <>{children}</>
 }
 
@@ -65,16 +74,16 @@ export function App() {
       <Route
         path="/cadastro-em-verificacao"
         element={
-          <RequireSession>
+          <RequireProfessional>
             <UnderReviewPage />
-          </RequireSession>
+          </RequireProfessional>
         }
       />
       <Route
         element={
-          <RequireSession>
+          <RequireProfessional>
             <AppShell />
-          </RequireSession>
+          </RequireProfessional>
         }
       >
         <Route path="/oportunidades" element={<MyOpportunitiesPage />} />
@@ -83,6 +92,15 @@ export function App() {
         <Route path="/solicitacoes" element={<RequestsPage />} />
         <Route path="/solicitacoes/:id" element={<RequestDetailPage />} />
         <Route path="/configuracoes" element={<SettingsPage />} />
+      </Route>
+      <Route
+        element={
+          <RequireAdmin>
+            <AdminShell />
+          </RequireAdmin>
+        }
+      >
+        <Route path="/admin/profissionais" element={<AdminProfessionalsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

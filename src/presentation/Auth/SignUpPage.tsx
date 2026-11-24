@@ -4,7 +4,7 @@ import { useDependencies } from '@/app/session'
 import { Banner, Button, SelectField, TextAreaField, TextField } from '@/designSystem/components'
 import { NetworkError } from '@/data/network/httpClient'
 import {
-  EMPTY_PROFESSIONAL_CATALOG,
+  FALLBACK_PROFESSIONAL_CATALOG,
   emptySignUpDraft,
   type ProfessionalCatalog,
   type SignUpDraft,
@@ -36,7 +36,8 @@ export function SignUpPage() {
   const [biographyOrDescription, setBiographyOrDescription] = useState('')
   const [documents, setDocuments] = useState<File[]>([])
   const [documentsError, setDocumentsError] = useState<string | null>(null)
-  const [catalog, setCatalog] = useState<ProfessionalCatalog>(EMPTY_PROFESSIONAL_CATALOG)
+  const [catalog, setCatalog] = useState<ProfessionalCatalog>(FALLBACK_PROFESSIONAL_CATALOG)
+  const [catalogWarning, setCatalogWarning] = useState<string | null>(null)
   const [errors, setErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -47,10 +48,16 @@ export function SignUpPage() {
     dependencies
       .loadProfessionalCatalog()
       .then((value) => {
-        if (active) setCatalog(value)
+        if (active) {
+          setCatalog(value)
+          setCatalogWarning(null)
+        }
       })
       .catch(() => {
-        if (active) setCatalog(EMPTY_PROFESSIONAL_CATALOG)
+        if (active) {
+          setCatalog(FALLBACK_PROFESSIONAL_CATALOG)
+          setCatalogWarning(strings.signUp.catalogFallback)
+        }
       })
     return () => {
       active = false
@@ -91,7 +98,7 @@ export function SignUpPage() {
     setSuccessMessage(null)
     setSubmitting(true)
     try {
-      await dependencies.registerProfessional(
+      const pending = await dependencies.registerProfessional(
         {
           ...draft,
           profile: 'PROFISSIONAL',
@@ -101,7 +108,13 @@ export function SignUpPage() {
         biographyOrDescription,
         documents,
       )
-      setSuccessMessage(strings.signUp.registrationSubmitted)
+      navigate('/verificacao', {
+        state: {
+          email: pending.email,
+          codeLength: pending.codeLength,
+          registration: `${draft.professional.councilId}/${draft.professional.stateId} ${draft.professional.number}`,
+        } satisfies SignUpHandoff,
+      })
     } catch (error) {
       if (error instanceof ValidationError) {
         setErrors({ [error.code]: error.message })
@@ -135,6 +148,7 @@ export function SignUpPage() {
           onChange={(email) => update({ email })}
           errorMessage={errors.emailRequired ?? errors.emailInvalid}
         />
+        {catalogWarning && <Banner message={catalogWarning} tone="warning" />}
         <div className="cb-row cb-row--compact">
           <SelectField
             label={strings.signUp.councilLabel}
@@ -162,6 +176,25 @@ export function SignUpPage() {
           value={draft.professional.number}
           onChange={(number) => update({ professional: { ...draft.professional, number } })}
           errorMessage={errors.registrationRequired}
+        />
+        <SelectField
+          label={strings.signUp.specialtyLabel}
+          placeholder={strings.common.select}
+          options={catalog.specialties.map((item) => ({ value: item.id, label: item.label }))}
+          value={draft.professional.specialtyId}
+          onChange={(specialtyId) =>
+            update({ professional: { ...draft.professional, specialtyId } })
+          }
+          errorMessage={errors.specialtyRequired}
+        />
+        <TextField
+          label={strings.signUp.workplaceLabel}
+          placeholder={strings.signUp.workplacePlaceholder}
+          value={draft.professional.workplace}
+          onChange={(workplace) =>
+            update({ professional: { ...draft.professional, workplace } })
+          }
+          errorMessage={errors.workplaceRequired}
         />
         <TextField
           label={strings.signUp.passwordLabel}

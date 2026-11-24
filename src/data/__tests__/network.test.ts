@@ -51,7 +51,7 @@ describe('Montagem da requisicao', () => {
       'SenhaSegura123!',
     )
 
-    expect(capturedUrl).toBe('http://localhost:8080/user/login')
+    expect(capturedUrl).toBe('https://carebridge-api-2.onrender.com/auth/login')
     expect(capturedInit?.method).toBe('POST')
     expect(new Headers(capturedInit?.headers).get('Content-Type')).toBe('application/json')
     expect(capturedInit?.body).toBe(
@@ -74,7 +74,15 @@ describe('Montagem da requisicao', () => {
     const fetchImpl: typeof fetch = async (input, init) => {
       capturedUrl = String(input)
       capturedInit = init
-      return new Response(null, { status: 201 })
+      return Response.json(
+        {
+          email: 'profissional@teste.com',
+          tipoPerfil: 'PROFISSIONAL_SAUDE',
+          exigeVerificacao: true,
+          tamanhoCodigo: 6,
+        },
+        { status: 201 },
+      )
     }
     const documents = [
       new File(['conteudo pdf'], 'registro.pdf', { type: 'application/pdf' }),
@@ -87,7 +95,7 @@ describe('Montagem da requisicao', () => {
       documents,
     )
 
-    expect(capturedUrl).toBe('http://localhost:8080/profissional-saude/cadastro')
+    expect(capturedUrl).toBe('https://carebridge-api-2.onrender.com/auth/register')
     expect(capturedInit?.method).toBe('POST')
     expect(new Headers(capturedInit?.headers).has('Content-Type')).toBe(false)
     const requestBody = capturedInit?.body
@@ -106,14 +114,20 @@ describe('Montagem da requisicao', () => {
     })
     expect(dataText).toBe(
       JSON.stringify({
+        tipoPerfil: 'PROFISSIONAL_SAUDE',
         usuarioDto: {
           email: 'profissional@teste.com',
           senha: 'Profissa@2026',
           tipoPerfil: 'PROFISSIONAL_SAUDE',
         },
         nome: 'Marcos Vieira',
-        documentosRegistro: ['CRM/DF 123456'],
+        conselho: 'CRM',
+        uf: 'DF',
+        numeroRegistro: '123456',
+        especialidade: 'cardiologia',
+        ondeAtende: 'Instituto Movida',
         biografiaOuDescricao: 'Médico clínico geral.',
+        acceptedTerms: true,
       }),
     )
     expect(body.getAll('documentos')).toEqual(documents)
@@ -123,7 +137,15 @@ describe('Montagem da requisicao', () => {
     let capturedBody: BodyInit | null | undefined
     const fetchImpl: typeof fetch = async (_input, init) => {
       capturedBody = init?.body
-      return new Response(null, { status: 201 })
+      return Response.json(
+        {
+          email: 'profissional@teste.com',
+          tipoPerfil: 'PROFISSIONAL_SAUDE',
+          exigeVerificacao: true,
+          tamanhoCodigo: 6,
+        },
+        { status: 201 },
+      )
     }
 
     await createDependencies(fetchImpl).registerProfessional(

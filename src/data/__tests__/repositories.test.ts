@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { emptyCriteria } from '@/domain/entities'
 import { ValidationError } from '@/domain/useCases'
 import { DEBUG_VERIFICATION_CODE } from '@/data/network/mockBackend'
+import { professionalCatalogFromDTO } from '@/data/mappers'
 import { testDependencies, validPatientDraft, validProfessionalDraft } from '@/test/factories'
 
 describe('Login', () => {
@@ -50,7 +51,7 @@ describe('Cadastro e verificacao', () => {
     const pending = await testDependencies().signUp(validProfessionalDraft())
     expect(pending.email).toBe('profissional@teste.com')
     expect(pending.profile).toBe('PROFISSIONAL')
-    expect(pending.codeLength).toBe(4)
+    expect(pending.codeLength).toBe(6)
   })
 
   it('o caso de uso normaliza o e-mail antes de enviar', async () => {
@@ -67,11 +68,12 @@ describe('Cadastro e verificacao', () => {
   it('o codigo de depuracao conclui a verificacao', async () => {
     const deps = testDependencies()
     const pending = await deps.signUp(validPatientDraft())
-    const session = await deps.verifyCode(pending.email, DEBUG_VERIFICATION_CODE)
-    expect(session.user.email).toBe('paciente@teste.com')
+    await expect(
+      deps.verifyCode(pending.email, DEBUG_VERIFICATION_CODE, 4),
+    ).resolves.toBeUndefined()
   })
 
-  it('verificacao devolve o perfil de quem se cadastrou', async () => {
+  it('verificacao conclui sem criar sessao', async () => {
     const deps = testDependencies()
     const draft = {
       ...validProfessionalDraft(),
@@ -79,30 +81,28 @@ describe('Cadastro e verificacao', () => {
       name: 'Helena Souza',
     }
     const pending = await deps.signUp(draft)
-    const session = await deps.verifyCode(pending.email, '0000')
-    expect(session.user.profile).toBe('PROFISSIONAL')
-    expect(session.user.email).toBe('novo.medico@clinica.com')
-    expect(session.user.name).toBe('Helena Souza')
+    await expect(deps.verifyCode(pending.email, '0000', 4)).resolves.toBeUndefined()
   })
 
   it.each(['1234', '0001', '9999'])('codigo errado %s devolve 401', async (code) => {
     await expect(
-      testDependencies().verifyCode('paciente@teste.com', code),
-    ).rejects.toMatchObject({ kind: 'unauthorized' })
+      testDependencies().verifyCode('paciente@teste.com', code, 4),
+    ).rejects.toMatchObject({ status: 400 })
   })
 
   it.each(['', '0', '00', '000'])(
     'codigo incompleto %s para no caso de uso',
     async (code) => {
       await expect(
-        testDependencies().verifyCode('paciente@teste.com', code),
+        testDependencies().verifyCode('paciente@teste.com', code, 4),
       ).rejects.toBeInstanceOf(ValidationError)
     },
   )
 
   it('caracteres nao numericos sao descartados antes de contar', async () => {
-    const session = await testDependencies().verifyCode('paciente@teste.com', '0-0 0a0')
-    expect(session.user.profile).toBe('PACIENTE')
+    await expect(
+      testDependencies().verifyCode('paciente@teste.com', '0-0 0a0', 4),
+    ).resolves.toBeUndefined()
   })
 
   it('reenvio de codigo responde sem corpo', async () => {
@@ -122,6 +122,24 @@ describe('Cadastro e verificacao', () => {
       'CREF',
     ])
     expect(catalog.states.length).toBeGreaterThan(0)
+  })
+
+  it('mapeia o formato portugues devolvido pelo backend', () => {
+    const catalog = professionalCatalogFromDTO({
+      especialidades: [{ id: 'cardiologia', nome: 'Cardiologia' }],
+      conselhos: [{ sigla: 'CRM', profissao: 'Medicina' }],
+      ufs: ['DF'],
+      distanciasKm: [2, 5, 10],
+    })
+    expect(catalog.councils).toEqual([{ id: 'CRM', label: 'CRM — Medicina' }])
+    expect(catalog.states).toEqual([{ id: 'DF', label: 'DF' }])
+  })
+
+  it('usa o catalogo de contingencia quando a resposta vem incompleta', () => {
+    const catalog = professionalCatalogFromDTO({})
+    expect(catalog.councils.some((item) => item.id === 'CRM')).toBe(true)
+    expect(catalog.states).toHaveLength(27)
+    expect(catalog.specialties.some((item) => item.id === 'cardiologia')).toBe(true)
   })
 })
 
@@ -166,12 +184,13 @@ describe('Busca de oportunidades', () => {
     expect(page.items).toHaveLength(2)
   })
 
-  it('pagina fora do intervalo e presa no limite', async () => {
+  it('pagina fora do intervalo volta vazia mantendo o indice solicitado', async () => {
     const page = await testDependencies().searchOpportunities({
       ...emptyCriteria(),
       page: 99,
     })
-    expect(page.page).toBe(3)
+    expect(page.page).toBe(99)
+    expect(page.items).toHaveLength(0)
   })
 
   it('paginas nao repetem itens', async () => {
@@ -249,14 +268,8 @@ describe('Detalhe, filtros e candidatura', () => {
   it('catalogo de filtros vem completo', async () => {
     const catalog = await testDependencies().loadFilters()
     expect(catalog.specialties.length).toBeGreaterThan(0)
-    expect(catalog.modalities).toHaveLength(2)
-    expect(catalog.offerTypes).toHaveLength(3)
+    expect(catalog.modalities).toHaveLength(3)
+    expect(catalog.offerTypes).toHaveLength(4)
   })
 
-  it('status da candidatura traz a linha do tempo', async () => {
-    const application = await testDependencies().loadApplicationStatus('app-20418')
-    expect(application.protocolNumber).toBe('20418')
-    expect(application.steps.length).toBeGreaterThanOrEqual(2)
-    expect(application.steps[0]?.isDone).toBe(true)
-  })
 })

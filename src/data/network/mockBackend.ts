@@ -157,7 +157,7 @@ function errorPayload(message: string, status: number, error: string): MockRespo
   }
 }
 
-type Handler = (body: unknown, path: string) => MockResponse
+type Handler = (body: unknown, path: string, url?: URL) => MockResponse
 
 interface Route {
   method: HttpMethod
@@ -249,6 +249,133 @@ function pathIdOf(path: string, index: number): string {
   return path.split('/').filter(Boolean)[index] ?? ''
 }
 
+function accessModeToApi(value: unknown): string {
+  if (value === 'preco-social' || value === 'social') return 'PRECO_SOCIAL'
+  return String(value ?? 'gratuito').replace('-', '_').toUpperCase()
+}
+
+function opportunityToV2(item: Record<string, unknown>): Record<string, unknown> {
+  const requiredDocuments = Array.isArray(item.requiredDocuments)
+    ? item.requiredDocuments
+    : []
+  return {
+    id: item.id,
+    titulo: item.title,
+    descricao: item.description ?? item.summary ?? '',
+    tipoServico: String(item.serviceType ?? 'consulta').toUpperCase(),
+    especialidade: item.specialty,
+    modalidade: String(item.modality ?? 'presencial').toUpperCase(),
+    modalidadeAcesso: accessModeToApi(item.accessMode ?? item.offerType),
+    preco: item.price ?? null,
+    publicoAlvo: Array.isArray(item.audiences)
+      ? item.audiences.map((value) => String(value).toUpperCase())
+      : ['ADULTOS'],
+    vagasTotais: item.totalVacancies ?? item.vacancies ?? 0,
+    vagasPreenchidas: item.filledVacancies ?? 0,
+    cep: item.cep ?? null,
+    endereco:
+      item.address ??
+      (item.location as Record<string, unknown> | undefined)?.address ??
+      null,
+    cidade: (item.location as Record<string, unknown> | undefined)?.city ?? 'Brasília',
+    uf: (item.location as Record<string, unknown> | undefined)?.state ?? 'DF',
+    distanciaKm: (item.location as Record<string, unknown> | undefined)?.distanceKm ?? null,
+    inscricoesDe: item.opensAt ?? null,
+    inscricoesAte: item.closesAt ?? null,
+    criteriosElegibilidade: item.eligibility ?? null,
+    semRestricoes: item.noRestrictions ?? false,
+    formaContato: String(item.contactMethod ?? 'plataforma').toUpperCase(),
+    status: item.status ?? 'ATIVA',
+    ultimaAtualizacao: item.updatedAt ?? new Date().toISOString(),
+    totalInscricoes: item.applicationCount ?? null,
+    ofertante: {
+      id: (item.provider as Record<string, unknown> | undefined)?.id ?? 'pr-test',
+      nome: (item.provider as Record<string, unknown> | undefined)?.name ?? 'Profissional Teste',
+      verificado: (item.provider as Record<string, unknown> | undefined)?.verified ?? true,
+    },
+    triagem: {
+      modo: 'PADRAO',
+      perguntas: [],
+      documentosExigidos: requiredDocuments.map((value, index) => ({
+        id: `doc-${index}`,
+        rotulo: String(value),
+      })),
+    },
+  }
+}
+
+function opportunityRequestToLegacy(body: unknown): Record<string, unknown> | null {
+  const request = body as Record<string, unknown> | null
+  if (!request) return null
+  return {
+    status: request.status,
+    title: request.titulo,
+    serviceType: String(request.tipoServico ?? '').toLowerCase(),
+    audiences: Array.isArray(request.publicoAlvo)
+      ? request.publicoAlvo.map((value) => String(value).toLowerCase())
+      : [],
+    description: request.descricao,
+    specialty: request.especialidade,
+    modality: String(request.modalidade ?? '').toLowerCase(),
+    cep: request.cep,
+    address: request.endereco,
+    accessMode:
+      request.modalidadeAcesso === 'PRECO_SOCIAL'
+        ? 'preco-social'
+        : String(request.modalidadeAcesso ?? '').toLowerCase(),
+    price: request.preco,
+    totalVacancies: request.vagasTotais,
+    opensAt: request.inscricoesDe,
+    closesAt: request.inscricoesAte,
+    eligibility: request.criteriosElegibilidade,
+    noRestrictions: request.semRestricoes,
+    contactMethod: String(request.formaContato ?? '').toLowerCase(),
+  }
+}
+
+function requestToV2(item: Record<string, unknown>, detail = false): Record<string, unknown> {
+  const source = detail ? requestDetailOf(item) : item
+  const messages = Array.isArray(source.messages) ? source.messages : []
+  const triage = Array.isArray(source.triage) ? source.triage : []
+  const documents = Array.isArray(source.documents) ? source.documents : []
+  return {
+    id: source.id,
+    protocolo: source.protocol ?? String(source.id ?? '').replace(/\D/g, ''),
+    status: source.status === 'AGUARDANDO_INFO' ? 'AGUARDANDO_INFORMACOES' : source.status,
+    oportunidade: { id: source.opportunityId, titulo: source.opportunityTitle },
+    paciente: { nome: source.patientName },
+    dataInscricao: source.receivedAt,
+    decididaEm: source.decidedAt ?? null,
+    respostasTriagem: triage.map((value) => {
+      const answer = value as Record<string, unknown>
+      return { perguntaId: crypto.randomUUID(), pergunta: answer.question, resposta: answer.answer }
+    }),
+    documentos: documents.map((value) => {
+      const document = value as Record<string, unknown>
+      return {
+        id: document.id,
+        documentoId: document.id,
+        nomeArquivo: document.name,
+        tamanhoBytes: Number(document.sizeKb ?? 0) * 1024,
+        enviadoEm: document.sentAt ?? null,
+      }
+    }),
+    mensagensNaoLidas: source.hasUnreadMessage ? 1 : 0,
+    podeTrocarMensagens: source.canMessage ?? source.status === 'APROVADA',
+    mensagens: detail
+      ? messages.map((value) => {
+          const message = value as Record<string, unknown>
+          return {
+            id: message.id,
+            autor: message.author === 'PROFISSIONAL' ? 'PROFISSIONAL_SAUDE' : 'PACIENTE',
+            texto: message.text,
+            enviadaEm: message.sentAt,
+          }
+        })
+      : null,
+  }
+}
+
 /** O handler recebe o corpo e o caminho, para as rotas com id. */
 const listMyOpportunities: Handler = () => ({
   status: 200,
@@ -325,6 +452,188 @@ const listRequests: Handler = () => ({
 })
 
 const ROUTES: Route[] = [
+  { method: 'POST', pattern: '/auth/login', status: 200, fixture: null, latencyMs: 0, respond: loginResponder },
+  { method: 'GET', pattern: '/user/me', status: 200, fixture: null, latencyMs: 0,
+    respond: () => ({
+      status: 200,
+      body: {
+        id: 'profissional-test',
+        email: 'profissional@teste.com',
+        tipoPerfil: 'PROFISSIONAL_SAUDE',
+        nome: 'Marcos Vieira',
+        situacaoRegistro: 'VERIFICADO',
+        conselho: 'CRM',
+        uf: 'DF',
+        numeroRegistro: '123456',
+        especialidade: 'cardiologia',
+        ondeAtende: 'Instituto Movida',
+      },
+    }) },
+  { method: 'POST', pattern: '/auth/register', status: 201, fixture: null, latencyMs: 0,
+    respond: (body) => {
+      const request = body as Record<string, unknown> | null
+      if (!request) return errorPayload('Bad Request: malformed body', 400, 'Bad Request')
+      const user = (request.usuarioDto ?? {}) as Record<string, unknown>
+      const email = String(user.email ?? request.email ?? '').toLowerCase()
+      const profile = String(request.tipoPerfil ?? request.profile ?? 'PACIENTE')
+      registrations.set(email, {
+        name: String(request.nome ?? request.username ?? ''),
+        email,
+        profile: profile === 'PROFISSIONAL_SAUDE' ? 'PROFISSIONAL' : profile,
+      })
+      return {
+        status: 201,
+        body: {
+          email,
+          tipoPerfil: profile,
+          exigeVerificacao: profile === 'PROFISSIONAL_SAUDE',
+          tamanhoCodigo: profile === 'PROFISSIONAL_SAUDE' ? 6 : null,
+        },
+      }
+    } },
+  { method: 'POST', pattern: '/auth/verify', status: 200, fixture: null, latencyMs: 0,
+    respond: (body) => {
+      const request = body as { code?: string } | null
+      return request?.code === DEBUG_VERIFICATION_CODE
+        ? { status: 200, body: { message: 'E-mail verificado com sucesso.' } }
+        : errorPayload('Código inválido ou vencido.', 400, 'Bad Request')
+    } },
+  { method: 'POST', pattern: '/auth/resend-code', status: 200, fixture: null, latencyMs: 0,
+    respond: () => ({ status: 200, body: { message: 'Código reenviado.' } }) },
+  { method: 'POST', pattern: '/auth/password-reset', status: 200, fixture: null, latencyMs: 0,
+    respond: () => ({ status: 200, body: { message: 'Se a conta existir, enviaremos um código.' } }) },
+  { method: 'GET', pattern: '/catalogos', status: 200, fixture: null, latencyMs: 0,
+    respond: () => ({
+      status: 200,
+      body: {
+        especialidades: loadFixture<{ specialties: { id: string; label: string }[] }>('filters')
+          .specialties.map((item) => ({ id: item.id, nome: item.label })),
+        conselhos: loadFixture<{ councils: { id: string }[] }>('professional_catalog')
+          .councils.map((item) => ({ sigla: item.id, profissao: item.id })),
+        ufs: loadFixture<{ states: { id: string }[] }>('professional_catalog')
+          .states.map((item) => item.id),
+        distanciasKm: [2, 5, 10],
+      },
+    }) },
+  { method: 'GET', pattern: '/oportunidades', status: 200, fixture: null, latencyMs: 0,
+    respond: (_body, _path, url) => {
+      const all = loadFixture<{ items: Record<string, unknown>[] }>('opportunities').items
+      const q = (url?.searchParams.get('q') ?? '').toLowerCase()
+      const specialties = (url?.searchParams.get('especialidade') ?? '').split(',').filter(Boolean)
+      const modalities = (url?.searchParams.get('modalidade') ?? '').toLowerCase().split(',').filter(Boolean)
+      const accessModes = (url?.searchParams.get('modalidadeAcesso') ?? '').split(',').filter(Boolean)
+      const maxDistance = Number(url?.searchParams.get('distanciaMaxKm') ?? '')
+      const filtered = all.filter((item) => {
+        const location = (item.location ?? {}) as Record<string, unknown>
+        const haystack = [item.title, item.specialty, (item.provider as Record<string, unknown>)?.name, location.city]
+          .join(' ')
+          .normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+        const distance = location.distanceKm
+        return (
+          (q === '' || haystack.includes(q.normalize('NFD').replace(/[̀-ͯ]/g, ''))) &&
+          (specialties.length === 0 || specialties.includes(String(item.specialty))) &&
+          (modalities.length === 0 || modalities.includes(String(item.modality))) &&
+          (accessModes.length === 0 || accessModes.includes(accessModeToApi(item.offerType))) &&
+          (!Number.isFinite(maxDistance) || maxDistance === 0 || distance === null || Number(distance) <= maxDistance)
+        )
+      })
+      const page = Number(url?.searchParams.get('page') ?? 0)
+      const size = Number(url?.searchParams.get('size') ?? 6)
+      const start = page * size
+      return {
+        status: 200,
+        body: {
+          content: filtered.slice(start, start + size).map(opportunityToV2),
+          number: page,
+          size,
+          totalPages: Math.max(Math.ceil(filtered.length / size), 1),
+          totalElements: filtered.length,
+        },
+      }
+    } },
+  { method: 'GET', pattern: '/oportunidades/{id}', status: 200, fixture: null, latencyMs: 0,
+    respond: (_body, path) => {
+      const id = pathIdOf(path, 1)
+      const managed = panel.opportunities.find((item) => item.id === id)
+      const publicItem = loadFixture<{ items: Record<string, unknown>[] }>('opportunities').items
+        .find((item) => item.id === id)
+      const found = managed ?? publicItem
+      return found
+        ? { status: 200, body: opportunityToV2(found) }
+        : { status: 404, body: loadFixture('error_404') }
+    } },
+  { method: 'GET', pattern: '/profissional-saude/oportunidades', status: 200, fixture: null, latencyMs: 0,
+    respond: () => ({ status: 200, body: panel.opportunities.map(opportunityToV2) }) },
+  { method: 'POST', pattern: '/oportunidades', status: 201, fixture: null, latencyMs: 0,
+    respond: (body) => {
+      const result = createOpportunity(opportunityRequestToLegacy(body), '/v1/professional/opportunities')
+      return { ...result, body: result.body ? opportunityToV2(result.body as Record<string, unknown>) : null }
+    } },
+  { method: 'PUT', pattern: '/oportunidades/{id}', status: 200, fixture: null, latencyMs: 0,
+    respond: (body, path) => {
+      const id = pathIdOf(path, 1)
+      const current = panel.opportunities.find((item) => item.id === id)
+      if (!current) return { status: 404, body: loadFixture('error_404') }
+      if (current.status === 'ENCERRADA') return errorPayload('Oportunidade encerrada.', 409, 'Conflict')
+      const request = opportunityRequestToLegacy(body) ?? {}
+      const updated: Record<string, unknown> = {
+        ...current,
+        ...request,
+        status: current.status,
+        updatedAt: new Date().toISOString(),
+      }
+      if (current.status === 'RASCUNHO' && request.status !== 'RASCUNHO') updated.status = 'ATIVA'
+      panel.opportunities = panel.opportunities.map((item) => item.id === id ? updated : item)
+      return { status: 200, body: opportunityToV2(updated) }
+    } },
+  { method: 'POST', pattern: '/oportunidades/{id}/encerrar', status: 204, fixture: null, latencyMs: 0,
+    respond: (_body, path) => {
+      const id = pathIdOf(path, 1)
+      if (!panel.opportunities.some((item) => item.id === id)) return { status: 404, body: loadFixture('error_404') }
+      panel.opportunities = panel.opportunities.map((item) => item.id === id ? { ...item, status: 'ENCERRADA' } : item)
+      return { status: 204, body: null }
+    } },
+  { method: 'DELETE', pattern: '/oportunidades/{id}', status: 204, fixture: null, latencyMs: 0,
+    respond: (_body, path) => {
+      const id = pathIdOf(path, 1)
+      if (!panel.opportunities.some((item) => item.id === id)) return { status: 404, body: loadFixture('error_404') }
+      panel.opportunities = panel.opportunities.filter((item) => item.id !== id)
+      return { status: 204, body: null }
+    } },
+  { method: 'GET', pattern: '/profissional-saude/inscricoes', status: 200, fixture: null, latencyMs: 0,
+    respond: () => ({ status: 200, body: panel.requests.map((item) => requestToV2(item)) }) },
+  { method: 'GET', pattern: '/profissional-saude/inscricoes/{id}', status: 200, fixture: null, latencyMs: 0,
+    respond: (_body, path) => {
+      const item = panel.requests.find((request) => request.id === pathIdOf(path, 2))
+      return item ? { status: 200, body: requestToV2(item, true) } : { status: 404, body: loadFixture('error_404') }
+    } },
+  { method: 'POST', pattern: '/profissional-saude/inscricoes/{id}/decisao', status: 200, fixture: null, latencyMs: 0,
+    respond: (body, path) => {
+      const id = pathIdOf(path, 2)
+      const request = body as { status?: string; motivo?: string } | null
+      const item = panel.requests.find((entry) => entry.id === id)
+      if (!item) return { status: 404, body: loadFixture('error_404') }
+      const updated = { ...item, status: request?.status, canMessage: request?.status === 'APROVADA', decidedAt: new Date().toISOString(), decisionReason: request?.motivo }
+      panel.requests = panel.requests.map((entry) => entry.id === id ? updated : entry)
+      return { status: 200, body: requestToV2(updated, true) }
+    } },
+  { method: 'POST', pattern: '/profissional-saude/inscricoes/{id}/pedido-informacao', status: 200, fixture: null, latencyMs: 0,
+    respond: (body, path) => {
+      const request = body as { texto?: string } | null
+      if ((request?.texto ?? '').trim() === '') return errorPayload('Pedido vazio.', 422, 'Unprocessable Entity')
+      const id = pathIdOf(path, 2)
+      const item = panel.requests.find((entry) => entry.id === id)
+      if (!item) return { status: 404, body: loadFixture('error_404') }
+      const updated = { ...item, status: 'AGUARDANDO_INFO' }
+      panel.requests = panel.requests.map((entry) => entry.id === id ? updated : entry)
+      return { status: 200, body: requestToV2(updated, true) }
+    } },
+  { method: 'POST', pattern: '/profissional-saude/inscricoes/{id}/mensagens', status: 201, fixture: null, latencyMs: 0,
+    respond: (body) => {
+      const request = body as { texto?: string } | null
+      if ((request?.texto ?? '').trim() === '') return errorPayload('Mensagem vazia.', 422, 'Unprocessable Entity')
+      return { status: 201, body: { id: crypto.randomUUID(), autor: 'PROFISSIONAL_SAUDE', texto: request?.texto, enviadaEm: new Date().toISOString() } }
+    } },
   { method: 'POST', pattern: '/user/login', status: 200, fixture: null, latencyMs: 400, respond: loginResponder },
   { method: 'POST', pattern: '/v1/auth/google', status: 200, fixture: 'auth_login', latencyMs: 500 },
   { method: 'POST', pattern: '/v1/auth/signup', status: 201, fixture: 'auth_signup', latencyMs: 450, respond: signUpResponder },
@@ -519,8 +828,17 @@ export function createMockFetch(options: { latency?: boolean } = {}): typeof fet
         } catch {
           parsed = null
         }
+      } else if (init?.body instanceof FormData) {
+        const dataPart = init.body.get('dados')
+        if (dataPart instanceof Blob) {
+          try {
+            parsed = JSON.parse(await dataPart.text())
+          } catch {
+            parsed = null
+          }
+        }
       }
-      return json(route.respond(parsed, url.pathname))
+      return json(route.respond(parsed, url.pathname, url))
     }
 
     return json({

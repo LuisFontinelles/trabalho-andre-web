@@ -30,7 +30,11 @@ export const ACCESS_MODES: readonly AccessMode[] = [
 ]
 
 export function accessModeFrom(raw: string): AccessMode {
-  if (raw === 'sus' || raw === 'preco-social' || raw === 'pesquisa') return raw
+  const normalized = raw.toUpperCase()
+  if (normalized === 'SUS') return 'sus'
+  if (normalized === 'PRECO_SOCIAL') return 'preco-social'
+  if (normalized === 'PESQUISA') return 'pesquisa'
+  if (raw === 'preco-social') return raw
   return 'gratuito'
 }
 
@@ -54,7 +58,9 @@ export type CareModality = 'presencial' | 'online' | 'hibrido'
 export const CARE_MODALITIES: readonly CareModality[] = ['presencial', 'online', 'hibrido']
 
 export function careModalityFrom(raw: string): CareModality {
-  if (raw === 'online' || raw === 'hibrido') return raw
+  const normalized = raw.toUpperCase()
+  if (normalized === 'ONLINE') return 'online'
+  if (normalized === 'HIBRIDO') return 'hibrido'
   return 'presencial'
 }
 
@@ -88,7 +94,8 @@ export const SERVICE_TYPE_LABEL: Record<ServiceType, string> = {
 }
 
 export function serviceTypeFrom(raw: string | null | undefined): ServiceType | null {
-  return SERVICE_TYPES.find((item) => item === raw) ?? null
+  const normalized = raw?.toLowerCase()
+  return SERVICE_TYPES.find((item) => item === normalized) ?? null
 }
 
 export type Audience = 'criancas' | 'adolescentes' | 'adultos' | 'idosos' | 'gestantes'
@@ -110,7 +117,8 @@ export const AUDIENCE_LABEL: Record<Audience, string> = {
 }
 
 export function audiencesFrom(raw: readonly string[] | null | undefined): readonly Audience[] {
-  return AUDIENCES.filter((item) => (raw ?? []).includes(item))
+  const normalized = (raw ?? []).map((item) => item.toLowerCase())
+  return AUDIENCES.filter((item) => normalized.includes(item))
 }
 
 /** Como paciente e profissional combinam o atendimento depois da aprovacao. */
@@ -125,7 +133,8 @@ export const CONTACT_METHOD_LABEL: Record<ContactMethod, string> = {
 }
 
 export function contactMethodFrom(raw: string | null | undefined): ContactMethod | null {
-  return CONTACT_METHODS.find((item) => item === raw) ?? null
+  const normalized = raw?.toLowerCase()
+  return CONTACT_METHODS.find((item) => item === normalized) ?? null
 }
 
 /** So a modalidade de preco social admite valor. Sem escolha, nao admite. */
@@ -212,6 +221,8 @@ export type RequestStatus =
   | 'RECUSADA'
 
 export function requestStatusFrom(raw: string): RequestStatus {
+  if (raw === 'RECEBIDA') return 'NOVA'
+  if (raw === 'AGUARDANDO_INFORMACOES') return 'AGUARDANDO_INFO'
   if (
     raw === 'EM_ANALISE' ||
     raw === 'AGUARDANDO_INFO' ||

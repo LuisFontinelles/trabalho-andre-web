@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -147,8 +148,10 @@ interface SessionStore {
   tipoPerfil: AuthProfile
   isAuthenticated: boolean
   canAccessOpportunities: boolean
+  canAccessAdmin: boolean
   sessionExpired: boolean
   signIn: (session: Session, profile?: ProfessionalProfile) => void
+  updateProfessionalProfile: (profile: ProfessionalProfile) => void
   signOut: () => void
 }
 
@@ -168,6 +171,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired)
   }, [])
 
+  const updateProfessionalProfile = useCallback((profile: ProfessionalProfile) => {
+    setStored((current) => {
+      if (current === null || current.session.tipoPerfil !== 'PROFISSIONAL_SAUDE') {
+        return current
+      }
+      const next = {
+        session: {
+          ...current.session,
+          validadoInstitucionalmente: profile.isVerified,
+        },
+        profile,
+      }
+      writeStoredSession(next)
+      return next
+    })
+  }, [])
+
   const value = useMemo<SessionStore>(
     () => ({
       session: stored?.session ?? null,
@@ -177,6 +197,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       canAccessOpportunities:
         Boolean(stored?.session.token.trim()) &&
         stored?.session.tipoPerfil === 'PROFISSIONAL_SAUDE',
+      canAccessAdmin:
+        Boolean(stored?.session.token.trim()) && stored?.session.tipoPerfil === 'ADMIN',
       sessionExpired,
       signIn: (session: Session, profile?: ProfessionalProfile) => {
         const effectiveProfile = profile ?? {
@@ -194,13 +216,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setStored(next)
         setSessionExpired(false)
       },
+      updateProfessionalProfile,
       signOut: () => {
         writeStoredSession(null)
         setStored(null)
         setSessionExpired(false)
       },
     }),
-    [stored, sessionExpired],
+    [stored, sessionExpired, updateProfessionalProfile],
   )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

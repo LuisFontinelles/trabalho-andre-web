@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { useDependencies, useSession } from '@/app/session'
+import { useDependencies } from '@/app/session'
 import { Banner, Button, CodeField } from '@/designSystem/components'
 import { NetworkError } from '@/data/network/httpClient'
 import { ValidationError } from '@/domain/useCases'
@@ -13,7 +13,6 @@ const RESEND_SECONDS = 45
 
 export function VerificationPage() {
   const dependencies = useDependencies()
-  const session = useSession()
   const navigate = useNavigate()
   const location = useLocation()
   const pending = location.state as SignUpHandoff | null
@@ -33,14 +32,12 @@ export function VerificationPage() {
     setNotice(null)
     setSubmitting(true)
     try {
-      const result = await dependencies.verifyCode(email, code, codeLength)
-      // Quem acabou de se cadastrar ainda tem o registro em conferencia.
-      session.signIn(result, { registration, isVerified: false })
-      navigate('/cadastro-em-verificacao', { replace: true })
+      await dependencies.verifyCode(email, code, codeLength)
+      navigate('/', { replace: true, state: { verified: true, registration } })
     } catch (error) {
       if (error instanceof ValidationError) {
         setCodeError(error.message)
-      } else if (error instanceof NetworkError && error.kind === 'unauthorized') {
+      } else if (error instanceof NetworkError && error.status === 400) {
         setCodeError(strings.verification.invalid)
       } else {
         setCodeError(strings.common.failed)

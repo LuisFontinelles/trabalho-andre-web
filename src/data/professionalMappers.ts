@@ -1,5 +1,6 @@
 import {
   accessModeFrom,
+  allowsPrice,
   audiencesFrom,
   careModalityFrom,
   contactMethodFrom,
@@ -12,9 +13,6 @@ import {
   type RequestDetail,
   type RequestMessage,
 } from '@/domain/professional'
-import {
-  allowsPrice,
-} from '@/domain/professional'
 import type { OpportunityDraft } from '@/domain/opportunityDraft'
 import {
   digitsOf,
@@ -25,92 +23,86 @@ import {
   selectedDocuments,
 } from '@/domain/opportunityDraft'
 import type {
+  ApplicationDTOv2,
   CreateOpportunityRequestDTO,
-  ManagedOpportunityDTO,
-  ReceivedRequestDTO,
-  RequestDetailDTO,
-  RequestMessageDTO,
+  MessageDTOv2,
+  OpportunityDTOv2,
 } from '@/data/professionalDto'
 
-export function managedOpportunityFromDTO(
-  dto: ManagedOpportunityDTO,
-): ManagedOpportunity {
+const upper = (value: string | null) => value?.toUpperCase() ?? null
+
+export function managedOpportunityFromDTO(dto: OpportunityDTOv2): ManagedOpportunity {
   return {
     id: dto.id,
-    title: dto.title,
-    description: dto.description ?? '',
-    serviceType: serviceTypeFrom(dto.serviceType),
-    audiences: audiencesFrom(dto.audiences),
-    specialtyId: dto.specialty,
-    accessMode: accessModeFrom(dto.accessMode),
-    price: dto.price,
-    filledVacancies: dto.filledVacancies,
-    totalVacancies: dto.totalVacancies,
-    applicationCount: dto.applicationCount,
+    title: dto.titulo,
+    description: dto.descricao ?? '',
+    serviceType: serviceTypeFrom(dto.tipoServico),
+    audiences: audiencesFrom(dto.publicoAlvo),
+    specialtyId: dto.especialidade,
+    accessMode: accessModeFrom(dto.modalidadeAcesso),
+    price: dto.preco ?? null,
+    filledVacancies: dto.vagasPreenchidas,
+    totalVacancies: dto.vagasTotais,
+    applicationCount: dto.totalInscricoes ?? 0,
     status: opportunityStatusFrom(dto.status),
-    modality: careModalityFrom(dto.modality),
+    modality: careModalityFrom(dto.modalidade),
     cep: dto.cep ?? null,
-    address: dto.address,
-    opensAt: dto.opensAt,
-    closesAt: dto.closesAt,
-    eligibility: dto.eligibility ?? '',
-    hasNoRestrictions: dto.noRestrictions ?? false,
-    contactMethod: contactMethodFrom(dto.contactMethod),
-    updatedAt: dto.updatedAt,
+    address: dto.endereco ?? null,
+    opensAt: dto.inscricoesDe ?? null,
+    closesAt: dto.inscricoesAte ?? null,
+    eligibility: dto.criteriosElegibilidade ?? '',
+    hasNoRestrictions: dto.semRestricoes ?? false,
+    contactMethod: contactMethodFrom(dto.formaContato),
+    updatedAt: dto.ultimaAtualizacao,
   }
 }
 
-export function receivedRequestFromDTO(dto: ReceivedRequestDTO): ReceivedRequest {
+export function receivedRequestFromDTO(dto: ApplicationDTOv2): ReceivedRequest {
   return {
     id: dto.id,
-    patientName: dto.patientName,
-    opportunityId: dto.opportunityId,
-    opportunityTitle: dto.opportunityTitle,
-    receivedAt: dto.receivedAt,
+    patientName: dto.paciente?.nome ?? '',
+    opportunityId: dto.oportunidade.id,
+    opportunityTitle: dto.oportunidade.titulo,
+    receivedAt: dto.dataInscricao,
     status: requestStatusFrom(dto.status),
-    hasUnreadMessage: dto.hasUnreadMessage,
-    canMessage: dto.canMessage,
+    hasUnreadMessage: (dto.mensagensNaoLidas ?? 0) > 0,
+    canMessage: dto.podeTrocarMensagens ?? false,
   }
 }
 
-export function requestMessageFromDTO(dto: RequestMessageDTO): RequestMessage {
+export function requestMessageFromDTO(dto: MessageDTOv2): RequestMessage {
   return {
     id: dto.id,
-    author: dto.author === 'PROFISSIONAL' ? 'PROFISSIONAL' : 'PACIENTE',
-    text: dto.text,
-    sentAt: dto.sentAt,
+    author: dto.autor === 'PROFISSIONAL_SAUDE' ? 'PROFISSIONAL' : 'PACIENTE',
+    text: dto.texto,
+    sentAt: dto.enviadaEm,
   }
 }
 
-export function requestDetailFromDTO(dto: RequestDetailDTO): RequestDetail {
+export function requestDetailFromDTO(dto: ApplicationDTOv2): RequestDetail {
   return {
     id: dto.id,
-    patientName: dto.patientName,
-    opportunityId: dto.opportunityId,
-    opportunityTitle: dto.opportunityTitle,
-    receivedAt: dto.receivedAt,
+    patientName: dto.paciente?.nome ?? '',
+    opportunityId: dto.oportunidade.id,
+    opportunityTitle: dto.oportunidade.titulo,
+    receivedAt: dto.dataInscricao,
     status: requestStatusFrom(dto.status),
-    // Sem protocolo do servidor, os digitos do id identificam o pedido.
-    protocol: dto.protocol ?? digitsOf(dto.id),
-    decidedAt: dto.decidedAt ?? null,
-    triage: dto.triage.map((item) => ({
-      question: item.question,
-      answer: item.answer,
+    protocol: dto.protocolo || digitsOf(dto.id),
+    decidedAt: dto.decididaEm ?? null,
+    triage: (dto.respostasTriagem ?? []).map((item) => ({
+      question: item.pergunta,
+      answer: item.resposta,
     })),
-    documents: dto.documents.map((item) => ({
+    documents: (dto.documentos ?? []).map((item) => ({
       id: item.id,
-      name: item.name,
-      sizeKb: item.sizeKb,
-      sentAt: item.sentAt ?? null,
+      name: item.nomeArquivo,
+      sizeKb: Math.ceil(item.tamanhoBytes / 1024),
+      sentAt: item.enviadoEm ?? null,
     })),
-    messages: dto.messages.map(requestMessageFromDTO),
+    messages: (dto.mensagens ?? []).map(requestMessageFromDTO),
   }
 }
 
-/**
- * `status` separa publicar de guardar rascunho. No rascunho os campos podem
- * estar pela metade, entao nada aqui presume que a validacao ja passou.
- */
 export function draftToDTO(
   draft: OpportunityDraft,
   status: 'ATIVA' | 'RASCUNHO' = 'ATIVA',
@@ -118,49 +110,45 @@ export function draftToDTO(
   const hasAddress = requiresAddress(draft.modality)
   return {
     status,
-    title: draft.title.trim(),
-    serviceType: draft.serviceType,
-    audiences: [...draft.audiences],
-    description: draft.description.trim(),
-    specialty: draft.specialtyId ?? '',
-    modality: draft.modality ?? 'presencial',
+    titulo: draft.title.trim(),
+    tipoServico: upper(draft.serviceType),
+    publicoAlvo: draft.audiences.map((item) => item.toUpperCase()),
+    descricao: draft.description.trim(),
+    especialidade: draft.specialtyId ?? '',
+    modalidade: upper(draft.modality) ?? 'PRESENCIAL',
     cep: hasAddress ? formatCep(draft.cep) : null,
-    address: hasAddress ? draft.address.trim() : null,
-    accessMode: draft.accessMode ?? 'gratuito',
-    price: allowsPrice(draft.accessMode) ? parsePrice(draft.price) : null,
-    totalVacancies: parseVacancies(draft.totalVacancies) ?? 0,
-    opensAt: draft.opensAt,
-    closesAt: draft.closesAt,
-    eligibility: draft.hasNoRestrictions ? null : draft.eligibility.trim(),
-    noRestrictions: draft.hasNoRestrictions,
-    contactMethod: draft.contactMethod,
-    triage: {
-      mode: draft.triageMode,
-      questions: draft.questions
+    endereco: hasAddress ? draft.address.trim() : null,
+    modalidadeAcesso:
+      draft.accessMode === 'preco-social'
+        ? 'PRECO_SOCIAL'
+        : (upper(draft.accessMode) ?? 'GRATUITO'),
+    preco: allowsPrice(draft.accessMode) ? parsePrice(draft.price) : null,
+    vagasTotais: parseVacancies(draft.totalVacancies) ?? 0,
+    inscricoesDe: draft.opensAt,
+    inscricoesAte: draft.closesAt,
+    criteriosElegibilidade: draft.hasNoRestrictions ? null : draft.eligibility.trim(),
+    semRestricoes: draft.hasNoRestrictions,
+    formaContato: upper(draft.contactMethod),
+    triagem: {
+      modo: draft.triageMode,
+      perguntas: draft.questions
         .filter((item) => item.label.trim() !== '')
         .map((item) => ({
           id: item.id,
-          label: item.label.trim(),
-          type: item.type,
-          required: item.isRequired,
-          options: [...item.options],
+          rotulo: item.label.trim(),
+          tipo: item.type,
+          obrigatoria: item.isRequired,
+          opcoes: item.type === 'MULTIPLA' ? [...item.options] : undefined,
         })),
-      documents: selectedDocuments(draft).map((item) => ({
+      documentosExigidos: selectedDocuments(draft).map((item) => ({
         id: item.id,
-        label: item.label.trim(),
+        rotulo: item.label.trim(),
       })),
     },
   }
 }
 
-/**
- * Carrega uma oportunidade no formulario de edicao. A API ainda nao devolve
- * a triagem junto da oportunidade, entao a edicao parte do formulario padrao
- * ate esse campo existir no contrato.
- */
-export function draftFromManagedOpportunity(
-  item: ManagedOpportunity,
-): OpportunityDraft {
+export function draftFromManagedOpportunity(item: ManagedOpportunity): OpportunityDraft {
   return {
     ...emptyOpportunityDraft(),
     title: item.title,

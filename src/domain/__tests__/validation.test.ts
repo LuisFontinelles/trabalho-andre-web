@@ -116,7 +116,13 @@ describe('Validacao do cadastro', () => {
   it('paciente nao precisa de dados profissionais', () => {
     const draft = {
       ...validPatientDraft(),
-      professional: { councilId: null, stateId: null, number: '' },
+      professional: {
+        councilId: null,
+        stateId: null,
+        number: '',
+        specialtyId: null,
+        workplace: '',
+      },
     }
     expect(() => validateSignUp(draft)).not.toThrow()
   })

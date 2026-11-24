@@ -1,20 +1,24 @@
 import type {
   ApplicationDTO,
   AuthResponseDTO,
+  CurrentUserDTO,
   FilterCatalogDTO,
   LoginResponseDTO,
   OpportunityDTO,
   PageDTO,
+  PendingProfessionalDTO,
   ProfessionalCatalogDTO,
   VerificationChallengeDTO,
 } from '@/data/dto'
 import {
   applicationFromDTO,
+  currentUserFromDTO,
   filterCatalogFromDTO,
   loginResultFromDTO,
   opportunityFromDTO,
   opportunityPageFromDTO,
   pendingVerificationFromDTO,
+  pendingProfessionalFromDTO,
   professionalCatalogFromDTO,
   professionalHealthSignupToDTO,
   sessionFromDTO,
@@ -24,35 +28,41 @@ import type { HttpClient } from '@/data/network/httpClient'
 import {
   queryItems,
   type Application,
+  type CurrentUser,
   type FilterCatalog,
   type LoginResult,
   type Opportunity,
   type OpportunityPage,
   type PendingVerification,
+  type PendingProfessional,
   type ProfessionalCatalog,
-  type SearchCriteria,
   type Session,
   type SignUpDraft,
 } from '@/domain/entities'
 import type {
   ApplicationRepository,
+  AdminRepository,
   AuthRepository,
   OpportunityRepository,
 } from '@/domain/repositories'
-
-export const PROFESSIONAL_SIGNUP_URL =
-  'http://localhost:8080/profissional-saude/cadastro'
-export const USER_LOGIN_URL = 'http://localhost:8080/user/login'
 
 export function createAuthRepository(client: HttpClient): AuthRepository {
   return {
     async login(email, password): Promise<LoginResult> {
       const { data, status } = await client.sendWithStatus<LoginResponseDTO>({
-        path: USER_LOGIN_URL,
+        path: 'auth/login',
         method: 'POST',
         body: { email, password },
       })
       return loginResultFromDTO(data, status)
+    },
+
+    async me(): Promise<CurrentUser> {
+      const dto = await client.send<CurrentUserDTO>({
+        path: 'user/me',
+        requiresAuth: true,
+      })
+      return currentUserFromDTO(dto)
     },
 
     async loginWithGoogle(): Promise<Session> {
@@ -66,7 +76,7 @@ export function createAuthRepository(client: HttpClient): AuthRepository {
 
     async signUp(draft: SignUpDraft): Promise<PendingVerification> {
       const dto = await client.send<VerificationChallengeDTO>({
-        path: 'auth/signup',
+        path: 'auth/register',
         method: 'POST',
         body: signUpDraftToDTO(draft),
       })
@@ -77,7 +87,7 @@ export function createAuthRepository(client: HttpClient): AuthRepository {
       draft: SignUpDraft,
       biographyOrDescription: string,
       documents: readonly File[],
-    ): Promise<void> {
+    ): Promise<PendingVerification> {
       const body = new FormData()
       body.append(
         'dados',
@@ -87,20 +97,20 @@ export function createAuthRepository(client: HttpClient): AuthRepository {
         ),
       )
       for (const document of documents) body.append('documentos', document)
-      await client.sendVoid({
-        path: PROFESSIONAL_SIGNUP_URL,
+      const dto = await client.send<VerificationChallengeDTO>({
+        path: 'auth/register',
         method: 'POST',
         body,
       })
+      return pendingVerificationFromDTO(dto)
     },
 
-    async verify(email, code): Promise<Session> {
-      const dto = await client.send<AuthResponseDTO>({
+    async verify(email, code): Promise<void> {
+      await client.send<{ message: string }>({
         path: 'auth/verify',
         method: 'POST',
         body: { email, code },
       })
-      return sessionFromDTO(dto)
     },
 
     async resendCode(email): Promise<void> {
@@ -121,95 +131,32 @@ export function createAuthRepository(client: HttpClient): AuthRepository {
 
     async professionalCatalog(): Promise<ProfessionalCatalog> {
       const dto = await client.send<ProfessionalCatalogDTO>({
-        path: 'auth/professional-catalog',
+        path: 'catalogos',
       })
       return professionalCatalogFromDTO(dto)
     },
   }
 }
 
-const PAGE_SIZE = 6
-
-function normalize(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-}
-
-/**
- * O backend ainda nao existe. A busca e a paginacao sao resolvidas no cliente
- * sobre o conjunto devolvido pela fixture, preservando o contrato de query que
- * o servidor vai implementar.
- */
 export function createOpportunityRepository(
   client: HttpClient,
 ): OpportunityRepository {
-  function applyFilters(
-    criteria: SearchCriteria,
-    items: readonly Opportunity[],
-  ): Opportunity[] {
-    const term = normalize(criteria.term)
-    return items.filter((item) => {
-      const haystack = normalize(
-        [item.title, item.provider.name, item.city, item.specialtyId].join(' '),
-      )
-      const matchesTerm = term === '' || haystack.includes(term)
-      const matchesSpecialty =
-        criteria.specialties.length === 0 ||
-        criteria.specialties.includes(item.specialtyId)
-      const matchesModality =
-        criteria.modalities.length === 0 || criteria.modalities.includes(item.modality)
-      const matchesOffer =
-        criteria.offerTypes.length === 0 || criteria.offerTypes.includes(item.offerType)
-      const limit = criteria.distance === null ? null : Number(criteria.distance)
-      const matchesDistance = limit === null || (item.distanceKm ?? 0) <= limit
-      return (
-        matchesTerm &&
-        matchesSpecialty &&
-        matchesModality &&
-        matchesOffer &&
-        matchesDistance
-      )
-    })
-  }
-
-  function paginate(items: Opportunity[], page: number): OpportunityPage {
-    if (items.length === 0) {
-      return { items: [], page: 1, totalPages: 1, totalItems: 0 }
-    }
-    const totalPages = Math.ceil(items.length / PAGE_SIZE)
-    const current = Math.min(Math.max(page, 1), totalPages)
-    const start = (current - 1) * PAGE_SIZE
-    return {
-      items: items.slice(start, start + PAGE_SIZE),
-      page: current,
-      totalPages,
-      totalItems: items.length,
-    }
-  }
-
   return {
     async search(criteria): Promise<OpportunityPage> {
       const dto = await client.send<PageDTO<OpportunityDTO>>({
-        path: 'opportunities',
+        path: 'oportunidades',
         query: queryItems(criteria),
       })
-      const page = opportunityPageFromDTO(dto)
-      return paginate(applyFilters(criteria, page.items), criteria.page)
+      return opportunityPageFromDTO(dto)
     },
 
     async detail(id): Promise<Opportunity> {
-      const dto = await client.send<OpportunityDTO>({ path: `opportunities/${id}` })
-      const detail = opportunityFromDTO(dto)
-      if (detail.id === id) return detail
-      const all = await client.send<PageDTO<OpportunityDTO>>({ path: 'opportunities' })
-      const found = all.items.find((item) => item.id === id)
-      return found ? opportunityFromDTO(found) : detail
+      const dto = await client.send<OpportunityDTO>({ path: `oportunidades/${id}` })
+      return opportunityFromDTO(dto)
     },
 
     async filters(): Promise<FilterCatalog> {
-      const dto = await client.send<FilterCatalogDTO>({ path: 'filters' })
+      const dto = await client.send<FilterCatalogDTO>({ path: 'catalogos' })
       return filterCatalogFromDTO(dto)
     },
   }
@@ -220,8 +167,43 @@ export function createApplicationRepository(
 ): ApplicationRepository {
   return {
     async status(id): Promise<Application> {
-      const dto = await client.send<ApplicationDTO>({ path: `applications/${id}` })
+      const dto = await client.send<ApplicationDTO>({
+        path: `profissional-saude/inscricoes/${id}`,
+        requiresAuth: true,
+      })
       return applicationFromDTO(dto)
+    },
+  }
+}
+
+export function createAdminRepository(client: HttpClient): AdminRepository {
+  async function changeStatus(
+    id: string,
+    action: 'aprovar' | 'recusar',
+  ): Promise<PendingProfessional> {
+    const dto = await client.send<PendingProfessionalDTO>({
+      path: `user/profissionais/${id}/${action}`,
+      method: 'PATCH',
+      requiresAuth: true,
+    })
+    return pendingProfessionalFromDTO(dto)
+  }
+
+  return {
+    async pendingProfessionals(): Promise<readonly PendingProfessional[]> {
+      const items = await client.send<PendingProfessionalDTO[]>({
+        path: 'user/profissionais/pendentes',
+        requiresAuth: true,
+      })
+      return items.map(pendingProfessionalFromDTO)
+    },
+
+    approveProfessional(id): Promise<PendingProfessional> {
+      return changeStatus(id, 'aprovar')
+    },
+
+    rejectProfessional(id): Promise<PendingProfessional> {
+      return changeStatus(id, 'recusar')
     },
   }
 }

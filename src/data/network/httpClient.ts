@@ -15,7 +15,8 @@ export interface Endpoint {
  * pena carrega-lo junto do erro em vez de so o codigo HTTP.
  */
 export interface ApiError {
-  statusCode: number
+  status?: number
+  statusCode?: number
   message: string
   error?: string | null
   requestId?: string | null
@@ -25,6 +26,9 @@ export type NetworkErrorKind =
   | 'invalidURL'
   | 'transport'
   | 'unauthorized'
+  | 'forbidden'
+  | 'conflict'
+  | 'rateLimited'
   | 'notFound'
   | 'server'
   | 'decoding'
@@ -141,12 +145,21 @@ export function createHttpClient(
     }
 
     const message = api?.message ?? `HTTP ${response.status}`
-    if (response.status === 401 || response.status === 403) {
-      if (response.status === 401 && token) options.onSessionExpired?.()
+    if (response.status === 401) {
+      if (token) options.onSessionExpired?.()
       throw new NetworkError('unauthorized', message, response.status, api)
+    }
+    if (response.status === 403) {
+      throw new NetworkError('forbidden', message, response.status, api)
     }
     if (response.status === 404) {
       throw new NetworkError('notFound', message, response.status, api)
+    }
+    if (response.status === 409) {
+      throw new NetworkError('conflict', message, response.status, api)
+    }
+    if (response.status === 429) {
+      throw new NetworkError('rateLimited', message, response.status, api)
     }
     throw new NetworkError('server', message, response.status, api)
   }

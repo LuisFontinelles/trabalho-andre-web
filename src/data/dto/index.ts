@@ -40,7 +40,23 @@ export interface LoginResponseDTO {
   autenticado?: boolean
   tipoPerfil?: string
   validadoInstitucionalmente?: boolean
+  expiraEmSegundos?: number
 }
+
+export interface CurrentUserDTO {
+  id: string
+  email: string
+  tipoPerfil: string
+  nome: string
+  situacaoRegistro?: string | null
+  conselho?: string | null
+  uf?: string | null
+  numeroRegistro?: string | null
+  especialidade?: string | null
+  ondeAtende?: string | null
+}
+
+export type PendingProfessionalDTO = CurrentUserDTO
 
 export interface ProfessionalRegistrationDTO {
   council: string
@@ -58,20 +74,29 @@ export interface SignUpRequestDTO {
 }
 
 export interface ProfessionalHealthSignupDTO {
+  tipoPerfil: 'PROFISSIONAL_SAUDE'
   usuarioDto: {
     email: string
     senha: string
     tipoPerfil: 'PROFISSIONAL_SAUDE'
   }
   nome: string
-  documentosRegistro: string[]
-  biografiaOuDescricao: string
+  conselho: string
+  uf: string
+  numeroRegistro: string
+  especialidade: string
+  ondeAtende: string
+  biografiaOuDescricao: string | null
+  acceptedTerms: boolean
 }
 
 export interface VerificationChallengeDTO {
   email: string
-  profile: string
-  codeLength: number
+  profile?: string
+  tipoPerfil?: string
+  codeLength?: number
+  tamanhoCodigo?: number | null
+  exigeVerificacao?: boolean
 }
 
 export interface VerifyCodeRequestDTO {
@@ -89,50 +114,48 @@ export interface FilterOptionDTO {
 }
 
 export interface ProfessionalCatalogDTO {
-  councils: FilterOptionDTO[]
-  states: FilterOptionDTO[]
+  councils?: FilterOptionDTO[]
+  states?: FilterOptionDTO[]
+  especialidades?: { id: string; nome: string }[]
+  conselhos?: { sigla: string; profissao: string }[]
+  ufs?: string[]
+  distanciasKm?: number[]
 }
 
 export interface ProviderDTO {
   id: string
-  name: string
-  kind: string
-  verified: boolean
-}
-
-export interface LocationDTO {
-  city: string
-  state: string
-  address: string | null
-  distanceKm: number | null
+  nome: string
+  verificado: boolean
 }
 
 export interface OpportunityDTO {
   id: string
-  title: string
-  specialty: string
-  modality: string
-  offerType: string
-  vacancies: number
-  provider: ProviderDTO
-  location: LocationDTO
-  summary: string | null
-  requiredDocuments: string[] | null
-  updatedAt: string
+  titulo: string
+  especialidade: string
+  modalidade: string
+  modalidadeAcesso: string
+  vagasTotais: number
+  vagasPreenchidas: number
+  ofertante: ProviderDTO
+  cidade?: string | null
+  endereco?: string | null
+  distanciaKm?: number | null
+  descricao?: string | null
+  triagem?: { documentosExigidos?: { id: string; rotulo: string }[] | null } | null
+  ultimaAtualizacao: string
 }
 
 export interface PageDTO<Item> {
-  items: Item[]
-  page: number
+  content: Item[]
+  number: number
+  size: number
   totalPages: number
-  totalItems: number
+  totalElements: number
 }
 
 export interface FilterCatalogDTO {
-  specialties: FilterOptionDTO[]
-  modalities: FilterOptionDTO[]
-  distances: FilterOptionDTO[]
-  offerTypes: FilterOptionDTO[]
+  especialidades: { id: string; nome: string }[]
+  distanciasKm: number[]
 }
 
 export interface TriageAnswersDTO {

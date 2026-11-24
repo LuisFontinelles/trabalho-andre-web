@@ -63,7 +63,7 @@ describe('Criterios de busca', () => {
     const criteria = emptyCriteria()
     expect(activeFilterCount(criteria)).toBe(0)
     expect(isFiltered(criteria)).toBe(false)
-    expect(queryItems(criteria)).toEqual({ page: '1' })
+    expect(queryItems(criteria)).toEqual({ page: '0', size: '6' })
   })
 
   it('conta cada dimensao de filtro uma vez', () => {
@@ -92,9 +92,9 @@ describe('Criterios de busca', () => {
     }
     const query = queryItems(criteria)
     expect(query.q).toBe('psico')
-    expect(query.specialty).toBe('cardiologia,psicologia')
-    expect(query.page).toBe('2')
-    expect(query.modality).toBeUndefined()
+    expect(query.especialidade).toBe('cardiologia,psicologia')
+    expect(query.page).toBe('1')
+    expect(query.modalidade).toBeUndefined()
   })
 })
 

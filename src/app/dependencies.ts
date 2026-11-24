@@ -1,15 +1,15 @@
 import { createHttpClient, SESSION_EXPIRED_EVENT } from '@/data/network/httpClient'
-import { BASE_URL, createMockFetch } from '@/data/network/mockBackend'
+import { API_BASE_URL } from '@/data/network/apiConfig'
 import {
   createApplicationRepository,
+  createAdminRepository,
   createAuthRepository,
   createOpportunityRepository,
-  PROFESSIONAL_SIGNUP_URL,
-  USER_LOGIN_URL,
 } from '@/data/repositories'
 import { createProfessionalRepository } from '@/data/professionalRepository'
 import {
   makeLoadApplicationStatus,
+  makeLoadCurrentUser,
   makeLoadFilters,
   makeLoadOpportunityDetail,
   makeLoadProfessionalCatalog,
@@ -24,17 +24,7 @@ import {
 
 /** Raiz de composicao. Equivale ao AppDependencies do aplicativo iOS. */
 export function createDependencies(fetchImpl?: typeof fetch) {
-  const mockFetch = createMockFetch()
-  const appFetch: typeof fetch =
-    fetchImpl ??
-    ((input, init) => {
-      const requestUrl =
-        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-      return requestUrl === PROFESSIONAL_SIGNUP_URL || requestUrl === USER_LOGIN_URL
-        ? fetch(input, init)
-        : mockFetch(input, init)
-    })
-  const client = createHttpClient(BASE_URL, appFetch, {
+  const client = createHttpClient(API_BASE_URL, fetchImpl ?? fetch, {
     getToken: () => {
       try {
         return sessionStorage.getItem('token')
@@ -52,13 +42,16 @@ export function createDependencies(fetchImpl?: typeof fetch) {
   const opportunityRepository = createOpportunityRepository(client)
   const applicationRepository = createApplicationRepository(client)
   const professionalRepository = createProfessionalRepository(client)
+  const adminRepository = createAdminRepository(client)
 
   return {
     authRepository,
     opportunityRepository,
     applicationRepository,
     professionalRepository,
+    adminRepository,
     login: makeLogin(authRepository),
+    loadCurrentUser: makeLoadCurrentUser(authRepository),
     signUp: makeSignUp(authRepository),
     registerProfessional: makeRegisterProfessional(authRepository),
     verifyCode: makeVerifyCode(authRepository),

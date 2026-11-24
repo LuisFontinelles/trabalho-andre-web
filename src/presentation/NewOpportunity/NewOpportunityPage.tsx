@@ -11,6 +11,7 @@ import {
   type Crumb,
 } from '@/designSystem/components'
 import { draftFromManagedOpportunity } from '@/data/professionalMappers'
+import { NetworkError } from '@/data/network/httpClient'
 import { EMPTY_FILTER_CATALOG, type FilterCatalog } from '@/domain/entities'
 import {
   DRAFT_STEPS,
@@ -40,6 +41,7 @@ function longDate(iso: string): string {
 export function NewOpportunityPage() {
   const dependencies = useDependencies()
   const session = useSession()
+  const { updateProfessionalProfile } = session
   const navigate = useNavigate()
   const { id } = useParams()
   const isEditing = id !== undefined
@@ -53,6 +55,31 @@ export function NewOpportunityPage() {
   const [busy, setBusy] = useState<'publish' | 'draft' | null>(null)
   const [isLoading, setLoading] = useState(isEditing)
   const [published, setPublished] = useState<ManagedOpportunity | null>(null)
+  const [isCheckingVerification, setCheckingVerification] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    dependencies
+      .loadCurrentUser()
+      .then((currentUser) => {
+        if (!active) return
+        updateProfessionalProfile({
+          registration: [currentUser.conselho, currentUser.uf, currentUser.numeroRegistro]
+            .filter(Boolean)
+            .join(' '),
+          isVerified: currentUser.situacaoRegistro === 'VERIFICADO',
+        })
+      })
+      .catch(() => {
+        // Mantém o valor conhecido da sessão se a conferência não responder.
+      })
+      .finally(() => {
+        if (active) setCheckingVerification(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [dependencies, updateProfessionalProfile])
 
   // Na edicao o formulario abre com o que ja esta salvo.
   useEffect(() => {
@@ -136,8 +163,10 @@ export function NewOpportunityPage() {
         return
       }
       setPublished(saved)
-    } catch {
-      setFormError(text.failed)
+    } catch (error) {
+      setFormError(
+        error instanceof NetworkError && error.apiMessage ? error.apiMessage : text.failed,
+      )
     } finally {
       setBusy(null)
     }
@@ -214,7 +243,7 @@ export function NewOpportunityPage() {
 
       {missing > 0 && <Banner message={text.missingFields(missing)} tone="danger" />}
       {formError && <Banner message={formError} tone="danger" />}
-      {isLast && !canPublish && !isPublishedItem && (
+      {isLast && !isCheckingVerification && !canPublish && !isPublishedItem && (
         <Banner message={text.publishLocked} tone="warning" icon="hourglass_top" />
       )}
 
@@ -246,7 +275,10 @@ export function NewOpportunityPage() {
             />
             <Button
               title={!isLast ? strings.common.continue : isPublishedItem ? text.save : text.publish}
-              isEnabled={busy === null && (!isLast || canPublish || isPublishedItem)}
+              isEnabled={
+                busy === null &&
+                (!isLast || (!isCheckingVerification && canPublish) || isPublishedItem)
+              }
               isLoading={busy === 'publish'}
               onClick={advance}
             />

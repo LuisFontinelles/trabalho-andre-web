@@ -320,7 +320,7 @@ describe('Editar oportunidade', () => {
   it('oportunidade encerrada nao pode ser editada', async () => {
     await expect(
       repo().updateOpportunity('op-101', validOpportunityDraft()),
-    ).rejects.toMatchObject({ status: 422 })
+    ).rejects.toMatchObject({ status: 409 })
   })
 
   it('encerrar e depois tentar editar tambem e barrado', async () => {
@@ -328,7 +328,7 @@ describe('Editar oportunidade', () => {
     await repository.closeOpportunity('op-105')
     await expect(
       repository.updateOpportunity('op-105', validOpportunityDraft()),
-    ).rejects.toMatchObject({ status: 422 })
+    ).rejects.toMatchObject({ status: 409 })
   })
 
   it('id inexistente responde 404', async () => {
@@ -410,24 +410,24 @@ describe('Campos novos do formulario', () => {
   it('online nao envia CEP nem endereco', () => {
     const dto = draftToDTO({ ...validOpportunityDraft(), modality: 'online' })
     expect(dto.cep).toBeNull()
-    expect(dto.address).toBeNull()
+    expect(dto.endereco).toBeNull()
   })
 
   it('sem restricoes nao envia o texto dos criterios', () => {
     const dto = draftToDTO({ ...validOpportunityDraft(), hasNoRestrictions: true })
-    expect(dto.noRestrictions).toBe(true)
-    expect(dto.eligibility).toBeNull()
+    expect(dto.semRestricoes).toBe(true)
+    expect(dto.criteriosElegibilidade).toBeNull()
   })
 
   it('as perguntas vao com tipo, obrigatoriedade e opcoes', () => {
     const dto = draftToDTO(validOpportunityDraft())
     expect(dto.status).toBe('ATIVA')
-    expect(dto.triage.questions[1]).toEqual({
+    expect(dto.triagem.perguntas[1]).toEqual({
       id: 'q2',
-      label: 'Há quanto tempo?',
-      type: 'MULTIPLA',
-      required: true,
-      options: ['Menos de 1 semana', 'De 1 a 4 semanas', 'De 1 a 6 meses', 'Mais de 6 meses'],
+      rotulo: 'Há quanto tempo?',
+      tipo: 'MULTIPLA',
+      obrigatoria: true,
+      opcoes: ['Menos de 1 semana', 'De 1 a 4 semanas', 'De 1 a 6 meses', 'Mais de 6 meses'],
     })
   })
 

@@ -2,6 +2,7 @@ import {
   DEFAULT_CODE_LENGTH,
   requiresProfessionalData,
   type Application,
+  type CurrentUser,
   type FilterCatalog,
   type LoginResult,
   type Opportunity,
@@ -9,7 +10,6 @@ import {
   type PendingVerification,
   type ProfessionalCatalog,
   type SearchCriteria,
-  type Session,
   type SignUpDraft,
 } from '@/domain/entities'
 import type {
@@ -30,6 +30,8 @@ export type ValidationCode =
   | 'councilRequired'
   | 'stateRequired'
   | 'registrationRequired'
+  | 'specialtyRequired'
+  | 'workplaceRequired'
   | 'codeIncomplete'
 
 const VALIDATION_MESSAGE: Record<ValidationCode, string> = {
@@ -43,6 +45,8 @@ const VALIDATION_MESSAGE: Record<ValidationCode, string> = {
   councilRequired: strings.signUp.councilRequired,
   stateRequired: strings.signUp.stateRequired,
   registrationRequired: strings.signUp.registrationRequired,
+  specialtyRequired: 'Escolha a especialidade.',
+  workplaceRequired: 'Informe onde você atende.',
   codeIncomplete: strings.verification.incomplete,
 }
 
@@ -89,6 +93,10 @@ export function validateSignUp(draft: SignUpDraft): void {
       throw new ValidationError('stateRequired')
     if (draft.professional.number.trim() === '')
       throw new ValidationError('registrationRequired')
+    if (draft.professional.specialtyId === null)
+      throw new ValidationError('specialtyRequired')
+    if (draft.professional.workplace.trim() === '')
+      throw new ValidationError('workplaceRequired')
   }
 
   validatePassword(draft.password, true)
@@ -125,7 +133,7 @@ export function makeRegisterProfessional(repository: AuthRepository) {
     draft: SignUpDraft,
     biographyOrDescription: string,
     documents: readonly File[],
-  ): Promise<void> => {
+  ): Promise<PendingVerification> => {
     validateSignUp(draft)
     return repository.registerProfessional(
       {
@@ -135,6 +143,7 @@ export function makeRegisterProfessional(repository: AuthRepository) {
         professional: {
           ...draft.professional,
           number: draft.professional.number.trim(),
+          workplace: draft.professional.workplace.trim(),
         },
       },
       biographyOrDescription.trim(),
@@ -148,11 +157,15 @@ export function makeVerifyCode(repository: AuthRepository) {
     email: string,
     code: string,
     length: number = DEFAULT_CODE_LENGTH,
-  ): Promise<Session> => {
+  ): Promise<void> => {
     const digits = code.replace(/\D/g, '')
     if (digits.length !== length) throw new ValidationError('codeIncomplete')
     return repository.verify(email, digits)
   }
+}
+
+export function makeLoadCurrentUser(repository: AuthRepository) {
+  return (): Promise<CurrentUser> => repository.me()
 }
 
 export function makeResendCode(repository: AuthRepository) {

@@ -1,9 +1,8 @@
 import type { HttpClient } from '@/data/network/httpClient'
 import type {
-  ManagedOpportunityDTO,
-  ReceivedRequestDTO,
-  RequestDetailDTO,
-  RequestMessageDTO,
+  ApplicationDTOv2,
+  MessageDTOv2,
+  OpportunityDTOv2,
 } from '@/data/professionalDto'
 import {
   draftToDTO,
@@ -12,7 +11,6 @@ import {
   requestDetailFromDTO,
   requestMessageFromDTO,
 } from '@/data/professionalMappers'
-import type { PageDTO } from '@/data/dto'
 import type { OpportunityDraft } from '@/domain/opportunityDraft'
 import type {
   ManagedOpportunity,
@@ -48,24 +46,24 @@ export function createProfessionalRepository(
 ): ProfessionalRepository {
   return {
     async myOpportunities() {
-      const dto = await client.send<PageDTO<ManagedOpportunityDTO>>({
-        path: 'professional/opportunities',
+      const dto = await client.send<OpportunityDTOv2[]>({
+        path: 'profissional-saude/oportunidades',
         requiresAuth: true,
       })
-      return dto.items.map(managedOpportunityFromDTO)
+      return dto.map(managedOpportunityFromDTO)
     },
 
     async opportunity(id) {
-      const dto = await client.send<ManagedOpportunityDTO>({
-        path: `professional/opportunities/${id}`,
+      const dto = await client.send<OpportunityDTOv2>({
+        path: `oportunidades/${id}`,
         requiresAuth: true,
       })
       return managedOpportunityFromDTO(dto)
     },
 
     async createOpportunity(draft, asDraft = false) {
-      const dto = await client.send<ManagedOpportunityDTO>({
-        path: 'professional/opportunities',
+      const dto = await client.send<OpportunityDTOv2>({
+        path: 'oportunidades',
         method: 'POST',
         body: draftToDTO(draft, asDraft ? 'RASCUNHO' : 'ATIVA'),
         requiresAuth: true,
@@ -74,8 +72,8 @@ export function createProfessionalRepository(
     },
 
     async updateOpportunity(id, draft, asDraft = false) {
-      const dto = await client.send<ManagedOpportunityDTO>({
-        path: `professional/opportunities/${id}`,
+      const dto = await client.send<OpportunityDTOv2>({
+        path: `oportunidades/${id}`,
         method: 'PUT',
         body: draftToDTO(draft, asDraft ? 'RASCUNHO' : 'ATIVA'),
         requiresAuth: true,
@@ -85,7 +83,7 @@ export function createProfessionalRepository(
 
     async closeOpportunity(id) {
       await client.sendVoid({
-        path: `professional/opportunities/${id}/close`,
+        path: `oportunidades/${id}/encerrar`,
         method: 'POST',
         requiresAuth: true,
       })
@@ -93,53 +91,59 @@ export function createProfessionalRepository(
 
     async deleteOpportunity(id) {
       await client.sendVoid({
-        path: `professional/opportunities/${id}`,
+        path: `oportunidades/${id}`,
         method: 'DELETE',
         requiresAuth: true,
       })
     },
 
     async receivedRequests() {
-      const dto = await client.send<PageDTO<ReceivedRequestDTO>>({
-        path: 'professional/requests',
+      const dto = await client.send<ApplicationDTOv2[]>({
+        path: 'profissional-saude/inscricoes',
         requiresAuth: true,
       })
-      return dto.items.map(receivedRequestFromDTO)
+      return dto.map(receivedRequestFromDTO)
     },
 
     async requestDetail(id) {
-      const dto = await client.send<RequestDetailDTO>({
-        path: `professional/requests/${id}`,
+      const dto = await client.send<ApplicationDTOv2>({
+        path: `profissional-saude/inscricoes/${id}`,
         requiresAuth: true,
       })
       return requestDetailFromDTO(dto)
     },
 
     async decideRequest(id, status, reason) {
-      const dto = await client.send<RequestDetailDTO>({
-        path: `professional/requests/${id}/decision`,
+      const dto = await client.send<ApplicationDTOv2>({
+        path: `profissional-saude/inscricoes/${id}/decisao`,
         method: 'POST',
-        body: reason === undefined ? { status } : { status, reason: reason.trim() },
+        body: {
+          status,
+          motivo: reason?.trim() ?? null,
+          combinado: status === 'APROVADA'
+            ? { quando: 'A combinar', onde: 'A combinar', levar: 'A combinar' }
+            : null,
+        },
         requiresAuth: true,
       })
       return requestDetailFromDTO(dto)
     },
 
     async requestInfo(id, text) {
-      const dto = await client.send<RequestDetailDTO>({
-        path: `professional/requests/${id}/info-request`,
+      const dto = await client.send<ApplicationDTOv2>({
+        path: `profissional-saude/inscricoes/${id}/pedido-informacao`,
         method: 'POST',
-        body: { text: text.trim() },
+        body: { texto: text.trim() },
         requiresAuth: true,
       })
       return requestDetailFromDTO(dto)
     },
 
     async sendMessage(id, text) {
-      const dto = await client.send<RequestMessageDTO>({
-        path: `professional/requests/${id}/messages`,
+      const dto = await client.send<MessageDTOv2>({
+        path: `profissional-saude/inscricoes/${id}/mensagens`,
         method: 'POST',
-        body: { text },
+        body: { texto: text },
         requiresAuth: true,
       })
       return requestMessageFromDTO(dto)

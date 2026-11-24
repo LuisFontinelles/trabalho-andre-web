@@ -22,11 +22,12 @@ export function LoginPage() {
 
   useEffect(() => {
     if (session.sessionExpired) setFormError(strings.login.sessionExpired)
-    else if (session.isAuthenticated && !session.canAccessOpportunities) {
+    else if (session.isAuthenticated && !session.canAccessOpportunities && !session.canAccessAdmin) {
       setFormError(strings.login.professionalOnly)
     }
   }, [
     session.canAccessOpportunities,
+    session.canAccessAdmin,
     session.isAuthenticated,
     session.sessionExpired,
   ])
@@ -65,24 +66,49 @@ export function LoginPage() {
         possuiToken &&
         ehProfissionalSaude
       ) {
+        sessionStorage.setItem('token', token)
+        const currentUser = await dependencies.loadCurrentUser()
+        const isVerified = currentUser.situacaoRegistro === 'VERIFICADO'
         session.signIn({
           token,
           tipoPerfil: 'PROFISSIONAL_SAUDE',
-          validadoInstitucionalmente: data.validadoInstitucionalmente === true,
+          validadoInstitucionalmente: isVerified,
           user: {
-            id: email.trim().toLowerCase(),
-            name: email.trim(),
-            email: email.trim().toLowerCase(),
+            id: currentUser.id,
+            name: currentUser.nome,
+            email: currentUser.email,
             profile: 'PROFISSIONAL',
             city: null,
           },
+        }, {
+          registration: [currentUser.conselho, currentUser.uf, currentUser.numeroRegistro]
+            .filter(Boolean)
+            .join(' '),
+          isVerified,
         })
         navigate('/oportunidades', { replace: true })
+      } else if (
+        status === 200 &&
+        data.autenticado === true &&
+        possuiToken &&
+        tipoPerfil === 'ADMIN'
+      ) {
+        session.signIn({
+          token,
+          tipoPerfil: 'ADMIN',
+          validadoInstitucionalmente: false,
+          user: {
+            id: email.trim().toLowerCase(),
+            name: strings.admin.userName,
+            email: email.trim().toLowerCase(),
+            profile: 'DESCONHECIDO',
+            city: null,
+          },
+        })
+        navigate('/admin/profissionais', { replace: true })
       } else if (status === 200 && data.autenticado === true && possuiToken) {
         const perfil =
-          tipoPerfil === 'PACIENTE' || tipoPerfil === 'ADMIN'
-            ? tipoPerfil
-            : 'DESCONHECIDO'
+          tipoPerfil === 'PACIENTE' ? tipoPerfil : 'DESCONHECIDO'
         session.signIn({
           token,
           tipoPerfil: perfil,
@@ -100,6 +126,7 @@ export function LoginPage() {
         setFormError(strings.login.sessionStartFailed)
       }
     } catch (error) {
+      session.signOut()
       if (error instanceof ValidationError) {
         if (error.code === 'emailRequired' || error.code === 'emailInvalid') {
           setEmailError(error.message)

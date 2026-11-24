@@ -17,7 +17,13 @@ export function validPatientDraft(): SignUpDraft {
     email: 'paciente@teste.com',
     password: 'Paciente@2026',
     confirmPassword: 'Paciente@2026',
-    professional: { councilId: null, stateId: null, number: '' },
+    professional: {
+      councilId: null,
+      stateId: null,
+      number: '',
+      specialtyId: null,
+      workplace: '',
+    },
     acceptedTerms: true,
   }
 }
@@ -29,7 +35,13 @@ export function validProfessionalDraft(): SignUpDraft {
     email: 'profissional@teste.com',
     password: 'Profissa@2026',
     confirmPassword: 'Profissa@2026',
-    professional: { councilId: 'CRM', stateId: 'DF', number: '123456' },
+    professional: {
+      councilId: 'CRM',
+      stateId: 'DF',
+      number: '123456',
+      specialtyId: 'cardiologia',
+      workplace: 'Instituto Movida',
+    },
     acceptedTerms: true,
   }
 }
