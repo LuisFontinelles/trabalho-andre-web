@@ -1,5 +1,5 @@
 import { createHttpClient } from '@/data/network/httpClient'
-import { createAuthRepository } from '@/data/repositories'
+import { createAdminRepository, createAuthRepository } from '@/data/repositories'
 import { createProfessionalRepository } from '@/data/professionalRepository'
 import {
   makeDeleteAccount,
@@ -66,11 +66,13 @@ export function createDependencies(
     options,
   )
   const authRepository = createAuthRepository(client)
+  const adminRepository = createAdminRepository(client)
   const professionalRepository = createProfessionalRepository(client)
 
   return {
     tokens,
     authRepository,
+    adminRepository,
     professionalRepository,
     login: makeLogin(authRepository),
     signUp: makeSignUp(authRepository),

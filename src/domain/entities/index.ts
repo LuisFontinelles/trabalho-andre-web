@@ -34,6 +34,18 @@ export interface Session {
   readonly registration?: string
 }
 
+/** Profissional aguardando a decisão de um administrador. */
+export interface PendingProfessional {
+  readonly id: string
+  readonly email: string
+  readonly name: string
+  readonly council: string
+  readonly state: string
+  readonly registrationNumber: string
+  readonly specialty: string
+  readonly workplace: string
+}
+
 /** A conta existe, mas nao e do perfil que este app atende. */
 export class WrongProfileError extends Error {
   readonly profile: UserProfile

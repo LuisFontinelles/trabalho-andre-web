@@ -56,6 +56,8 @@ export function LoginPage() {
       })
       if (result.authProfile === 'PROFISSIONAL_SAUDE') {
         navigate('/oportunidades', { replace: true })
+      } else if (result.authProfile === 'ADMIN') {
+        navigate('/admin/profissionais', { replace: true })
       } else {
         setFormError(strings.login.notProfessional)
       }

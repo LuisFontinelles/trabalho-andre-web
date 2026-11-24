@@ -137,6 +137,7 @@ interface SessionStore {
   profile: ProfessionalProfile
   isAuthenticated: boolean
   canAccessOpportunities: boolean
+  canAccessAdmin: boolean
   signIn: (session: Session, profile?: ProfessionalProfile) => void
   signOut: () => void
 }
@@ -169,6 +170,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isAuthenticated: stored !== null,
       canAccessOpportunities:
         Boolean(stored?.session.token.trim()) && stored?.session.authProfile === 'PROFISSIONAL_SAUDE',
+      canAccessAdmin:
+        Boolean(stored?.session.token.trim()) && stored?.session.authProfile === 'ADMIN',
       signIn: (session: Session, profile: ProfessionalProfile = VERIFIED_PROFILE) => {
         const next = { session, profile }
         tokens.set(session.token)

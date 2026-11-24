@@ -24,6 +24,7 @@ function mountLogin(
           <Routes>
             <Route path="/" element={<LoginPage />} />
             <Route path="/oportunidades" element={<p>Área profissional</p>} />
+            <Route path="/admin/profissionais" element={<p>Área administrativa</p>} />
           </Routes>
         </MemoryRouter>
       </SessionProvider>
@@ -92,6 +93,21 @@ describe('LoginPage', () => {
     ).toBeInTheDocument()
     expect(screen.queryByText('Área profissional')).not.toBeInTheDocument()
     expect(sessionStorage.getItem('tipoPerfil')).toBe('PACIENTE')
+  })
+
+  it('direciona administrador para a fila de profissionais', async () => {
+    mountLogin({
+      token: 'jwt-admin',
+      autenticado: true,
+      tipoPerfil: 'ADMIN',
+      validadoInstitucionalmente: false,
+    })
+
+    await submitLogin()
+
+    expect(await screen.findByText('Área administrativa')).toBeInTheDocument()
+    expect(sessionStorage.getItem('token')).toBe('jwt-admin')
+    expect(sessionStorage.getItem('tipoPerfil')).toBe('ADMIN')
   })
 
   it('exige o valor exato PROFISSIONAL_SAUDE para direcionar ao painel', async () => {

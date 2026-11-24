@@ -3,12 +3,14 @@ import type {
   CatalogosDTO,
   LoginResponseDTO,
   MeDTO,
+  PendingProfessionalDTO,
   ProfissionalCadastroDTO,
 } from '@/data/dto'
 import type {
   AuthProfile,
   Catalog,
   PendingVerification,
+  PendingProfessional,
   Session,
   SignUpDraft,
   User,
@@ -86,6 +88,21 @@ export function registrationFromMe(me: MeDTO | null): string | undefined {
   const number = me?.numeroRegistro?.trim()
   if (!council || !state || !number) return undefined
   return `${council}/${state} ${number}`
+}
+
+export function pendingProfessionalFromDTO(
+  dto: PendingProfessionalDTO,
+): PendingProfessional {
+  return {
+    id: dto.id,
+    email: dto.email,
+    name: dto.nome?.trim() || dto.email,
+    council: dto.conselho?.trim() ?? '',
+    state: dto.uf?.trim() ?? '',
+    registrationNumber: dto.numeroRegistro?.trim() ?? '',
+    specialty: dto.especialidade?.trim() ?? '',
+    workplace: dto.ondeAtende?.trim() ?? '',
+  }
 }
 
 /** Parte `dados` do cadastro. A tela nao tem biografia; vai nula. */

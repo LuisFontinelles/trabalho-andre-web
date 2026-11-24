@@ -28,6 +28,7 @@ O painel fala o [contrato da API, versão 2](CONTRATO-API-CareBridge.md): caminh
 | Verificação por código de 4 dígitos, com reenvio cronometrado | Pronto |
 | Cadastro em verificação, com aviso no painel | Pronto |
 | Recuperação de senha | Pronto, integrada à API |
+| Área administrativa: listar, aprovar e recusar cadastros profissionais | Pronto, integrada à API |
 | Minhas oportunidades: indicadores, tabela e estados vazio, carregando e erro | Pronto |
 | Encerrar oportunidade e excluir rascunho, com confirmação | Pronto |
 | Nova oportunidade, nos três passos do protótipo | Pronto |

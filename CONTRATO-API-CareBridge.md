@@ -502,9 +502,9 @@ Aprovar soma 1 em `vagasPreenchidas`. Decisão final não volta atrás.
 
 ---
 
-## 9. Rotas de ADMIN (já existem, sem cliente)
+## 9. Rotas de ADMIN
 
-`GET /user/profissionais/pendentes` e `PATCH /user/profissionais/{id}/aprovar`. Aprovar passa `situacaoRegistro` a `VERIFICADO`. Para a apresentação é preciso um ADMIN no banco (migração com um usuário de demonstração, por exemplo).
+O painel web usa `GET /user/profissionais/pendentes`, `PATCH /user/profissionais/{id}/aprovar` e `PATCH /user/profissionais/{id}/recusar`. Aprovar passa `situacaoRegistro` a `VERIFICADO`; recusar passa a `RECUSADO`. Todas exigem sessão com `tipoPerfil: ADMIN`.
 
 ---
 

@@ -3,16 +3,18 @@ import type {
   CatalogosDTO,
   LoginResponseDTO,
   MeDTO,
+  PendingProfessionalDTO,
 } from '@/data/dto'
 import {
   catalogFromDTO,
   pendingVerificationFromDTO,
+  pendingProfessionalFromDTO,
   sessionFromDTO,
   signUpForm,
 } from '@/data/mappers'
 import { bearer, NetworkError, type HttpClient } from '@/data/network/httpClient'
-import type { Session } from '@/domain/entities'
-import type { AuthRepository } from '@/domain/repositories'
+import type { PendingProfessional, Session } from '@/domain/entities'
+import type { AdminRepository, AuthRepository } from '@/domain/repositories'
 
 export const PROFESSIONAL_SIGNUP_URL = 'auth/register'
 export const USER_LOGIN_URL = 'auth/login'
@@ -113,6 +115,36 @@ export function createAuthRepository(client: HttpClient): AuthRepository {
 
     async catalog() {
       return catalogFromDTO(await client.send<CatalogosDTO>({ path: 'catalogos' }))
+    },
+  }
+}
+
+export function createAdminRepository(client: HttpClient): AdminRepository {
+  async function changeStatus(
+    id: string,
+    action: 'aprovar' | 'recusar',
+  ): Promise<PendingProfessional> {
+    const dto = await client.send<PendingProfessionalDTO>({
+      path: `user/profissionais/${id}/${action}`,
+      method: 'PATCH',
+      authenticated: true,
+    })
+    return pendingProfessionalFromDTO(dto)
+  }
+
+  return {
+    async pendingProfessionals() {
+      const items = await client.send<PendingProfessionalDTO[]>({
+        path: 'user/profissionais/pendentes',
+        authenticated: true,
+      })
+      return items.map(pendingProfessionalFromDTO)
+    },
+    approveProfessional(id) {
+      return changeStatus(id, 'aprovar')
+    },
+    rejectProfessional(id) {
+      return changeStatus(id, 'recusar')
     },
   }
 }
