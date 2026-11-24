@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { Session } from '@/domain/entities'
+import { authProfileFrom, type Session } from '@/domain/entities'
 import { createDependencies, type Dependencies } from '@/app/dependencies'
 
 const DependenciesContext = createContext<Dependencies | null>(null)
@@ -86,8 +86,29 @@ function readStoredSession(): StoredSession | null {
     if (raw === null) return null
     const parsed = JSON.parse(raw) as StoredSession | Session
     // Formato antigo: so a sessao, sem o perfil profissional.
-    if ('token' in parsed) return { session: parsed, profile: VERIFIED_PROFILE }
-    return parsed
+    if ('token' in parsed) {
+      return {
+        session: {
+          ...parsed,
+          authProfile: authProfileFrom(
+            parsed.authProfile ?? (parsed.user.profile === 'PROFISSIONAL' ? 'PROFISSIONAL_SAUDE' : parsed.user.profile),
+          ),
+        },
+        profile: VERIFIED_PROFILE,
+      }
+    }
+    return {
+      ...parsed,
+      session: {
+        ...parsed.session,
+        authProfile: authProfileFrom(
+          parsed.session.authProfile ??
+            (parsed.session.user.profile === 'PROFISSIONAL'
+              ? 'PROFISSIONAL_SAUDE'
+              : parsed.session.user.profile),
+        ),
+      },
+    }
   } catch {
     return null
   }
@@ -95,8 +116,17 @@ function readStoredSession(): StoredSession | null {
 
 function writeStoredSession(stored: StoredSession | null): void {
   try {
-    if (stored === null) sessionStorage.removeItem(SESSION_KEY)
-    else sessionStorage.setItem(SESSION_KEY, JSON.stringify(stored))
+    if (stored === null) {
+      sessionStorage.removeItem(SESSION_KEY)
+      sessionStorage.removeItem('token')
+      sessionStorage.removeItem('tipoPerfil')
+      sessionStorage.removeItem('validadoInstitucionalmente')
+    } else {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(stored))
+      sessionStorage.setItem('token', stored.session.token)
+      sessionStorage.setItem('tipoPerfil', stored.session.authProfile)
+      sessionStorage.setItem('validadoInstitucionalmente', String(stored.session.isVerified))
+    }
   } catch {
     // Sem armazenamento a sessao vale so para esta navegacao, e tudo bem.
   }
@@ -106,6 +136,8 @@ interface SessionStore {
   session: Session | null
   profile: ProfessionalProfile
   isAuthenticated: boolean
+  canAccessOpportunities: boolean
+  canAccessAdmin: boolean
   signIn: (session: Session, profile?: ProfessionalProfile) => void
   signOut: () => void
 }
@@ -136,6 +168,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       session: stored?.session ?? null,
       profile: stored?.profile ?? VERIFIED_PROFILE,
       isAuthenticated: stored !== null,
+      canAccessOpportunities:
+        Boolean(stored?.session.token.trim()) && stored?.session.authProfile === 'PROFISSIONAL_SAUDE',
+      canAccessAdmin:
+        Boolean(stored?.session.token.trim()) && stored?.session.authProfile === 'ADMIN',
       signIn: (session: Session, profile: ProfessionalProfile = VERIFIED_PROFILE) => {
         const next = { session, profile }
         tokens.set(session.token)

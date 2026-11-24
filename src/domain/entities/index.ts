@@ -1,6 +1,12 @@
 /** Entidades de dominio. Nao conhecem React, rede nem DTO. */
 
 export type UserProfile = 'PACIENTE' | 'PROFISSIONAL' | 'DESCONHECIDO'
+export type AuthProfile = 'PACIENTE' | 'PROFISSIONAL_SAUDE' | 'ADMIN' | 'DESCONHECIDO'
+
+export function authProfileFrom(raw: string): AuthProfile {
+  if (raw === 'PACIENTE' || raw === 'PROFISSIONAL_SAUDE' || raw === 'ADMIN') return raw
+  return 'DESCONHECIDO'
+}
 
 export function userProfileFrom(raw: string): UserProfile {
   if (raw === 'PACIENTE' || raw === 'PROFISSIONAL') return raw
@@ -21,10 +27,23 @@ export function firstName(user: User): string {
 export interface Session {
   readonly token: string
   readonly user: User
+  readonly authProfile: AuthProfile
   /** Se o registro profissional ja foi conferido (o selo de verificado). */
   readonly isVerified: boolean
   /** "CRM/DF 123456", quando o GET /user/me traz o registro. */
   readonly registration?: string
+}
+
+/** Profissional aguardando a decisão de um administrador. */
+export interface PendingProfessional {
+  readonly id: string
+  readonly email: string
+  readonly name: string
+  readonly council: string
+  readonly state: string
+  readonly registrationNumber: string
+  readonly specialty: string
+  readonly workplace: string
 }
 
 /** A conta existe, mas nao e do perfil que este app atende. */

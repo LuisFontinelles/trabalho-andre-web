@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createDependencies } from '@/app/dependencies'
 import { createMockFetch, requestLog } from '@/data/network/mockBackend'
-import { WrongProfileError } from '@/domain/entities'
 import { validProfessionalDraft } from '@/test/factories'
 
 const API = 'https://api.teste/'
@@ -14,7 +13,7 @@ interface Call {
 type Reply = { status: number; body: unknown } | 'network'
 
 /**
- * fetch falso da API real. Responde por caminho (`/auth/login`, `/user/me`) e
+ * fetch falso da API real. Responde por caminho (`/user/login`, `/user/me`) e
  * guarda as chamadas. 'network' simula a rota inacessivel.
  */
 function apiFetch(replies: Record<string, Reply>) {
@@ -84,6 +83,7 @@ describe('Login na API real', () => {
     expect(meHeaders.Authorization).toBe('Bearer jwt.do.servidor')
     expect(session).toEqual({
       token: 'jwt.do.servidor',
+      authProfile: 'PROFISSIONAL_SAUDE',
       isVerified: false,
       user: {
         id: '6f1c-uuid',
@@ -123,22 +123,24 @@ describe('Login na API real', () => {
     })
   })
 
-  it('recusa conta de paciente no painel', async () => {
+  it('identifica conta de paciente para o guard do painel', async () => {
     const { deps } = realApiDependencies({
       '/auth/login': { status: 200, body: { ...LOGIN_OK, tipoPerfil: 'PACIENTE' } },
     })
-    await expect(deps.login('paciente@exemplo.com', 'Senha@2026')).rejects.toBeInstanceOf(
-      WrongProfileError,
-    )
+    await expect(deps.login('paciente@exemplo.com', 'Senha@2026')).resolves.toMatchObject({
+      authProfile: 'PACIENTE',
+      user: { profile: 'PACIENTE' },
+    })
   })
 
-  it('o perfil do /me vale mais que o do login', async () => {
+  it('o perfil do login controla o acesso mesmo se o /me vier divergente', async () => {
     const { deps } = realApiDependencies({
       '/auth/login': { status: 200, body: LOGIN_OK },
       '/user/me': { status: 200, body: { ...ME, tipoPerfil: 'ADMIN' } },
     })
-    await expect(deps.login('ana@exemplo.com', 'Senha@2026')).rejects.toMatchObject({
-      profile: 'DESCONHECIDO',
+    await expect(deps.login('ana@exemplo.com', 'Senha@2026')).resolves.toMatchObject({
+      authProfile: 'PROFISSIONAL_SAUDE',
+      user: { profile: 'DESCONHECIDO' },
     })
   })
 
@@ -338,7 +340,7 @@ describe('Cadastro na API real', () => {
 })
 
 describe('Selecao do backend', () => {
-  it('sem endereco da API tudo fica no simulado', async () => {
+  it('permite injetar o backend simulado somente nos testes', async () => {
     const fake = apiFetch({})
     const deps = createDependencies(createMockFetch({ latency: false }), '', fake.impl)
     const session = await deps.login('profissional@teste.com', 'Profissa@2026')

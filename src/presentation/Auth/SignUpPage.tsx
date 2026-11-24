@@ -1,7 +1,7 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useId, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { rememberRegistration, useDependencies, useSession } from '@/app/session'
-import { Banner, Button, PasswordField, SelectField, TextField } from '@/designSystem/components'
+import { Banner, Button, PasswordField, SelectField, TextAreaField, TextField } from '@/designSystem/components'
 import { NetworkError } from '@/data/network/httpClient'
 import { EMPTY_CATALOG, emptySignUpDraft, type Catalog, type SignUpDraft } from '@/domain/entities'
 import {
@@ -15,6 +15,10 @@ import { ruleList } from '@/presentation/Auth/passwordRules'
 import { strings } from '@/resources/strings'
 
 type FieldErrors = Partial<Record<ValidationCode, string>>
+
+const MAX_DOCUMENT_COUNT = 2
+const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024
+const MAX_REQUEST_SIZE = 22 * 1024 * 1024
 
 /** O que a tela de verificacao precisa saber sobre o cadastro recem-feito. */
 export interface SignUpHandoff {
@@ -31,8 +35,12 @@ export function SignUpPage() {
   const dependencies = useDependencies()
   const session = useSession()
   const navigate = useNavigate()
+  const documentInputId = useId()
 
   const [draft, setDraft] = useState<SignUpDraft>(emptySignUpDraft)
+  const [biographyOrDescription, setBiographyOrDescription] = useState('')
+  const [documents, setDocuments] = useState<File[]>([])
+  const [documentsError, setDocumentsError] = useState<string | null>(null)
   const [catalog, setCatalog] = useState<Catalog>(EMPTY_CATALOG)
   const [errors, setErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
@@ -82,9 +90,29 @@ export function SignUpPage() {
     })
   }
 
+  function selectDocuments(event: ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(event.currentTarget.files ?? [])
+    event.currentTarget.value = ''
+    setDocumentsError(null)
+    if (selected.length > MAX_DOCUMENT_COUNT) {
+      setDocumentsError(strings.signUp.tooManyDocuments)
+      return
+    }
+    if (selected.some((file) => file.size > MAX_DOCUMENT_SIZE)) {
+      setDocumentsError(strings.signUp.documentTooLarge)
+      return
+    }
+    if (selected.reduce((total, file) => total + file.size, 0) > MAX_REQUEST_SIZE) {
+      setDocumentsError(strings.signUp.requestTooLarge)
+      return
+    }
+    setDocuments(selected)
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault()
     setFormError(null)
+    setDocumentsError(null)
     // A tela nova nao repete a senha nem tem caixa de termos: criar a conta
     // ja e o aceite, como o texto acima do botao avisa.
     const payload: SignUpDraft = {
@@ -103,7 +131,7 @@ export function SignUpPage() {
     }
     setSubmitting(true)
     try {
-      const pending = await dependencies.signUp(payload)
+      const pending = await dependencies.signUp(payload, biographyOrDescription, documents)
       const council = catalog.councils.find((item) => item.id === draft.professional.councilId)
       const state = catalog.states.find((item) => item.id === draft.professional.stateId)
       const registration = `${council?.label ?? ''}/${state?.label ?? ''} ${draft.professional.number.trim()}`
@@ -227,7 +255,50 @@ export function SignUpPage() {
           errorMessage={errors.passwordRequired ?? errors.passwordWeak}
           rules={ruleList(draft.password)}
         />
+        <TextAreaField
+          label={strings.signUp.biographyLabel}
+          value={biographyOrDescription}
+          onChange={setBiographyOrDescription}
+          placeholder={strings.signUp.biographyPlaceholder}
+          maxLength={2000}
+        />
+        <div className="cb-field">
+          <label className="cb-field__label" htmlFor={documentInputId}>
+            {strings.signUp.documentsLabel}
+          </label>
+          <div className="cb-field__box">
+            <input
+              id={documentInputId}
+              className="cb-field__input cb-field__input--file"
+              type="file"
+              multiple
+              onChange={selectDocuments}
+              aria-describedby={`${documentInputId}-help`}
+            />
+          </div>
+          <span id={`${documentInputId}-help`} className="cb-auth__caption">
+            {strings.signUp.documentsHelp}
+          </span>
+          {documents.length > 0 && (
+            <ul className="cb-auth__documents">
+              {documents.map((file) => (
+                <li key={`${file.name}-${file.lastModified}-${file.size}`}>
+                  <span>{file.name}</span>
+                  <button
+                    type="button"
+                    className="cb-auth__document-remove"
+                    onClick={() => setDocuments((current) => current.filter((item) => item !== file))}
+                    aria-label={`${strings.signUp.removeDocument}: ${file.name}`}
+                  >
+                    {strings.signUp.removeDocument}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <p className="cb-auth__caption">{strings.signUp.terms}</p>
+        {documentsError && <Banner message={documentsError} tone="danger" />}
         {formError && <Banner message={formError} tone="danger" />}
         <Button title={strings.signUp.submit} type="submit" fillsWidth isLoading={isSubmitting} />
       </form>

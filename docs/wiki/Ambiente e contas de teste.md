@@ -13,30 +13,23 @@ A aplicação sobe em `http://localhost:5173`.
 
 ## Contas
 
-O backend ainda não existe. Estas duas contas são aceitas pelo servidor simulado.
+A aplicação usa a API real. Use uma conta profissional existente no ambiente configurado ou faça o cadastro pela própria aplicação. As credenciais disponíveis dependem do banco de dados do backend.
 
-| Perfil | E-mail | Senha |
-|---|---|---|
-| Profissional de saúde | `profissional@teste.com` | qualquer senha não vazia |
-| Paciente | `paciente@teste.com` | qualquer senha não vazia (o painel recusa o perfil) |
-
-Não existe senha certa: o mock só valida o e-mail. Qualquer outro endereço é recusado com 401, de propósito, para dar como exercitar a tela de erro. Cinco erros seguidos no mesmo e-mail bloqueiam o login por 15 minutos (429), como o contrato pede.
-
-A convenção usada nos testes automatizados é `Profissa@2026` e `Paciente@2026`, caso você queira padronizar.
+`profissional@teste.com` e `paciente@teste.com` existem somente no servidor simulado usado pelos testes automatizados. Elas não são contas garantidas na API real nem no site publicado.
 
 ## Código de verificação
 
-**`0000`.** Qualquer outro código devolve 401 e mostra "Código incorreto".
+O código é enviado pelo backend real. O valor `0000` é aceito somente pelo servidor simulado da suíte automatizada.
 
 ## Cadastro com e-mail novo
 
-O cadastro aceita endereços que não estão na lista. O registro fica guardado em memória enquanto a aba estiver aberta, e a verificação devolve o perfil e o nome que você cadastrou.
+O cadastro envia os dados para a API real. A persistência, verificação e liberação do profissional seguem as regras do backend configurado.
 
 No cadastro de profissional, escolha qualquer conselho e UF; o número do registro tem de 4 a 7 dígitos. A conta nova nasce em verificação: salva rascunho, mas não publica.
 
 ## O que esperar
 
-A sessão vive em memória. Recarregar a página desloga, igual ao aplicativo iOS. Navegue pelos links da barra lateral em vez de digitar a URL.
+A sessão é preservada durante a aba atual. Recarregar a página mantém o acesso enquanto a sessão for válida.
 
 ## Comandos
 

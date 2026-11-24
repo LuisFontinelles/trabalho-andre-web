@@ -1,6 +1,5 @@
 import { createHttpClient } from '@/data/network/httpClient'
-import { BASE_URL, createMockFetch } from '@/data/network/mockBackend'
-import { createAuthRepository } from '@/data/repositories'
+import { createAdminRepository, createAuthRepository } from '@/data/repositories'
 import { createProfessionalRepository } from '@/data/professionalRepository'
 import {
   makeDeleteAccount,
@@ -14,10 +13,12 @@ import {
 } from '@/domain/useCases'
 
 /**
- * Endereco da API real. Vazio = tudo no servidor simulado. Local:
- * `http://localhost:8080`; o Render libera CORS para o GitHub Pages.
+ * Endereco da API usada pela aplicacao. Desenvolvimento e producao usam o
+ * mesmo backend publicado; testes podem injetar outro transporte e URL.
  */
-const API_URL: string = import.meta.env.VITE_API_URL ?? ''
+const API_URL: string =
+  import.meta.env.VITE_API_URL?.trim() || 'https://carebridge-api-2.onrender.com'
+const INJECTED_BACKEND_URL = 'https://api.carebridge.local'
 
 /**
  * Guarda o token da sessao para o cliente HTTP mandar `Authorization:
@@ -52,21 +53,26 @@ export function createTokenStore(): TokenStore {
 
 /** Raiz de composicao. Equivale ao AppDependencies do aplicativo iOS. */
 export function createDependencies(
-  fetchImpl: typeof fetch = createMockFetch(),
+  fetchImpl: typeof fetch = (...args) => fetch(...args),
   apiUrl: string = API_URL,
-  apiFetch: typeof fetch = (...args) => fetch(...args),
+  apiFetch: typeof fetch = fetchImpl,
   tokens: TokenStore = createTokenStore(),
 ) {
   const options = { getToken: tokens.get, onUnauthorized: tokens.expire }
-  const mockClient = createHttpClient(BASE_URL, fetchImpl, options)
   const usesApi = apiUrl.trim() !== ''
-  const client = usesApi ? createHttpClient(apiUrl, apiFetch, options) : mockClient
+  const client = createHttpClient(
+    usesApi ? apiUrl : INJECTED_BACKEND_URL,
+    usesApi ? apiFetch : fetchImpl,
+    options,
+  )
   const authRepository = createAuthRepository(client)
+  const adminRepository = createAdminRepository(client)
   const professionalRepository = createProfessionalRepository(client)
 
   return {
     tokens,
     authRepository,
+    adminRepository,
     professionalRepository,
     login: makeLogin(authRepository),
     signUp: makeSignUp(authRepository),

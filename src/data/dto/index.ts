@@ -42,6 +42,9 @@ export interface MeDTO {
   ondeAtende?: string | null
 }
 
+/** Resposta das rotas administrativas de avaliação profissional. */
+export type PendingProfessionalDTO = MeDTO
+
 export interface UsuarioDTO {
   email: string
   senha: string

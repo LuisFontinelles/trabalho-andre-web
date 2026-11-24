@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { WrongProfileError } from '@/domain/entities'
 import { ValidationError } from '@/domain/useCases'
 import {
   DEBUG_RESET_CODE,
@@ -30,10 +29,11 @@ describe('Login', () => {
     expect(authorizationLog).toEqual([null, 'Bearer mock.profissional@teste.com'])
   })
 
-  it('conta de paciente e recusada no painel', async () => {
-    await expect(deps().login('paciente@teste.com', 'Paciente@2026')).rejects.toBeInstanceOf(
-      WrongProfileError,
-    )
+  it('conta de paciente e identificada para o guard bloquear o painel', async () => {
+    await expect(deps().login('paciente@teste.com', 'Paciente@2026')).resolves.toMatchObject({
+      authProfile: 'PACIENTE',
+      user: { profile: 'PACIENTE' },
+    })
   })
 
   it('e-mail e normalizado antes de bater no servidor', async () => {
@@ -153,7 +153,12 @@ describe('Cadastro e verificacao', () => {
     const draft = { ...validProfessionalDraft(), name: 'Helena Souza' }
     const pending = await dependencies.signUp(draft)
     const session = (await dependencies.verifyCode(pending.email, DEBUG_VERIFICATION_CODE))!
-    expect(requestLog).toEqual(['POST /auth/register', 'POST /auth/verify', 'POST /auth/login', 'GET /user/me'])
+    expect(requestLog).toEqual([
+      'POST /auth/register',
+      'POST /auth/verify',
+      'POST /auth/login',
+      'GET /user/me',
+    ])
     expect(session.user).toMatchObject({
       email: 'novo.medico@clinica.com',
       name: 'Helena Souza',

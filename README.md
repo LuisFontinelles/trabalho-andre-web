@@ -7,9 +7,9 @@
 
 **https://luisfontinelles.github.io/trabalho-andre-web/**
 
-Não precisa instalar nada: o site roda no navegador, sobre dados de demonstração. Entre com **`profissional@teste.com`** e qualquer senha; se o cadastro pedir código de verificação, use **`0000`**.
+Não precisa instalar nada: o site roda no navegador e usa a API real. Para entrar, use uma conta profissional cadastrada nesse ambiente ou crie uma pela tela **Criar conta de profissional**. As antigas credenciais `profissional@teste.com` e código `0000` pertencem apenas aos testes automatizados e não funcionam no site publicado.
 
-A sessão dura enquanto a aba estiver aberta, então recarregar a página não desloga. Como os dados são de demonstração, o que você criar ou alterar volta ao estado inicial quando a aba é fechada.
+A sessão dura enquanto a aba estiver aberta, então recarregar a página não desloga. O que você criar ou alterar é persistido pela API conforme as regras do backend.
 
 Aplicação web do trabalho final de **Soluções Computacionais** (Universidade Católica de Brasília, 2026/2, prof. Andre Gustavo Bastos Lima). É o cliente do profissional de saúde na plataforma CareBridge, que reúne oportunidades de cuidado em saúde gratuitas, acessíveis ou direcionadas a públicos específicos.
 
@@ -19,15 +19,16 @@ Repositórios irmãos: [mobile](https://github.com/LuisFontinelles/trabalho-andr
 
 ## Estado atual
 
-O painel fala o [contrato da API, versão 2](CONTRATO-API-CareBridge.md): caminhos sem `/v1`, nomes em português, valores fechados em MAIÚSCULAS e erro `{status, message}`, igual ao app iOS. Login e cadastro já vão para a API real quando `VITE_API_URL` está definido; o resto roda sobre um servidor simulado que responde exatamente o contrato, exercitando o caminho real de rede: URL, token, código de status, decodificação e tratamento de erro.
+O painel fala o [contrato da API, versão 2](CONTRATO-API-CareBridge.md): caminhos sem `/v1`, nomes em português, valores fechados em MAIÚSCULAS e erro `{status, message}`, igual ao app iOS. A aplicação usa a API real em todos os fluxos. O servidor simulado por fixtures fica restrito aos testes automatizados.
 
 | Área | Situação |
 |---|---|
-| Login | Pronto, sobre fixture |
+| Login | Pronto, integrado à API |
 | Cadastro de profissional, com conselho e registro | Pronto, com validação completa |
 | Verificação por código de 4 dígitos, com reenvio cronometrado | Pronto |
 | Cadastro em verificação, com aviso no painel | Pronto |
-| Recuperação de senha | Pronto, sobre fixture |
+| Recuperação de senha | Pronto, integrada à API |
+| Área administrativa: listar, aprovar e recusar cadastros profissionais | Pronto, integrada à API |
 | Minhas oportunidades: indicadores, tabela e estados vazio, carregando e erro | Pronto |
 | Encerrar oportunidade e excluir rascunho, com confirmação | Pronto |
 | Nova oportunidade, nos três passos do protótipo | Pronto |
@@ -38,7 +39,7 @@ O painel fala o [contrato da API, versão 2](CONTRATO-API-CareBridge.md): caminh
 | Solicitações recebidas, com os 6 estados e filtro por estado | Pronto |
 | Detalhe da solicitação: triagem, documentos, decisão e mensagens | Pronto |
 | Aprovar, recusar com motivo e pedir informações | Pronto |
-| Combinado da aprovação (quando, onde, levar) | **Automático**: a tela ainda não pergunta; vai "A combinar", o endereço (ou a modalidade, se online) e os documentos exigidos |
+| Combinado da aprovação (quando, onde, levar) | Pronto, com campos opcionais; vazios usam "A combinar" |
 | Abrir documento anexado | Pronto, com a pré-visualização do protótipo |
 | Baixar documento anexado | **Desativado e marcado** |
 | Configurações: perfil, tema claro e escuro, avisos e dados da conta | Pronto |
@@ -59,38 +60,21 @@ npm install
 npm run dev
 ```
 
-### Contas de teste
+### API real
 
-| Perfil | E-mail | Senha |
-|---|---|---|
-| Profissional de saúde | `profissional@teste.com` | qualquer senha não vazia |
-| Paciente | `paciente@teste.com` | qualquer senha não vazia |
-
-Qualquer outro e-mail é recusado com 401, de propósito, para exercitar o estado de erro.
-
-**Código de verificação:** `0000`. Qualquer outro devolve 401.
-
-O painel é só do profissional: a conta de paciente entra no servidor, mas o painel recusa o perfil. Cinco senhas erradas seguidas no mesmo e-mail bloqueiam o login por 15 minutos (429).
-
-O cadastro aceita e-mails novos: a conta fica em memória, nasce em verificação (salva rascunho, não publica) e entra com a senha cadastrada depois do código.
-
-### Login e cadastro com a API real
-
-Login e cadastro do profissional já falam com a [carebridge-api](https://github.com/Joao-Victor-Medeiros/carebridge-api) (Swagger em <https://carebridge-api-2.onrender.com/swagger-ui/index.html>). O restante do painel continua no backend de fixtures.
+Todos os fluxos falam com a API configurada em `VITE_API_URL`. Durante `npm run dev` e no build de produção, o padrão é o backend publicado no Render. Assim, a interface local testa exatamente o mesmo backend e banco usados em produção.
 
 ```bash
-cp .env.example .env.local   # VITE_API_URL=/api
+cp .env.example .env.local   # VITE_API_URL=https://carebridge-api-2.onrender.com
 npm run dev
 ```
 
-A API ainda não libera CORS, então o navegador não chama o Render direto: o `npm run dev` repassa `/api/*` para lá. Para apontar para a API rodando na sua máquina, defina `API_PROXY_TARGET=http://localhost:8080` no `.env.local`. Sem `VITE_API_URL` (e no GitHub Pages) tudo segue no mock.
-
 | Tela | Rota da API | Observação |
 |---|---|---|
-| Login | `POST /user/login` e, logo depois, `GET /user/me` | O nome vem do `/user/me`. Enquanto a API não tem essa rota (404, 401, 403, 5xx ou erro de rede), o nome sai do e-mail. Conta de paciente é recusada. |
-| Cadastro | `POST /profissional-saude/cadastro` (multipart, parte `dados`) | `conselho`, `uf`, `numeroRegistro`, `especialidade`, `ondeAtende` e `aceitouTermos`, como no contrato. 201 sem corpo ou `exigeVerificacao: false` entra direto e cai em "Cadastro em verificação". |
+| Login | `POST /auth/login` e, logo depois, `GET /user/me` | O nome vem do `/user/me`. Perfis não profissionais mantêm a sessão, mas o guard bloqueia o painel. |
+| Cadastro | `POST /auth/register` (multipart, partes `dados` e `documentos`) | Envia registro, especialidade, local de atendimento, biografia e até 2 documentos. |
 
-Recuperar senha, código por e-mail, catálogo, oportunidades e solicitações ainda não existem na API e continuam no simulado, já no formato do contrato. O token do login real vai junto, então trocar cada rota é só mudar o cliente HTTP do repositório em `src/app/dependencies.ts`.
+Recuperação de senha, catálogo, oportunidades, solicitações, configurações e decisões usam os respectivos endpoints reais. Fixtures e `createMockFetch()` são usados somente pela suíte automatizada.
 
 ## Scripts
 
@@ -165,7 +149,7 @@ O corpo de erro é o do contrato, com os campos do Spring junto:
   "status": 409,
   "message": "Já existe um usuário cadastrado com este e-mail.",
   "error": "Conflict",
-  "path": "/profissional-saude/cadastro",
+  "path": "/auth/register",
   "timestamp": "2026-11-19T02:52:06Z"
 }
 ```

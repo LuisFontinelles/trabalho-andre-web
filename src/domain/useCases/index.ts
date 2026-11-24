@@ -143,18 +143,26 @@ export function makeLogin(repository: AuthRepository) {
 }
 
 export function makeSignUp(repository: AuthRepository) {
-  return async (draft: SignUpDraft): Promise<PendingVerification> => {
+  return async (
+    draft: SignUpDraft,
+    biographyOrDescription = '',
+    documents: readonly File[] = [],
+  ): Promise<PendingVerification> => {
     validateSignUp(draft)
-    return repository.signUp({
-      ...draft,
-      name: draft.name.trim(),
-      email: draft.email.trim().toLowerCase(),
-      professional: {
-        ...draft.professional,
-        number: draft.professional.number.trim(),
-        workplace: draft.professional.workplace.trim(),
+    return repository.signUp(
+      {
+        ...draft,
+        name: draft.name.trim(),
+        email: draft.email.trim().toLowerCase(),
+        professional: {
+          ...draft.professional,
+          number: draft.professional.number.trim(),
+          workplace: draft.professional.workplace.trim(),
+        },
       },
-    })
+      biographyOrDescription.trim(),
+      documents,
+    )
   }
 }
 
@@ -184,11 +192,17 @@ export function makeRequestPasswordReset(repository: AuthRepository) {
 export const RESET_CODE_LENGTH = 6
 
 export function makeResetPassword(repository: AuthRepository) {
-  return async (email: string, code: string, newPassword: string): Promise<void> => {
+  return async (
+    email: string,
+    code: string,
+    newPassword: string,
+    confirmPassword: string = newPassword,
+  ): Promise<void> => {
     const digits = code.replace(/\D/g, '')
     if (digits.length !== RESET_CODE_LENGTH) throw new ValidationError('codeIncomplete')
     if (newPassword === '') throw new ValidationError('passwordRequired')
     if (!isStrongPassword(newPassword)) throw new ValidationError('newPasswordWeak')
+    if (newPassword !== confirmPassword) throw new ValidationError('passwordMismatch')
     await repository.resetPassword(email.trim().toLowerCase(), digits, newPassword)
   }
 }

@@ -1,10 +1,20 @@
-import type { Catalog, PendingVerification, Session, SignUpDraft } from '@/domain/entities'
+import type {
+  Catalog,
+  PendingProfessional,
+  PendingVerification,
+  Session,
+  SignUpDraft,
+} from '@/domain/entities'
 
 /** Protocolos que o dominio declara e a camada de dados cumpre. */
 
 export interface AuthRepository {
   login(email: string, password: string): Promise<Session>
-  signUp(draft: SignUpDraft): Promise<PendingVerification>
+  signUp(
+    draft: SignUpDraft,
+    biographyOrDescription?: string,
+    documents?: readonly File[],
+  ): Promise<PendingVerification>
   /** Nulo quando o e-mail foi confirmado mas a senha nao esta mais na memoria. */
   verify(email: string, code: string): Promise<Session | null>
   resendCode(email: string): Promise<void>
@@ -16,4 +26,10 @@ export interface AuthRepository {
   /** LGPD: anonimiza a conta. Pede a senha atual. */
   deleteAccount(password: string): Promise<void>
   catalog(): Promise<Catalog>
+}
+
+export interface AdminRepository {
+  pendingProfessionals(): Promise<readonly PendingProfessional[]>
+  approveProfessional(id: string): Promise<PendingProfessional>
+  rejectProfessional(id: string): Promise<PendingProfessional>
 }
