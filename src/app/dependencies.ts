@@ -17,7 +17,8 @@ import {
  * testes passam uma URL vazia explicitamente.
  */
 const API_URL: string =
-  import.meta.env.VITE_API_URL?.trim() || 'https://carebridge-api-2.onrender.com'
+  import.meta.env.VITE_API_URL?.trim() ||
+  (import.meta.env.DEV ? '/api' : 'https://carebridge-api-2.onrender.com')
 const INJECTED_BACKEND_URL = 'https://api.carebridge.local'
 
 /**

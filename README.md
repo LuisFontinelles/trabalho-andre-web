@@ -61,14 +61,14 @@ npm run dev
 
 ### API real
 
-Todos os fluxos falam com a API configurada em `VITE_API_URL`. Sem essa variável, a aplicação usa o backend publicado no Render. As contas e credenciais disponíveis dependem do ambiente do backend.
+Todos os fluxos falam com a API configurada em `VITE_API_URL`. Durante `npm run dev`, o padrão é `/api`, encaminhado para `http://localhost:8080`. No build de produção, o padrão é o backend publicado no Render. Assim, cadastro e login locais usam o mesmo banco.
 
 ```bash
 cp .env.example .env.local   # VITE_API_URL=/api
 npm run dev
 ```
 
-A API pode ser acessada pelo proxy de desenvolvimento: o `npm run dev` repassa `/api/*` para o destino configurado. Para apontar para a API rodando na sua máquina, defina `API_PROXY_TARGET=http://localhost:8080` no `.env.local`.
+A API é acessada pelo proxy de desenvolvimento: o `npm run dev` repassa `/api/*` para `http://localhost:8080` por padrão. Use `API_PROXY_TARGET` no `.env.local` somente para escolher outro backend.
 
 | Tela | Rota da API | Observação |
 |---|---|---|

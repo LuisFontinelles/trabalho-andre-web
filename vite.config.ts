@@ -26,7 +26,7 @@ const base = process.env.VITE_BASE ?? '/'
  * Render direto. Em desenvolvimento o Vite faz a ponte: /api/user/login vira
  * <alvo>/user/login. Para usar, defina VITE_API_URL=/api (ver .env.example).
  */
-const apiTarget = process.env.API_PROXY_TARGET ?? 'https://carebridge-api-2.onrender.com'
+const apiTarget = process.env.API_PROXY_TARGET ?? 'http://localhost:8080'
 
 export default defineConfig({
   base,
