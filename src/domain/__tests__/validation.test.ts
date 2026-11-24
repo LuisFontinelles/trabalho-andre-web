@@ -57,11 +57,11 @@ describe('Validacao de senha', () => {
     }
   })
 
-  it('no cadastro exige 8 caracteres, maiuscula e numero', () => {
+  it('no cadastro exige 8 caracteres, maiuscula, minuscula, numero e simbolo', () => {
     expect(() => validatePassword('Paciente@2026', true)).not.toThrow()
   })
 
-  it.each(['curta1A', 'minusculas123', 'SemNumeroAqui'])(
+  it.each(['curta1A', 'minusculas@123', 'SEMMINUSCULA@1', 'SemNumero@Aqui', 'SemSimbolo123'])(
     'rejeita a senha fraca %s',
     (password) => {
       try {

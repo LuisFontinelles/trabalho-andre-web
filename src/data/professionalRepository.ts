@@ -13,6 +13,7 @@ import {
 } from '@/data/professionalMappers'
 import type { OpportunityDraft } from '@/domain/opportunityDraft'
 import type {
+  AppointmentArrangement,
   ManagedOpportunity,
   ReceivedRequest,
   RequestDetail,
@@ -35,7 +36,12 @@ export interface ProfessionalRepository {
   receivedRequests(): Promise<readonly ReceivedRequest[]>
   requestDetail(id: string): Promise<RequestDetail>
   /** A recusa leva o motivo, que o paciente le. */
-  decideRequest(id: string, status: RequestStatus, reason?: string): Promise<RequestDetail>
+  decideRequest(
+    id: string,
+    status: RequestStatus,
+    reason?: string,
+    arrangement?: AppointmentArrangement,
+  ): Promise<RequestDetail>
   /** Pede uma informacao que falta; o pedido fica aguardando a resposta. */
   requestInfo(id: string, text: string): Promise<RequestDetail>
   sendMessage(id: string, text: string): Promise<RequestMessage>
@@ -113,7 +119,7 @@ export function createProfessionalRepository(
       return requestDetailFromDTO(dto)
     },
 
-    async decideRequest(id, status, reason) {
+    async decideRequest(id, status, reason, arrangement) {
       const dto = await client.send<ApplicationDTOv2>({
         path: `profissional-saude/inscricoes/${id}/decisao`,
         method: 'POST',
@@ -121,7 +127,11 @@ export function createProfessionalRepository(
           status,
           motivo: reason?.trim() ?? null,
           combinado: status === 'APROVADA'
-            ? { quando: 'A combinar', onde: 'A combinar', levar: 'A combinar' }
+            ? {
+                quando: arrangement?.when.trim() || 'A combinar',
+                onde: arrangement?.where.trim() || 'A combinar',
+                levar: arrangement?.bring.trim() || '',
+              }
             : null,
         },
         requiresAuth: true,

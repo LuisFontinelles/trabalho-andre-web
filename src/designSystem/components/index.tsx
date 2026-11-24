@@ -720,19 +720,21 @@ export function Modal({
 }) {
   const titleId = useId()
   const panel = useRef<HTMLDivElement>(null)
+  const onDismissRef = useRef(onDismiss)
+  onDismissRef.current = onDismiss
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null
     panel.current?.focus()
     function onKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key === 'Escape') onDismiss()
+      if (event.key === 'Escape') onDismissRef.current()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('keydown', onKeyDown)
       previous?.focus()
     }
-  }, [onDismiss])
+  }, [])
 
   return (
     <div className="cb-overlay">

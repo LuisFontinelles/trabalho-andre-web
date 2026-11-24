@@ -395,6 +395,12 @@ export interface RequestMessage {
   readonly sentAt: string
 }
 
+export interface AppointmentArrangement {
+  readonly when: string
+  readonly where: string
+  readonly bring: string
+}
+
 export function isFromProfessional(message: RequestMessage): boolean {
   return message.author === 'PROFISSIONAL'
 }

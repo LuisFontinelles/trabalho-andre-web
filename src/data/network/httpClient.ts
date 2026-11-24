@@ -8,6 +8,8 @@ export interface Endpoint {
   body?: unknown
   headers?: Record<string, string>
   requiresAuth?: boolean
+  /** Alguns 401 validam uma credencial informada na acao, nao o token da sessao. */
+  invalidatesSessionOnUnauthorized?: boolean
 }
 
 /**
@@ -146,7 +148,9 @@ export function createHttpClient(
 
     const message = api?.message ?? `HTTP ${response.status}`
     if (response.status === 401) {
-      if (token) options.onSessionExpired?.()
+      if (token && endpoint.invalidatesSessionOnUnauthorized !== false) {
+        options.onSessionExpired?.()
+      }
       throw new NetworkError('unauthorized', message, response.status, api)
     }
     if (response.status === 403) {

@@ -8,6 +8,7 @@ import {
 } from '@/data/repositories'
 import { createProfessionalRepository } from '@/data/professionalRepository'
 import {
+  makeConfirmPasswordReset,
   makeLoadApplicationStatus,
   makeLoadCurrentUser,
   makeLoadFilters,
@@ -57,6 +58,7 @@ export function createDependencies(fetchImpl?: typeof fetch) {
     verifyCode: makeVerifyCode(authRepository),
     resendCode: makeResendCode(authRepository),
     requestPasswordReset: makeRequestPasswordReset(authRepository),
+    confirmPasswordReset: makeConfirmPasswordReset(authRepository),
     loadProfessionalCatalog: makeLoadProfessionalCatalog(authRepository),
     searchOpportunities: makeSearchOpportunities(opportunityRepository),
     loadOpportunityDetail: makeLoadOpportunityDetail(opportunityRepository),

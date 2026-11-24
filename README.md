@@ -7,9 +7,9 @@
 
 **https://luisfontinelles.github.io/trabalho-andre-web/**
 
-Não precisa instalar nada: o site roda no navegador, sobre dados de demonstração. Entre com **`profissional@teste.com`** e qualquer senha; se o cadastro pedir código de verificação, use **`0000`**.
+Não precisa instalar nada: o site roda no navegador e se conecta à API configurada no deploy. Para entrar, use uma conta cadastrada no backend.
 
-A sessão dura enquanto a aba estiver aberta, então recarregar a página não desloga. Como os dados são de demonstração, o que você criar ou alterar volta ao estado inicial quando a aba é fechada.
+A sessão dura enquanto a aba estiver aberta, então recarregar a página não desloga.
 
 Aplicação web do trabalho final de **Soluções Computacionais** (Universidade Católica de Brasília, 2026/2, prof. Andre Gustavo Bastos Lima). É o cliente do profissional de saúde na plataforma CareBridge, que reúne oportunidades de cuidado em saúde gratuitas, acessíveis ou direcionadas a públicos específicos.
 
@@ -19,15 +19,16 @@ Repositórios irmãos: [mobile](https://github.com/LuisFontinelles/trabalho-andr
 
 ## Estado atual
 
-O backend ainda não existe. A aplicação roda inteira sobre um servidor simulado por fixtures, exercitando o caminho real de rede: montagem da URL, código de status, decodificação e tratamento de erro. Apontar para a API de verdade é não instalar o interceptador.
+Por padrão, a aplicação usa a API definida em `VITE_API_BASE_URL`, com fallback para o backend publicado no Render. O servidor simulado por fixtures continua isolado nos testes automatizados, exercitando montagem da URL, códigos de status, decodificação e tratamento de erros sem afetar produção.
 
 | Área | Situação |
 |---|---|
-| Login | Pronto, sobre fixture |
+| Login e guards por perfil | Pronto, integrado à API |
 | Cadastro de profissional, com conselho e registro | Pronto, com validação completa |
-| Verificação por código de 4 dígitos, com reenvio cronometrado | Pronto |
+| Verificação por código de 6 dígitos, com reenvio cronometrado | Pronto |
 | Cadastro em verificação, com aviso no painel | Pronto |
-| Recuperação de senha | Pronto, sobre fixture |
+| Recuperação de senha por código e definição da nova senha | Pronto, integrado à API |
+| Aprovação e recusa administrativa de profissionais | Pronto, em área isolada de ADMIN |
 | Minhas oportunidades: indicadores, tabela e estados vazio, carregando e erro | Pronto |
 | Encerrar oportunidade e excluir rascunho, com confirmação | Pronto |
 | Nova oportunidade, nos três passos do protótipo | Pronto |
@@ -36,10 +37,10 @@ O backend ainda não existe. A aplicação roda inteira sobre um servidor simula
 | Triagem: perguntas com tipo de resposta e documentos exigidos | Pronto |
 | Solicitações recebidas, com filtro por status | Pronto |
 | Detalhe da solicitação: triagem, documentos, decisão e mensagens | Pronto |
-| Aprovar, recusar com motivo e pedir informações | Pronto |
+| Aprovar com dados do atendimento, recusar com motivo e pedir informações | Pronto |
 | Abrir documento anexado | Pronto, com a pré-visualização do protótipo |
 | Baixar documento anexado | **Desativado e marcado** |
-| Configurações: perfil, tema claro e escuro, avisos e dados da conta | Pronto |
+| Configurações: perfil, tema, avisos, exportação local e exclusão da conta | Pronto |
 | Ver a oportunidade como paciente | **Desativado e marcado** |
 
 As telas seguem o protótipo do Figma nas três larguras: **desktop** (1440, menu lateral completo), **tablet** (834, trilho de ícones) e **mobile** (390, barra superior e menu recolhido). No mobile as tabelas viram cartões e as linhas de campos viram colunas. Os tokens de cor, espaço e raio, a escala de texto em Inter e os ícones Material Symbols Rounded são os do arquivo de design, com tema claro e escuro.
@@ -59,16 +60,7 @@ npm run dev
 
 ### Contas de teste
 
-| Perfil | E-mail | Senha |
-|---|---|---|
-| Profissional de saúde | `profissional@teste.com` | qualquer senha não vazia |
-| Paciente | `paciente@teste.com` | qualquer senha não vazia |
-
-Qualquer outro e-mail é recusado com 401, de propósito, para exercitar o estado de erro.
-
-**Código de verificação:** `0000`. Qualquer outro devolve 401.
-
-O cadastro aceita e-mails novos: o registro fica guardado em memória e a verificação devolve o perfil e o nome cadastrados.
+As credenciais dependem do ambiente do backend. Para testes automatizados, o projeto injeta `createMockFetch()` e usa contas, códigos e dados exclusivamente locais; essas credenciais não são usadas pela aplicação em produção.
 
 ## Scripts
 
@@ -82,7 +74,7 @@ O cadastro aceita e-mails novos: o registro fica guardado em memória e a verifi
 
 ## Testes
 
-332 testes em Vitest, com **97,6% de cobertura de linhas** em domínio e camada de dados.
+364 testes em Vitest cobrem domínio, dados e os fluxos críticos de interface.
 
 | Suíte | O que cobre |
 |---|---|
@@ -92,8 +84,9 @@ O cadastro aceita e-mails novos: o registro fica guardado em memória e a verifi
 | `opportunityDraft` | Os três passos do formulário, campo a campo |
 | `triage` | Modos da triagem, perguntas e documentos exigidos |
 | `network` | Montagem de URL, casamento de rotas e cada código de erro |
-| `repositories` | Login, cadastro, verificação, busca e candidatura |
-| `professionalRepository` | Criar, editar, encerrar, excluir, decidir e responder |
+| `repositories` | Login, cadastro, verificação, redefinição de senha, conta, busca e candidatura |
+| `professionalRepository` | Criar, editar, encerrar, excluir, decidir, combinar atendimento e responder |
+| telas críticas | Login, administração, recuperação de senha e exclusão da conta |
 
 O estado do mock é reiniciado antes e depois de cada teste, então nenhum teste depende do que outro deixou.
 

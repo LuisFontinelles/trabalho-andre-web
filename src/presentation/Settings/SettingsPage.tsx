@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useSession } from '@/app/session'
+import { useDependencies, useSession } from '@/app/session'
 import { readTheme, saveTheme, type ThemeChoice } from '@/app/theme'
+import { NetworkError } from '@/data/network/httpClient'
 import {
   Banner,
   Button,
@@ -51,6 +52,7 @@ function noop() {
 
 export function SettingsPage() {
   const session = useSession()
+  const dependencies = useDependencies()
   const navigate = useNavigate()
   const user = session.session?.user
   const { registration, isVerified } = session.profile
@@ -59,6 +61,9 @@ export function SettingsPage() {
   const [notices, setNotices] = useState(readNotices)
   const [notice, setNotice] = useState<string | null>(null)
   const [isDeleting, setDeleting] = useState(false)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [isDeleteBusy, setDeleteBusy] = useState(false)
 
   function chooseTheme(choice: ThemeChoice) {
     setTheme(choice)
@@ -93,6 +98,33 @@ export function SettingsPage() {
   function signOut() {
     session.signOut()
     navigate('/', { replace: true })
+  }
+
+  function closeDelete() {
+    if (isDeleteBusy) return
+    setDeleting(false)
+    setDeletePassword('')
+    setDeleteError(null)
+  }
+
+  async function deleteAccount() {
+    if (deletePassword === '') {
+      setDeleteError(text.deletePasswordRequired)
+      return
+    }
+    setDeleteBusy(true)
+    setDeleteError(null)
+    try {
+      await dependencies.authRepository.deleteAccount(deletePassword)
+      session.signOut()
+      navigate('/', { replace: true })
+    } catch (error) {
+      setDeleteError(
+        error instanceof NetworkError ? error.apiMessage ?? text.deleteFailed : text.deleteFailed,
+      )
+    } finally {
+      setDeleteBusy(false)
+    }
   }
 
   return (
@@ -155,9 +187,26 @@ export function SettingsPage() {
         <Modal
           title={text.deleteTitle}
           message={text.deleteMessage}
-          onDismiss={() => setDeleting(false)}
-          actions={<Button title={strings.common.close} onClick={() => setDeleting(false)} />}
-        />
+          onDismiss={closeDelete}
+          actions={
+            <>
+              <Button title={strings.common.cancel} kind="outline" isEnabled={!isDeleteBusy} onClick={closeDelete} />
+              <Button title={text.deleteConfirm} kind="danger" isLoading={isDeleteBusy} onClick={() => void deleteAccount()} />
+            </>
+          }
+        >
+          <TextField
+            label={text.deletePassword}
+            type="password"
+            autoComplete="current-password"
+            value={deletePassword}
+            onChange={(value) => {
+              setDeletePassword(value)
+              setDeleteError(null)
+            }}
+            errorMessage={deleteError}
+          />
+        </Modal>
       )}
     </>
   )

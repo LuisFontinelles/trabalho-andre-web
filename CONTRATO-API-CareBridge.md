@@ -1,6 +1,8 @@
 # CareBridge · Contrato da API
 
-Este documento descreve a API que o aplicativo iOS já consome. Enquanto o servidor não existe, o app intercepta as próprias requisições e responde com os JSONs que estão aqui. Isso significa que **o contrato já está exercitado de ponta a ponta**: montagem da requisição, código de status, decodificação e tratamento de erro.
+> **Documento legado.** Este contrato registra a primeira versão, baseada em rotas `/v1` e nomes em inglês. O frontend atual usa o contrato v2 do backend, com rotas sem prefixo e campos em português. Consulte `docs/contrato-api.md` no repositório `carebridge-api` para o contrato vigente.
+
+Este documento descreve o contrato histórico que orientou o primeiro backend simulado dos clientes.
 
 Para o backend, a consequência prática é boa. Quando um endpoint real passar a responder no mesmo formato, basta apontar o app para ele e o fluxo funciona sem mudança no cliente. Os JSONs abaixo não são exemplo ilustrativo: são exatamente o que o app espera receber hoje.
 

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { draftFromManagedOpportunity, draftToDTO } from '@/data/professionalMappers'
 import { emptyOpportunityDraft } from '@/domain/opportunityDraft'
 import { isDecided } from '@/domain/professional'
+import { createDependencies } from '@/app/dependencies'
+import { createMockFetch } from '@/data/network/mockBackend'
 import { testDependencies, validOpportunityDraft } from '@/test/factories'
 
 const repo = () => testDependencies().professionalRepository
@@ -198,27 +200,26 @@ describe('Decisao sobre a solicitacao', () => {
 
   it('aprovar libera a conversa com o paciente', async () => {
     const repository = repo()
-    const before = (await repository.receivedRequests()).find((i) => i.id === 'req-004')
-    expect(before?.canMessage).toBe(false)
+    await repository.decideRequest('req-002', 'APROVADA')
 
-    await repository.decideRequest('req-004', 'APROVADA')
-
-    const after = (await repository.receivedRequests()).find((i) => i.id === 'req-004')
+    const after = (await repository.receivedRequests()).find((i) => i.id === 'req-002')
     expect(after?.canMessage).toBe(true)
   })
 
   it('recusar fecha a conversa', async () => {
     const repository = repo()
-    await repository.decideRequest('req-001', 'RECUSADA')
-    const item = (await repository.receivedRequests()).find((i) => i.id === 'req-001')
+    await repository.decideRequest('req-002', 'RECUSADA')
+    const item = (await repository.receivedRequests()).find((i) => i.id === 'req-002')
     expect(item?.canMessage).toBe(false)
   })
 
-  it('a decisao pode ser revista', async () => {
+  it('a decisao final nao pode ser revista', async () => {
     const repository = repo()
     await repository.decideRequest('req-002', 'APROVADA')
-    const updated = await repository.decideRequest('req-002', 'RECUSADA')
-    expect(updated.status).toBe('RECUSADA')
+    await expect(repository.decideRequest('req-002', 'RECUSADA')).rejects.toMatchObject({
+      kind: 'conflict',
+      status: 409,
+    })
   })
 
   it('solicitacao inexistente responde 404', async () => {
@@ -456,6 +457,55 @@ describe('Recusar e pedir informacoes', () => {
   it('a aprovacao registra quando foi decidida', async () => {
     const updated = await repo().decideRequest('req-002', 'APROVADA')
     expect(updated.decidedAt).not.toBeNull()
+  })
+
+  it('a aprovacao envia os dados combinados preenchidos', async () => {
+    const mockFetch = createMockFetch({ latency: false })
+    let sentBody: Record<string, unknown> | null = null
+    const capturingFetch: typeof fetch = async (input, init) => {
+      if (String(input).includes('/profissional-saude/inscricoes/req-002/decisao')) {
+        sentBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+      }
+      return mockFetch(input, init)
+    }
+    const repository = createDependencies(capturingFetch).professionalRepository
+
+    await repository.decideRequest('req-002', 'APROVADA', undefined, {
+      when: ' Terça, às 10h ',
+      where: ' Sala 204 ',
+      bring: ' Exames anteriores ',
+    })
+
+    expect(sentBody).toMatchObject({
+      status: 'APROVADA',
+      combinado: {
+        quando: 'Terça, às 10h',
+        onde: 'Sala 204',
+        levar: 'Exames anteriores',
+      },
+    })
+  })
+
+  it('campos vazios da aprovacao usam valores seguros', async () => {
+    const mockFetch = createMockFetch({ latency: false })
+    let sentBody: Record<string, unknown> | null = null
+    const capturingFetch: typeof fetch = async (input, init) => {
+      if (String(input).includes('/profissional-saude/inscricoes/req-002/decisao')) {
+        sentBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+      }
+      return mockFetch(input, init)
+    }
+
+    await createDependencies(capturingFetch).professionalRepository.decideRequest(
+      'req-002',
+      'APROVADA',
+      undefined,
+      { when: '', where: ' ', bring: '' },
+    )
+
+    expect(sentBody).toMatchObject({
+      combinado: { quando: 'A combinar', onde: 'A combinar', levar: '' },
+    })
   })
 
   it('pedir informacoes deixa o pedido aguardando', async () => {

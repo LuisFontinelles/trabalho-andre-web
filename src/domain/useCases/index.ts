@@ -72,8 +72,10 @@ export function validatePassword(password: string, strict: boolean): void {
   if (password === '') throw new ValidationError('passwordRequired')
   if (!strict) return
   const hasUpper = /[A-Z]/.test(password)
+  const hasLower = /[a-z]/.test(password)
   const hasDigit = /[0-9]/.test(password)
-  if (password.length < 8 || !hasUpper || !hasDigit) {
+  const hasSpecial = /[^A-Za-z0-9]/.test(password)
+  if (password.length < 8 || !hasUpper || !hasLower || !hasDigit || !hasSpecial) {
     throw new ValidationError('passwordWeak')
   }
 }
@@ -176,6 +178,22 @@ export function makeRequestPasswordReset(repository: AuthRepository) {
   return async (email: string): Promise<void> => {
     validateEmail(email)
     await repository.requestPasswordReset(email.trim().toLowerCase())
+  }
+}
+
+export function makeConfirmPasswordReset(repository: AuthRepository) {
+  return async (
+    email: string,
+    code: string,
+    newPassword: string,
+    confirmPassword: string,
+  ): Promise<void> => {
+    validateEmail(email)
+    const digits = code.replace(/\D/g, '')
+    if (digits.length !== 6) throw new ValidationError('codeIncomplete')
+    validatePassword(newPassword, true)
+    if (newPassword !== confirmPassword) throw new ValidationError('passwordMismatch')
+    await repository.confirmPasswordReset(email.trim().toLowerCase(), digits, newPassword)
   }
 }
 

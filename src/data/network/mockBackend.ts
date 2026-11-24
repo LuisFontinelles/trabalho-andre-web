@@ -35,6 +35,7 @@ export const TEST_ACCOUNTS = {
 export type TestAccountEmail = keyof typeof TEST_ACCOUNTS
 
 export const DEBUG_VERIFICATION_CODE = '0000'
+export const DEBUG_PASSWORD_RESET_CODE = '123456'
 
 const FIXTURES: Record<string, unknown> = {
   auth_login: authLogin,
@@ -501,7 +502,23 @@ const ROUTES: Route[] = [
   { method: 'POST', pattern: '/auth/resend-code', status: 200, fixture: null, latencyMs: 0,
     respond: () => ({ status: 200, body: { message: 'Código reenviado.' } }) },
   { method: 'POST', pattern: '/auth/password-reset', status: 200, fixture: null, latencyMs: 0,
-    respond: () => ({ status: 200, body: { message: 'Se a conta existir, enviaremos um código.' } }) },
+    respond: (body) => {
+      const request = body as { code?: string; newPassword?: string } | null
+      if (request?.code === undefined && request?.newPassword === undefined) {
+        return { status: 200, body: { message: 'Se a conta existir, enviaremos um código.' } }
+      }
+      if (request?.code !== DEBUG_PASSWORD_RESET_CODE) {
+        return errorPayload('Código inválido ou vencido.', 400, 'Bad Request')
+      }
+      return { status: 200, body: { message: 'Senha redefinida com sucesso.' } }
+    } },
+  { method: 'DELETE', pattern: '/me', status: 204, fixture: null, latencyMs: 0,
+    respond: (body) => {
+      const request = body as { password?: string } | null
+      return request?.password === 'Profissa@2026'
+        ? { status: 204, body: null }
+        : errorPayload('Senha atual incorreta.', 401, 'Unauthorized')
+    } },
   { method: 'GET', pattern: '/catalogos', status: 200, fixture: null, latencyMs: 0,
     respond: () => ({
       status: 200,
@@ -613,6 +630,9 @@ const ROUTES: Route[] = [
       const request = body as { status?: string; motivo?: string } | null
       const item = panel.requests.find((entry) => entry.id === id)
       if (!item) return { status: 404, body: loadFixture('error_404') }
+      if (item.status === 'APROVADA' || item.status === 'RECUSADA') {
+        return errorPayload('Esta solicitação já foi decidida.', 409, 'Conflict')
+      }
       const updated = { ...item, status: request?.status, canMessage: request?.status === 'APROVADA', decidedAt: new Date().toISOString(), decisionReason: request?.motivo }
       panel.requests = panel.requests.map((entry) => entry.id === id ? updated : entry)
       return { status: 200, body: requestToV2(updated, true) }
@@ -635,7 +655,6 @@ const ROUTES: Route[] = [
       return { status: 201, body: { id: crypto.randomUUID(), autor: 'PROFISSIONAL_SAUDE', texto: request?.texto, enviadaEm: new Date().toISOString() } }
     } },
   { method: 'POST', pattern: '/user/login', status: 200, fixture: null, latencyMs: 400, respond: loginResponder },
-  { method: 'POST', pattern: '/v1/auth/google', status: 200, fixture: 'auth_login', latencyMs: 500 },
   { method: 'POST', pattern: '/v1/auth/signup', status: 201, fixture: 'auth_signup', latencyMs: 450, respond: signUpResponder },
   { method: 'POST', pattern: '/profissional-saude/cadastro', status: 201, fixture: null, latencyMs: 450 },
   { method: 'POST', pattern: '/v1/auth/verify', status: 200, fixture: 'auth_login', latencyMs: 400, respond: verifyResponder },

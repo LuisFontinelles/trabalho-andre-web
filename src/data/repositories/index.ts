@@ -1,6 +1,5 @@
 import type {
   ApplicationDTO,
-  AuthResponseDTO,
   CurrentUserDTO,
   FilterCatalogDTO,
   LoginResponseDTO,
@@ -21,7 +20,6 @@ import {
   pendingProfessionalFromDTO,
   professionalCatalogFromDTO,
   professionalHealthSignupToDTO,
-  sessionFromDTO,
   signUpDraftToDTO,
 } from '@/data/mappers'
 import type { HttpClient } from '@/data/network/httpClient'
@@ -36,7 +34,6 @@ import {
   type PendingVerification,
   type PendingProfessional,
   type ProfessionalCatalog,
-  type Session,
   type SignUpDraft,
 } from '@/domain/entities'
 import type {
@@ -63,15 +60,6 @@ export function createAuthRepository(client: HttpClient): AuthRepository {
         requiresAuth: true,
       })
       return currentUserFromDTO(dto)
-    },
-
-    async loginWithGoogle(): Promise<Session> {
-      const dto = await client.send<AuthResponseDTO>({
-        path: 'auth/google',
-        method: 'POST',
-        body: {},
-      })
-      return sessionFromDTO(dto)
     },
 
     async signUp(draft: SignUpDraft): Promise<PendingVerification> {
@@ -126,6 +114,24 @@ export function createAuthRepository(client: HttpClient): AuthRepository {
         path: 'auth/password-reset',
         method: 'POST',
         body: { email },
+      })
+    },
+
+    async confirmPasswordReset(email, code, newPassword): Promise<void> {
+      await client.sendVoid({
+        path: 'auth/password-reset',
+        method: 'POST',
+        body: { email, code, newPassword },
+      })
+    },
+
+    async deleteAccount(password): Promise<void> {
+      await client.sendVoid({
+        path: 'me',
+        method: 'DELETE',
+        body: { password },
+        requiresAuth: true,
+        invalidatesSessionOnUnauthorized: false,
       })
     },
 

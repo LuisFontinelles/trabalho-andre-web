@@ -11,6 +11,7 @@ import {
   SkeletonRows,
   StateBox,
   TextAreaField,
+  TextField,
   type Crumb,
 } from '@/designSystem/components'
 import { Icon } from '@/designSystem/tokens/icons'
@@ -58,6 +59,9 @@ export function RequestDetailPage() {
   const [dialog, setDialog] = useState<Dialog | null>(null)
   const [dialogText, setDialogText] = useState('')
   const [dialogError, setDialogError] = useState<string | null>(null)
+  const [arrangementWhen, setArrangementWhen] = useState('')
+  const [arrangementWhere, setArrangementWhere] = useState('')
+  const [arrangementBring, setArrangementBring] = useState('')
   const [message, setMessage] = useState('')
   const [isBusy, setBusy] = useState(false)
 
@@ -83,6 +87,11 @@ export function RequestDetailPage() {
     setDialog(next)
     setDialogText(initialText)
     setDialogError(null)
+    if (next.kind === 'approve') {
+      setArrangementWhen('')
+      setArrangementWhere('')
+      setArrangementBring('')
+    }
   }
 
   async function run(action: () => Promise<RequestDetail>) {
@@ -101,7 +110,12 @@ export function RequestDetailPage() {
 
   function approve() {
     void run(async () => {
-      const updated = await dependencies.professionalRepository.decideRequest(id, 'APROVADA')
+      const updated = await dependencies.professionalRepository.decideRequest(
+        id,
+        'APROVADA',
+        undefined,
+        { when: arrangementWhen, where: arrangementWhere, bring: arrangementBring },
+      )
       // A aprovacao ocupa uma vaga; a contagem da tela acompanha.
       setOpportunity((current) =>
         current === null
@@ -312,7 +326,27 @@ export function RequestDetailPage() {
               <Button title={text.approveConfirm} isLoading={isBusy} onClick={approve} />
             </>
           }
-        />
+        >
+          <p className="cb-callout">{text.arrangementHint}</p>
+          <TextField
+            label={text.arrangementWhen}
+            placeholder={text.arrangementWhenPlaceholder}
+            value={arrangementWhen}
+            onChange={setArrangementWhen}
+          />
+          <TextField
+            label={text.arrangementWhere}
+            placeholder={text.arrangementWherePlaceholder}
+            value={arrangementWhere}
+            onChange={setArrangementWhere}
+          />
+          <TextAreaField
+            label={text.arrangementBring}
+            placeholder={text.arrangementBringPlaceholder}
+            value={arrangementBring}
+            onChange={setArrangementBring}
+          />
+        </Modal>
       )}
 
       {dialog?.kind === 'reject' && (

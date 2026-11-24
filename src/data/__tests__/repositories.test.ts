@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { emptyCriteria } from '@/domain/entities'
 import { ValidationError } from '@/domain/useCases'
-import { DEBUG_VERIFICATION_CODE } from '@/data/network/mockBackend'
+import { DEBUG_PASSWORD_RESET_CODE, DEBUG_VERIFICATION_CODE } from '@/data/network/mockBackend'
 import { professionalCatalogFromDTO } from '@/data/mappers'
 import { testDependencies, validPatientDraft, validProfessionalDraft } from '@/test/factories'
 
@@ -164,6 +164,63 @@ describe('Recuperar senha', () => {
     await expect(testDependencies().requestPasswordReset('  ')).rejects.toMatchObject({
       code: 'emailRequired',
     })
+  })
+
+  it('confirma a nova senha com codigo valido', async () => {
+    await expect(
+      testDependencies().confirmPasswordReset(
+        '  Profissional@Teste.com ',
+        DEBUG_PASSWORD_RESET_CODE,
+        'Nova@2026',
+        'Nova@2026',
+      ),
+    ).resolves.toBeUndefined()
+  })
+
+  it('rejeita codigo de recuperacao invalido', async () => {
+    await expect(
+      testDependencies().confirmPasswordReset(
+        'profissional@teste.com',
+        '654321',
+        'Nova@2026',
+        'Nova@2026',
+      ),
+    ).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('valida senha e confirmacao antes da rede', async () => {
+    await expect(
+      testDependencies().confirmPasswordReset(
+        'profissional@teste.com',
+        DEBUG_PASSWORD_RESET_CODE,
+        'fraca',
+        'fraca',
+      ),
+    ).rejects.toMatchObject({ code: 'passwordWeak' })
+    await expect(
+      testDependencies().confirmPasswordReset(
+        'profissional@teste.com',
+        DEBUG_PASSWORD_RESET_CODE,
+        'Nova@2026',
+        'Outra@2026',
+      ),
+    ).rejects.toMatchObject({ code: 'passwordMismatch' })
+  })
+})
+
+describe('Minha conta', () => {
+  it('exclui a conta com a senha atual', async () => {
+    await expect(
+      testDependencies().authRepository.deleteAccount('Profissa@2026'),
+    ).resolves.toBeUndefined()
+  })
+
+  it('mantem a sessao quando apenas a senha de confirmacao esta errada', async () => {
+    sessionStorage.setItem('token', 'jwt-valido')
+    await expect(
+      testDependencies().authRepository.deleteAccount('senha-incorreta'),
+    ).rejects.toMatchObject({ kind: 'unauthorized' })
+    expect(sessionStorage.getItem('token')).toBe('jwt-valido')
   })
 })
 
