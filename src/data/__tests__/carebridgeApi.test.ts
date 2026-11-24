@@ -63,15 +63,15 @@ const ME = {
 }
 
 describe('Login na API real', () => {
-  it('chama /user/login e depois /user/me com o token, e usa o nome do /me', async () => {
+  it('chama /auth/login e depois /user/me com o token, e usa o nome do /me', async () => {
     const { deps, calls } = realApiDependencies({
-      '/user/login': { status: 200, body: LOGIN_OK },
+      '/auth/login': { status: 200, body: LOGIN_OK },
       '/user/me': { status: 200, body: ME },
     })
     const session = await deps.login(' Ana.Souza@Exemplo.com ', 'Senha@2026')
 
     expect(calls.map((call) => call.url)).toEqual([
-      'https://api.teste/user/login',
+      'https://api.teste/auth/login',
       'https://api.teste/user/me',
     ])
     expect(calls[0]!.init.method).toBe('POST')
@@ -102,7 +102,7 @@ describe('Login na API real', () => {
     ['erro de rede', 'network' as const],
   ])('sem /user/me (%s) o nome sai do e-mail', async (_case, reply) => {
     const { deps } = realApiDependencies({
-      '/user/login': { status: 200, body: LOGIN_OK },
+      '/auth/login': { status: 200, body: LOGIN_OK },
       '/user/me': reply as Reply,
     })
     const session = await deps.login('ana.souza@exemplo.com', 'Senha@2026')
@@ -117,7 +117,7 @@ describe('Login na API real', () => {
   it('o login responde sem expiraEmSegundos, como a API de hoje, e funciona', async () => {
     const { expiraEmSegundos: _omitted, ...legacy } = LOGIN_OK
     void _omitted
-    const { deps } = realApiDependencies({ '/user/login': { status: 200, body: legacy } })
+    const { deps } = realApiDependencies({ '/auth/login': { status: 200, body: legacy } })
     await expect(deps.login('ana@exemplo.com', 'Senha@2026')).resolves.toMatchObject({
       token: 'jwt.do.servidor',
     })
@@ -125,7 +125,7 @@ describe('Login na API real', () => {
 
   it('identifica conta de paciente para o guard do painel', async () => {
     const { deps } = realApiDependencies({
-      '/user/login': { status: 200, body: { ...LOGIN_OK, tipoPerfil: 'PACIENTE' } },
+      '/auth/login': { status: 200, body: { ...LOGIN_OK, tipoPerfil: 'PACIENTE' } },
     })
     await expect(deps.login('paciente@exemplo.com', 'Senha@2026')).resolves.toMatchObject({
       authProfile: 'PACIENTE',
@@ -135,7 +135,7 @@ describe('Login na API real', () => {
 
   it('o perfil do login controla o acesso mesmo se o /me vier divergente', async () => {
     const { deps } = realApiDependencies({
-      '/user/login': { status: 200, body: LOGIN_OK },
+      '/auth/login': { status: 200, body: LOGIN_OK },
       '/user/me': { status: 200, body: { ...ME, tipoPerfil: 'ADMIN' } },
     })
     await expect(deps.login('ana@exemplo.com', 'Senha@2026')).resolves.toMatchObject({
@@ -146,7 +146,7 @@ describe('Login na API real', () => {
 
   it('senha errada e 401 no contrato v2', async () => {
     const { deps } = realApiDependencies({
-      '/user/login': { status: 401, body: { status: 401, message: 'E-mail ou senha incorretos.' } },
+      '/auth/login': { status: 401, body: { status: 401, message: 'E-mail ou senha incorretos.' } },
     })
     await expect(deps.login('ana@exemplo.com', 'errada')).rejects.toMatchObject({
       kind: 'unauthorized',
@@ -157,7 +157,7 @@ describe('Login na API real', () => {
 
   it('a API de hoje ainda responde 403 sem message para senha errada: vira forbidden', async () => {
     const { deps } = realApiDependencies({
-      '/user/login': {
+      '/auth/login': {
         status: 403,
         body: { timestamp: '2026-11-11T12:00:00Z', status: 403, error: 'Forbidden', path: '/auth/login' },
       },
@@ -171,7 +171,7 @@ describe('Login na API real', () => {
 
   it('o painel vai para a API real com o token do login', async () => {
     const { deps, calls } = realApiDependencies({
-      '/user/login': { status: 200, body: LOGIN_OK },
+      '/auth/login': { status: 200, body: LOGIN_OK },
       '/user/me': { status: 200, body: ME },
       '/profissional-saude/oportunidades': { status: 200, body: [] },
     })
@@ -187,14 +187,14 @@ describe('Login na API real', () => {
 describe('Cadastro na API real', () => {
   it('envia multipart com conselho, uf, numero, especialidade e local de atendimento', async () => {
     const { deps, calls } = realApiDependencies({
-      '/profissional-saude/cadastro': {
+      '/auth/register': {
         status: 201,
         body: { email: 'novo.medico@clinica.com', tipoPerfil: 'PROFISSIONAL_SAUDE', exigeVerificacao: false },
       },
     })
     const pending = await deps.signUp(validProfessionalDraft())
 
-    expect(calls[0]!.url).toBe('https://api.teste/profissional-saude/cadastro')
+    expect(calls[0]!.url).toBe('https://api.teste/auth/register')
     const form = calls[0]!.init.body as FormData
     expect(form).toBeInstanceOf(FormData)
     const headers = calls[0]!.init.headers as Record<string, string>
@@ -229,7 +229,7 @@ describe('Cadastro na API real', () => {
 
   it('201 sem corpo e lido como conta que ja nasce ativa', async () => {
     const { deps } = realApiDependencies({
-      '/profissional-saude/cadastro': { status: 201, body: null },
+      '/auth/register': { status: 201, body: null },
     })
     await expect(deps.signUp(validProfessionalDraft())).resolves.toMatchObject({
       requiresCode: false,
@@ -238,7 +238,7 @@ describe('Cadastro na API real', () => {
 
   it('exigeVerificacao verdadeiro pede o codigo do tamanho informado', async () => {
     const { deps } = realApiDependencies({
-      '/profissional-saude/cadastro': {
+      '/auth/register': {
         status: 201,
         body: { email: 'novo.medico@clinica.com', tipoPerfil: 'PROFISSIONAL_SAUDE', exigeVerificacao: true, tamanhoCodigo: 6 },
       },
@@ -251,7 +251,7 @@ describe('Cadastro na API real', () => {
 
   it('e-mail repetido chega como conflict com a mensagem da API', async () => {
     const { deps } = realApiDependencies({
-      '/profissional-saude/cadastro': {
+      '/auth/register': {
         status: 409,
         body: { status: 409, message: 'Já existe um usuário cadastrado com este e-mail.' },
       },
@@ -265,21 +265,21 @@ describe('Cadastro na API real', () => {
 
   it('verifica o codigo em /auth/verify e entra com a senha do cadastro', async () => {
     const { deps, calls } = realApiDependencies({
-      '/profissional-saude/cadastro': {
+      '/auth/register': {
         status: 201,
         body: { email: 'novo.medico@clinica.com', tipoPerfil: 'PROFISSIONAL_SAUDE', exigeVerificacao: true, tamanhoCodigo: 6 },
       },
       '/auth/verify': { status: 200, body: { message: 'E-mail verificado com sucesso.' } },
-      '/user/login': { status: 200, body: LOGIN_OK },
+      '/auth/login': { status: 200, body: LOGIN_OK },
       '/user/me': { status: 200, body: ME },
     })
     await deps.signUp(validProfessionalDraft())
     const session = await deps.verifyCode('novo.medico@clinica.com', '123 456', 6)
 
     expect(calls.map((call) => new URL(call.url).pathname)).toEqual([
-      '/profissional-saude/cadastro',
+      '/auth/register',
       '/auth/verify',
-      '/user/login',
+      '/auth/login',
       '/user/me',
     ])
     expect(JSON.parse(calls[1]!.init.body as string)).toEqual({

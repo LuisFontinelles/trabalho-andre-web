@@ -9,13 +9,13 @@ export type TipoPerfil = 'PACIENTE' | 'PROFISSIONAL_SAUDE' | 'ADMIN'
 /** `situacaoRegistro`, so do profissional. */
 export type SituacaoRegistro = 'EM_VERIFICACAO' | 'VERIFICADO' | 'RECUSADO'
 
-/** POST /user/login */
+/** POST /auth/login */
 export interface LoginRequestDTO {
   email: string
   password: string
 }
 
-/** Resposta de POST /user/login. */
+/** Resposta de POST /auth/login. */
 export interface LoginResponseDTO {
   token: string
   autenticado: boolean
@@ -49,7 +49,7 @@ export interface UsuarioDTO {
 }
 
 /**
- * Parte `dados` (JSON) do multipart de POST /profissional-saude/cadastro. O `tipoPerfil` da
+ * Parte `dados` (JSON) do multipart de POST /auth/register. O `tipoPerfil` da
  * raiz escolhe o tipo do cadastro. Os termos vao nos dois nomes: a API le
  * `acceptedTerms`, e `aceitouTermos` e o nome do contrato.
  */

@@ -83,7 +83,7 @@ Valor desconhecido não quebra os clientes: cada um cai num padrão seguro. Mesm
 
 ## 3. Acesso
 
-### POST /user/login · existe com outro formato
+### POST /auth/login
 
 ```json
 { "email": "paciente@teste.com", "password": "Senha2026" }
@@ -138,16 +138,17 @@ Para `PROFISSIONAL_SAUDE`, o mesmo objeto traz o registro, que o painel mostra n
 
 `situacaoRegistro`, `conselho`, `uf`, `numeroRegistro`, `especialidade` e `ondeAtende` só vêm para `PROFISSIONAL_SAUDE`. `dataNascimento` e `telefone` só para `PACIENTE`. Campo que não se aplica vem nulo ou ausente.
 
-### POST /paciente/cadastro · existe com outro formato
+### POST /auth/register · paciente
 
 ```json
 {
+  "tipoPerfil": "PACIENTE",
   "usuarioDto": { "email": "ana@email.com", "senha": "Senha2026", "tipoPerfil": "PACIENTE" },
   "nome": "Ana Souza",
   "dataNascimento": "1988-03-12",
   "telefone": "61999990000",
   "endereco": null,
-  "aceitouTermos": true
+  "acceptedTerms": true
 }
 ```
 
@@ -161,12 +162,13 @@ Regras: o servidor ignora o `tipoPerfil` enviado e grava sempre `PACIENTE` (hoje
 
 `exigeVerificacao: false` significa que a conta já nasce ativa: o cliente faz login direto. Enquanto o código por e-mail não existir, o backend devolve `false` (ou 201 sem corpo, que os clientes leem como `false`).
 
-### POST /profissional-saude/cadastro · existe com outro formato
+### POST /auth/register · profissional de saúde
 
 `multipart/form-data` com a parte `dados` (JSON, `Content-Type: application/json`) e até 2 arquivos na parte `documentos`.
 
 ```json
 {
+  "tipoPerfil": "PROFISSIONAL_SAUDE",
   "usuarioDto": { "email": "mariana@clinica.com", "senha": "Senha2026", "tipoPerfil": "PROFISSIONAL_SAUDE" },
   "nome": "Mariana Costa",
   "conselho": "CRM",
@@ -175,7 +177,7 @@ Regras: o servidor ignora o `tipoPerfil` enviado e grava sempre `PACIENTE` (hoje
   "especialidade": "cardiologia",
   "ondeAtende": "Instituto Movida",
   "biografiaOuDescricao": null,
-  "aceitouTermos": true
+  "acceptedTerms": true
 }
 ```
 

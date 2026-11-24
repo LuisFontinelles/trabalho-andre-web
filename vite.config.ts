@@ -21,25 +21,9 @@ function spaFallback() {
 // Em producao o site vive em /trabalho-andre-web/; em desenvolvimento, na raiz.
 const base = process.env.VITE_BASE ?? '/'
 
-/**
- * A API real ainda nao responde CORS, entao o navegador nao pode chamar o
- * Render direto. Em desenvolvimento o Vite faz a ponte: /api/user/login vira
- * <alvo>/user/login. Para usar, defina VITE_API_URL=/api (ver .env.example).
- */
-const apiTarget = process.env.API_PROXY_TARGET ?? 'http://localhost:8080'
-
 export default defineConfig({
   base,
   plugins: [react(), spaFallback()],
-  server: {
-    proxy: {
-      '/api': {
-        target: apiTarget,
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
-      },
-    },
-  },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },

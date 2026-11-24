@@ -25,7 +25,7 @@ describe('Login', () => {
     const session = await deps().login('profissional@teste.com', 'Profissa@2026')
     expect(session.user.name).toBe('Marcos Vieira')
     expect(session.user.id).toBe('9b3d7e21-5c8f-4a06-b2d4-71e5a0c9f302')
-    expect(requestLog).toEqual(['POST /user/login', 'GET /user/me'])
+    expect(requestLog).toEqual(['POST /auth/login', 'GET /user/me'])
     expect(authorizationLog).toEqual([null, 'Bearer mock.profissional@teste.com'])
   })
 
@@ -125,7 +125,7 @@ describe('Cadastro e verificacao', () => {
       codeLength: 4,
       requiresCode: true,
     })
-    expect(requestLog).toEqual(['POST /profissional-saude/cadastro'])
+    expect(requestLog).toEqual(['POST /auth/register'])
   })
 
   it('o caso de uso normaliza o e-mail antes de enviar', async () => {
@@ -154,9 +154,9 @@ describe('Cadastro e verificacao', () => {
     const pending = await dependencies.signUp(draft)
     const session = (await dependencies.verifyCode(pending.email, DEBUG_VERIFICATION_CODE))!
     expect(requestLog).toEqual([
-      'POST /profissional-saude/cadastro',
+      'POST /auth/register',
       'POST /auth/verify',
-      'POST /user/login',
+      'POST /auth/login',
       'GET /user/me',
     ])
     expect(session.user).toMatchObject({

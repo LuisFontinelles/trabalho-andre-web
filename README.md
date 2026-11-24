@@ -61,19 +61,17 @@ npm run dev
 
 ### API real
 
-Todos os fluxos falam com a API configurada em `VITE_API_URL`. Durante `npm run dev`, o padrão é `/api`, encaminhado para `http://localhost:8080`. No build de produção, o padrão é o backend publicado no Render. Assim, cadastro e login locais usam o mesmo banco.
+Todos os fluxos falam com a API configurada em `VITE_API_URL`. Durante `npm run dev` e no build de produção, o padrão é o backend publicado no Render. Assim, a interface local testa exatamente o mesmo backend e banco usados em produção.
 
 ```bash
-cp .env.example .env.local   # VITE_API_URL=/api
+cp .env.example .env.local   # VITE_API_URL=https://carebridge-api-2.onrender.com
 npm run dev
 ```
 
-A API é acessada pelo proxy de desenvolvimento: o `npm run dev` repassa `/api/*` para `http://localhost:8080` por padrão. Use `API_PROXY_TARGET` no `.env.local` somente para escolher outro backend.
-
 | Tela | Rota da API | Observação |
 |---|---|---|
-| Login | `POST /user/login` e, logo depois, `GET /user/me` | O nome vem do `/user/me`. Perfis não profissionais mantêm a sessão, mas o guard bloqueia o painel. |
-| Cadastro | `POST /profissional-saude/cadastro` (multipart, partes `dados` e `documentos`) | Envia registro, especialidade, local de atendimento, biografia e até 2 documentos. |
+| Login | `POST /auth/login` e, logo depois, `GET /user/me` | O nome vem do `/user/me`. Perfis não profissionais mantêm a sessão, mas o guard bloqueia o painel. |
+| Cadastro | `POST /auth/register` (multipart, partes `dados` e `documentos`) | Envia registro, especialidade, local de atendimento, biografia e até 2 documentos. |
 
 Recuperação de senha, catálogo, oportunidades, solicitações, configurações e decisões usam os respectivos endpoints reais. Fixtures e `createMockFetch()` são usados somente pela suíte automatizada.
 
@@ -150,7 +148,7 @@ O corpo de erro é o do contrato, com os campos do Spring junto:
   "status": 409,
   "message": "Já existe um usuário cadastrado com este e-mail.",
   "error": "Conflict",
-  "path": "/profissional-saude/cadastro",
+  "path": "/auth/register",
   "timestamp": "2026-11-19T02:52:06Z"
 }
 ```

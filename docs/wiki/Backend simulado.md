@@ -68,13 +68,13 @@ O do contrato: pelo menos `status` e `message`, com os campos padrão do Spring 
   "status": 409,
   "message": "Já existe um usuário cadastrado com este e-mail.",
   "error": "Conflict",
-  "path": "/profissional-saude/cadastro",
+  "path": "/auth/register",
   "timestamp": "2026-11-19T02:52:06Z"
 }
 ```
 
 O `NetworkError` carrega esse corpo e separa os casos: `unauthorized` (401), `forbidden` (403), `notFound`, `conflict` (409), `tooManyAttempts` (429), `badRequest` e `server`. A tela mostra a `message` do servidor quando ela explica o que fazer.
 
-## Quando o backend chegar
+## Backend real
 
-O mock e a API falam o mesmo contrato, então trocar é rota por rota: em `createDependencies`, o repositório da rota que já existe passa a usar o cliente da API real. Login e cadastro do profissional já estão assim (ver `src/data/carebridgeApi.ts`).
+A aplicação usa o backend real em todos os fluxos. O mock permanece disponível somente quando a suíte injeta `createMockFetch()` explicitamente.

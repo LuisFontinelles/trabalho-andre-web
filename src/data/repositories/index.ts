@@ -14,8 +14,8 @@ import { bearer, NetworkError, type HttpClient } from '@/data/network/httpClient
 import type { Session } from '@/domain/entities'
 import type { AuthRepository } from '@/domain/repositories'
 
-export const PROFESSIONAL_SIGNUP_URL = 'profissional-saude/cadastro'
-export const USER_LOGIN_URL = 'user/login'
+export const PROFESSIONAL_SIGNUP_URL = 'auth/register'
+export const USER_LOGIN_URL = 'auth/login'
 
 /**
  * GET /user/me logo depois do login, para ter o nome. A rota e nova no

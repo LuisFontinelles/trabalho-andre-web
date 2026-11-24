@@ -61,7 +61,7 @@ describe('LoginPage', () => {
 
     expect(await screen.findByText('Área profissional')).toBeInTheDocument()
     expect(fetchImpl).toHaveBeenCalledWith(
-      '/api/user/login',
+      'https://carebridge-api-2.onrender.com/auth/login',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
