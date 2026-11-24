@@ -1,6 +1,6 @@
 # Backend simulado
 
-O backend ainda não existe. A aplicação roda inteira sobre um servidor de mentira que substitui o `fetch`.
+Este servidor simulado substitui o `fetch` exclusivamente nos testes automatizados. A aplicação executada no navegador usa a API real.
 
 Isso é a tradução para o React do `FixtureURLProtocol` do aplicativo iOS, que intercepta o `URLSession`. A ideia é a mesma nos dois: **interceptar na camada mais baixa possível**, abaixo do cliente HTTP.
 
@@ -10,7 +10,7 @@ A alternativa óbvia seria implementar os repositórios com dados fixos. Interce
 
 O caminho real continua sendo exercitado: montagem da URL, código de status, cabeçalhos, decodificação e tratamento de erro. Um bug de decodificação aparece no desenvolvimento, não na integração.
 
-E apontar para a API de verdade vira não instalar o interceptador. Nenhuma tela, nenhum caso de uso e nenhum repositório mudam.
+Os testes instalam o interceptador explicitamente. A composição de produção não importa este módulo nem suas fixtures.
 
 ## Onde fica
 
@@ -37,7 +37,7 @@ Estas existem só para exercitar o tratamento de erro e **não precisam ser impl
 
 As da seção 10 do contrato, iguais às do mock do app iOS.
 
-**Login** aceita `profissional@teste.com` com qualquer senha não vazia (`paciente@teste.com` também entra, mas o painel recusa o perfil). Conta cadastrada na sessão entra com a senha do cadastro, depois do código. Cinco erros seguidos no mesmo e-mail bloqueiam por 15 minutos (429).
+**Login de teste** aceita `profissional@teste.com` com qualquer senha não vazia (`paciente@teste.com` também entra, mas o painel recusa o perfil). Essas contas existem somente no mock e não são credenciais da API real.
 
 **Token** é `mock.<email>` e vai em `Authorization: Bearer` nas rotas com cadeado. Sem token, ou com o token `expired`, a rota responde 401 e o painel volta para o login. Paciente numa rota do profissional recebe 403. Um token que não é do mock (o JWT da API real, quando login e cadastro vão para lá) vale como o profissional de demonstração.
 
@@ -51,7 +51,7 @@ As da seção 10 do contrato, iguais às do mock do app iOS.
 
 ## Latência
 
-O mock simula latência de rede por padrão, entre 50ms e 600ms conforme a rota, para os estados de carregamento serem visíveis no desenvolvimento.
+O mock pode simular latência de rede entre 50ms e 600ms conforme a rota.
 
 Nos testes a latência é desligada:
 

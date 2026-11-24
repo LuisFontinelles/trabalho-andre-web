@@ -508,7 +508,7 @@ Aprovar soma 1 em `vagasPreenchidas`. Decisão final não volta atrás.
 
 ## 10. Servidor simulado dos clientes
 
-Os dois clientes respondem este contrato em memória enquanto a API não tem a rota.
+Os clientes de teste podem responder este contrato em memória para manter os testes automatizados isolados da rede. Essas credenciais não existem necessariamente na API real.
 
 | Item | Valor |
 | --- | --- |

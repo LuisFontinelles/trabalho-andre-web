@@ -7,9 +7,9 @@
 
 **https://luisfontinelles.github.io/trabalho-andre-web/**
 
-Não precisa instalar nada: o site roda no navegador, sobre dados de demonstração. Entre com **`profissional@teste.com`** e qualquer senha; se o cadastro pedir código de verificação, use **`0000`**.
+Não precisa instalar nada: o site roda no navegador e usa a API real. Para entrar, use uma conta profissional cadastrada nesse ambiente ou crie uma pela tela **Criar conta de profissional**. As antigas credenciais `profissional@teste.com` e código `0000` pertencem apenas aos testes automatizados e não funcionam no site publicado.
 
-A sessão dura enquanto a aba estiver aberta, então recarregar a página não desloga. Como os dados são de demonstração, o que você criar ou alterar volta ao estado inicial quando a aba é fechada.
+A sessão dura enquanto a aba estiver aberta, então recarregar a página não desloga. O que você criar ou alterar é persistido pela API conforme as regras do backend.
 
 Aplicação web do trabalho final de **Soluções Computacionais** (Universidade Católica de Brasília, 2026/2, prof. Andre Gustavo Bastos Lima). É o cliente do profissional de saúde na plataforma CareBridge, que reúne oportunidades de cuidado em saúde gratuitas, acessíveis ou direcionadas a públicos específicos.
 

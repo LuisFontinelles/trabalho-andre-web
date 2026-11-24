@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Entre com `profissional@teste.com` e qualquer senha não vazia. O código de verificação é `0000`.
+Para testar manualmente, use uma conta existente na API configurada ou faça o cadastro pela aplicação. `profissional@teste.com` e o código `0000` são exclusivos dos testes automatizados.
 
 ## O fluxo de uma mudança
 
