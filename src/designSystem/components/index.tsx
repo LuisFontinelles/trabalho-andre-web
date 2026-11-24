@@ -253,7 +253,13 @@ export function TextField({
   const id = useId()
   return (
     <FieldShell label={label} htmlFor={id} errorMessage={errorMessage} isEnabled={isEnabled}>
-      <div className={cx('cb-field__box', errorMessage && 'cb-field__box--error')}>
+      <div
+        className={cx(
+          'cb-field__box',
+          isReadOnly && 'cb-field__box--readonly',
+          errorMessage && 'cb-field__box--error',
+        )}
+      >
         <input
           id={id}
           className="cb-field__input"
@@ -268,7 +274,76 @@ export function TextField({
           aria-invalid={errorMessage ? true : undefined}
           onChange={(event) => onChange(event.target.value)}
         />
+        {isReadOnly && (
+          <span className="cb-field__lock" title={strings.common.readOnly}>
+            <Icon name="lock" size={18} tone="tertiary" />
+          </span>
+        )}
       </div>
+    </FieldShell>
+  )
+}
+
+export interface PasswordRule {
+  label: string
+  met: boolean
+}
+
+/** Campo de senha com botao de mostrar e, se vier, a lista das regras marcada ao digitar. */
+export function PasswordField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  autoComplete = 'current-password',
+  errorMessage,
+  rules,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  autoComplete?: string
+  errorMessage?: string | null
+  rules?: readonly PasswordRule[]
+}) {
+  const id = useId()
+  const rulesId = useId()
+  const [isVisible, setVisible] = useState(false)
+  return (
+    <FieldShell label={label} htmlFor={id} errorMessage={errorMessage}>
+      <div className={cx('cb-field__box', errorMessage && 'cb-field__box--error')}>
+        <input
+          id={id}
+          className="cb-field__input"
+          type={isVisible ? 'text' : 'password'}
+          value={value}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          aria-invalid={errorMessage ? true : undefined}
+          aria-describedby={rules ? rulesId : undefined}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <button
+          type="button"
+          className="cb-icon-button cb-field__toggle"
+          aria-label={isVisible ? strings.common.hidePassword : strings.common.showPassword}
+          aria-pressed={isVisible}
+          onClick={() => setVisible((current) => !current)}
+        >
+          <Icon name={isVisible ? 'visibility_off' : 'visibility'} size={20} tone="secondary" />
+        </button>
+      </div>
+      {rules && (
+        <ul className="cb-password-rules" id={rulesId}>
+          {rules.map((rule) => (
+            <li key={rule.label} className={cx('cb-password-rules__item', rule.met && 'cb-password-rules__item--met')}>
+              <Icon name={rule.met ? 'check_circle' : 'radio_button_unchecked'} size={16} />
+              {rule.label}
+            </li>
+          ))}
+        </ul>
+      )}
     </FieldShell>
   )
 }
@@ -312,6 +387,9 @@ interface SelectFieldBase {
   options: readonly SelectOption[]
   errorMessage?: string | null
   isEnabled?: boolean
+  /** Texto do menu aberto sem opcoes (carregando ou falhou). */
+  emptyMessage?: string
+  onOpen?: () => void
 }
 
 type SelectFieldProps = SelectFieldBase &
@@ -326,7 +404,7 @@ type SelectFieldProps = SelectFieldBase &
  * escolhas separadas por virgula.
  */
 export function SelectField(props: SelectFieldProps) {
-  const { label, placeholder, options, errorMessage, isEnabled = true } = props
+  const { label, placeholder, options, errorMessage, isEnabled = true, emptyMessage, onOpen } = props
   const id = useId()
   const [isOpen, setOpen] = useState(false)
   const [active, setActive] = useState(0)
@@ -403,7 +481,10 @@ export function SelectField(props: SelectFieldProps) {
           aria-controls={`${id}-list`}
           aria-invalid={errorMessage ? true : undefined}
           disabled={!isEnabled}
-          onClick={() => setOpen((current) => !current)}
+          onClick={() => {
+            if (!isOpen) onOpen?.()
+            setOpen((current) => !current)
+          }}
           onKeyDown={onKeyDown}
         >
           <span className={cx('cb-select__value', text === '' && 'cb-select__value--empty')}>
@@ -418,6 +499,11 @@ export function SelectField(props: SelectFieldProps) {
             role="listbox"
             aria-multiselectable={props.multiple || undefined}
           >
+            {options.length === 0 && emptyMessage && (
+              <li className="cb-select__empty" role="presentation">
+                {emptyMessage}
+              </li>
+            )}
             {options.map((option, index) => {
               const isSelected = selected.includes(option.value)
               return (
@@ -720,21 +806,19 @@ export function Modal({
 }) {
   const titleId = useId()
   const panel = useRef<HTMLDivElement>(null)
-  const onDismissRef = useRef(onDismiss)
-  onDismissRef.current = onDismiss
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null
     panel.current?.focus()
     function onKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key === 'Escape') onDismissRef.current()
+      if (event.key === 'Escape') onDismiss()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('keydown', onKeyDown)
       previous?.focus()
     }
-  }, [])
+  }, [onDismiss])
 
   return (
     <div className="cb-overlay">

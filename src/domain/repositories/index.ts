@@ -1,49 +1,23 @@
-import type {
-  Application,
-  CurrentUser,
-  FilterCatalog,
-  LoginResult,
-  OpportunityPage,
-  Opportunity,
-  PendingVerification,
-  PendingProfessional,
-  ProfessionalCatalog,
-  SearchCriteria,
-  SignUpDraft,
-} from '@/domain/entities'
+import type { Catalog, PendingVerification, Session, SignUpDraft } from '@/domain/entities'
 
 /** Protocolos que o dominio declara e a camada de dados cumpre. */
 
 export interface AuthRepository {
-  login(email: string, password: string): Promise<LoginResult>
-  me(): Promise<CurrentUser>
-  signUp(draft: SignUpDraft): Promise<PendingVerification>
-  registerProfessional(
+  login(email: string, password: string): Promise<Session>
+  signUp(
     draft: SignUpDraft,
-    biographyOrDescription: string,
-    documents: readonly File[],
+    biographyOrDescription?: string,
+    documents?: readonly File[],
   ): Promise<PendingVerification>
-  verify(email: string, code: string): Promise<void>
+  /** Nulo quando o e-mail foi confirmado mas a senha nao esta mais na memoria. */
+  verify(email: string, code: string): Promise<Session | null>
   resendCode(email: string): Promise<void>
-  /** Solicita o codigo de nova senha. Nao diz se o e-mail tem conta. */
+  /** Envia o codigo de nova senha. Nao diz se o e-mail tem conta. */
   requestPasswordReset(email: string): Promise<void>
-  confirmPasswordReset(email: string, code: string, newPassword: string): Promise<void>
+  resetPassword(email: string, code: string, newPassword: string): Promise<void>
+  /** LGPD: tudo o que a API guarda da conta, em JSON. */
+  exportMyData(): Promise<unknown>
+  /** LGPD: anonimiza a conta. Pede a senha atual. */
   deleteAccount(password: string): Promise<void>
-  professionalCatalog(): Promise<ProfessionalCatalog>
-}
-
-export interface AdminRepository {
-  pendingProfessionals(): Promise<readonly PendingProfessional[]>
-  approveProfessional(id: string): Promise<PendingProfessional>
-  rejectProfessional(id: string): Promise<PendingProfessional>
-}
-
-export interface OpportunityRepository {
-  search(criteria: SearchCriteria): Promise<OpportunityPage>
-  detail(id: string): Promise<Opportunity>
-  filters(): Promise<FilterCatalog>
-}
-
-export interface ApplicationRepository {
-  status(id: string): Promise<Application>
+  catalog(): Promise<Catalog>
 }

@@ -1,13 +1,18 @@
-import type { Opportunity, SignUpDraft } from '@/domain/entities'
+import type { SignUpDraft } from '@/domain/entities'
 import type { ManagedOpportunity, ReceivedRequest } from '@/domain/professional'
 import type { OpportunityDraft } from '@/domain/opportunityDraft'
-import { emptyOpportunityDraft } from '@/domain/opportunityDraft'
+import { DEFAULT_QUESTIONS, emptyOpportunityDraft } from '@/domain/opportunityDraft'
 import { createDependencies } from '@/app/dependencies'
 import { createMockFetch } from '@/data/network/mockBackend'
 
-/** Dependencias apontando para o backend de fixtures, sem latencia. */
-export function testDependencies() {
-  return createDependencies(createMockFetch({ latency: false }))
+/**
+ * Dependencias apontando para o servidor simulado, sem latencia. Com
+ * `signedInAs`, o token da conta ja esta guardado, como depois do login.
+ */
+export function testDependencies(signedInAs: string | null = 'profissional@teste.com') {
+  const dependencies = createDependencies(createMockFetch({ latency: false }), '')
+  if (signedInAs !== null) dependencies.tokens.set(`mock.${signedInAs}`)
+  return dependencies
 }
 
 export function validPatientDraft(): SignUpDraft {
@@ -17,13 +22,7 @@ export function validPatientDraft(): SignUpDraft {
     email: 'paciente@teste.com',
     password: 'Paciente@2026',
     confirmPassword: 'Paciente@2026',
-    professional: {
-      councilId: null,
-      stateId: null,
-      number: '',
-      specialtyId: null,
-      workplace: '',
-    },
+    professional: { councilId: null, stateId: null, number: '', specialtyId: null, workplace: '' },
     acceptedTerms: true,
   }
 }
@@ -32,7 +31,7 @@ export function validProfessionalDraft(): SignUpDraft {
   return {
     profile: 'PROFISSIONAL',
     name: 'Marcos Vieira',
-    email: 'profissional@teste.com',
+    email: 'novo.medico@clinica.com',
     password: 'Profissa@2026',
     confirmPassword: 'Profissa@2026',
     professional: {
@@ -43,25 +42,6 @@ export function validProfessionalDraft(): SignUpDraft {
       workplace: 'Instituto Movida',
     },
     acceptedTerms: true,
-  }
-}
-
-export function makeOpportunity(overrides: Partial<Opportunity> = {}): Opportunity {
-  return {
-    id: 'op-001',
-    title: 'Psicologia online',
-    specialtyId: 'psicologia',
-    modality: 'online',
-    offerType: 'gratuita',
-    vacancies: 3,
-    provider: { id: 'pr-001', name: 'Clinica Saude', isVerified: true },
-    city: 'Brasilia',
-    address: 'Remoto',
-    distanceKm: null,
-    summary: 'Atendimento semanal',
-    requiredDocuments: ['RG'],
-    updatedAt: '2026-10-05T14:00:00Z',
-    ...overrides,
   }
 }
 
@@ -90,6 +70,18 @@ export function makeManagedOpportunity(
     hasNoRestrictions: false,
     contactMethod: 'plataforma',
     updatedAt: '2026-10-05T14:00:00Z',
+    city: 'Brasília',
+    state: 'DF',
+    audienceNote: null,
+    responseDays: 15,
+    triage: {
+      mode: 'PADRAO',
+      questions: DEFAULT_QUESTIONS,
+      documents: [
+        { id: 'rg', label: 'RG' },
+        { id: 'encaminhamento', label: 'Encaminhamento médico' },
+      ],
+    },
     ...overrides,
   }
 }
@@ -99,10 +91,12 @@ export function makeReceivedRequest(
 ): ReceivedRequest {
   return {
     id: 'req-001',
+    protocol: '20418',
     patientName: 'Ana Souza',
     opportunityId: 'op-101',
     opportunityTitle: 'Cardiologia - vaga social',
     receivedAt: '2026-10-21T09:12:00Z',
+    deadline: '2026-11-05T09:12:00Z',
     status: 'EM_ANALISE',
     hasUnreadMessage: false,
     canMessage: false,

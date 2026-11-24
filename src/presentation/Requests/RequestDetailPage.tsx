@@ -110,12 +110,13 @@ export function RequestDetailPage() {
 
   function approve() {
     void run(async () => {
-      const updated = await dependencies.professionalRepository.decideRequest(
-        id,
-        'APROVADA',
-        undefined,
-        { when: arrangementWhen, where: arrangementWhere, bring: arrangementBring },
-      )
+      const updated = await dependencies.professionalRepository.decideRequest(id, 'APROVADA', {
+        agreement: {
+          when: arrangementWhen.trim() || text.toArrange,
+          where: arrangementWhere.trim() || text.toArrange,
+          bring: arrangementBring.trim(),
+        },
+      })
       // A aprovacao ocupa uma vaga; a contagem da tela acompanha.
       setOpportunity((current) =>
         current === null
@@ -131,7 +132,9 @@ export function RequestDetailPage() {
       setDialogError(text.rejectReasonRequired)
       return
     }
-    void run(() => dependencies.professionalRepository.decideRequest(id, 'RECUSADA', dialogText))
+    void run(() =>
+      dependencies.professionalRepository.decideRequest(id, 'RECUSADA', { reason: dialogText }),
+    )
   }
 
   function askInfo() {
@@ -203,8 +206,9 @@ export function RequestDetailPage() {
       <div className="cb-columns">
         <div className="cb-columns__main">
           <Panel title={text.triageTitle} gap="none">
+            {detail.triage.length === 0 && <p className="cb-callout">{text.noAnswers}</p>}
             {detail.triage.map((item) => (
-              <div key={item.question} className="cb-answer">
+              <div key={item.questionId} className="cb-answer">
                 <span className="cb-answer__key">{item.question}</span>
                 <span className="cb-answer__value">{item.answer}</span>
               </div>
@@ -239,18 +243,39 @@ export function RequestDetailPage() {
                 tone="success"
               />
             )}
+            {detail.status === 'APROVADA' && detail.agreement !== null && (
+              <p className="cb-callout">
+                {text.agreement(detail.agreement.when, detail.agreement.where, detail.agreement.bring)}
+              </p>
+            )}
             {detail.status === 'RECUSADA' && (
               <Banner message={text.rejectedNote(shortDate(detail.decidedAt))} tone="danger" icon="info" />
             )}
-            {detail.status === 'AGUARDANDO_INFO' && (
-              <Banner message={text.waitingNote} tone="warning" icon="hourglass_top" />
+            {detail.status === 'RECUSADA' && detail.decisionReason && (
+              <p className="cb-callout">{text.rejectedReason(detail.decisionReason)}</p>
+            )}
+            {detail.status === 'CANCELADA' && (
+              <Banner message={text.cancelledNote(shortDate(detail.decidedAt))} tone="info" icon="info" />
+            )}
+            {detail.status === 'AGUARDANDO_INFORMACOES' && (
+              <Banner
+                message={text.waitingNote(shortDate(detail.infoRequest?.deadline ?? null))}
+                tone="warning"
+                icon="hourglass_top"
+              />
+            )}
+            {detail.status === 'AGUARDANDO_INFORMACOES' && detail.infoRequest !== null && (
+              <p className="cb-callout">{text.infoAsked(detail.infoRequest.text)}</p>
             )}
             {!decided && (
               <>
                 <p className="cb-callout">
                   {text.pendingHint(
                     lowerFirst(relativeDay(detail.receivedAt)),
-                    shortDate(responseDeadline(detail.receivedAt)),
+                    shortDate(
+                      detail.deadline ??
+                        responseDeadline(detail.receivedAt, opportunity?.responseDays),
+                    ),
                   )}
                   {left !== null && total !== null && text.vacanciesLeft(left, total)}
                 </p>

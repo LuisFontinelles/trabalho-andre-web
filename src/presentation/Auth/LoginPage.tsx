@@ -1,132 +1,65 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useDependencies, useSession } from '@/app/session'
-import { Banner, Button, TextField } from '@/designSystem/components'
+import { useState, type FormEvent } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { rememberedRegistration, useDependencies, useSession } from '@/app/session'
+import { Banner, Button, PasswordField, TextField } from '@/designSystem/components'
 import { NetworkError } from '@/data/network/httpClient'
 import { ValidationError } from '@/domain/useCases'
 import { AuthCard } from '@/presentation/Auth/AuthCard'
 import { strings } from '@/resources/strings'
 
+/** Aviso que outra tela deixa ao voltar para o login (e-mail confirmado, senha trocada). */
+export interface LoginHandoff {
+  notice: string
+  email: string
+}
+
 export function LoginPage() {
   const dependencies = useDependencies()
   const session = useSession()
   const navigate = useNavigate()
+  const handoff = useLocation().state as LoginHandoff | null
 
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(handoff?.email ?? '')
   const [password, setPassword] = useState('')
   const [emailError, setEmailError] = useState<string | null>(null)
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setSubmitting] = useState(false)
-  const submittingLock = useRef(false)
-
-  useEffect(() => {
-    if (session.sessionExpired) setFormError(strings.login.sessionExpired)
-    else if (session.isAuthenticated && !session.canAccessOpportunities && !session.canAccessAdmin) {
-      setFormError(strings.login.professionalOnly)
-    }
-  }, [
-    session.canAccessOpportunities,
-    session.canAccessAdmin,
-    session.isAuthenticated,
-    session.sessionExpired,
-  ])
 
   function messageFor(error: unknown): string {
     if (error instanceof NetworkError) {
-      if (error.kind === 'unauthorized') return strings.login.invalidCredentials
-      if (error.kind === 'transport' || error.kind === 'offline') {
-        return strings.login.connectionFailed
+      // O contrato v2 responde 401 para senha errada; a API de hoje ainda
+      // responde 403 nessa rota publica, que so pode querer dizer o mesmo.
+      if (error.kind === 'unauthorized' || error.kind === 'forbidden' || error.kind === 'notFound') {
+        return strings.login.invalidCredentials
       }
+      if (error.kind === 'tooManyAttempts') return strings.login.tooManyAttempts
+      if (error.kind === 'transport' || error.kind === 'offline') return strings.login.connectionFailed
+      if (error.kind === 'decoding') return strings.login.sessionStartFailed
+      return strings.common.failed
     }
-    return strings.login.sessionStartFailed
+    return strings.login.invalidCredentials
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    if (submittingLock.current) return
-    submittingLock.current = true
     setEmailError(null)
     setPasswordError(null)
     setFormError(null)
     setSubmitting(true)
-    session.signOut()
     try {
       const result = await dependencies.login(email, password)
-      const { status, data } = result
-      const token = data.token
-      const tipoPerfil = data.tipoPerfil
-
-      const possuiToken = typeof token === 'string' && token.trim().length > 0
-      const ehProfissionalSaude = tipoPerfil === 'PROFISSIONAL_SAUDE'
-
-      if (
-        status === 200 &&
-        data.autenticado === true &&
-        possuiToken &&
-        ehProfissionalSaude
-      ) {
-        sessionStorage.setItem('token', token)
-        const currentUser = await dependencies.loadCurrentUser()
-        const isVerified = currentUser.situacaoRegistro === 'VERIFICADO'
-        session.signIn({
-          token,
-          tipoPerfil: 'PROFISSIONAL_SAUDE',
-          validadoInstitucionalmente: isVerified,
-          user: {
-            id: currentUser.id,
-            name: currentUser.nome,
-            email: currentUser.email,
-            profile: 'PROFISSIONAL',
-            city: null,
-          },
-        }, {
-          registration: [currentUser.conselho, currentUser.uf, currentUser.numeroRegistro]
-            .filter(Boolean)
-            .join(' '),
-          isVerified,
-        })
+      session.signIn(result, {
+        // O /user/me traz o registro; o guardado no cadastro cobre a API que ainda nao traz.
+        registration: result.registration ?? rememberedRegistration(result.user.email),
+        isVerified: result.isVerified,
+      })
+      if (result.authProfile === 'PROFISSIONAL_SAUDE') {
         navigate('/oportunidades', { replace: true })
-      } else if (
-        status === 200 &&
-        data.autenticado === true &&
-        possuiToken &&
-        tipoPerfil === 'ADMIN'
-      ) {
-        session.signIn({
-          token,
-          tipoPerfil: 'ADMIN',
-          validadoInstitucionalmente: false,
-          user: {
-            id: email.trim().toLowerCase(),
-            name: strings.admin.userName,
-            email: email.trim().toLowerCase(),
-            profile: 'DESCONHECIDO',
-            city: null,
-          },
-        })
-        navigate('/admin/profissionais', { replace: true })
-      } else if (status === 200 && data.autenticado === true && possuiToken) {
-        const perfil =
-          tipoPerfil === 'PACIENTE' ? tipoPerfil : 'DESCONHECIDO'
-        session.signIn({
-          token,
-          tipoPerfil: perfil,
-          validadoInstitucionalmente: data.validadoInstitucionalmente === true,
-          user: {
-            id: email.trim().toLowerCase(),
-            name: email.trim(),
-            email: email.trim().toLowerCase(),
-            profile: perfil === 'PACIENTE' ? 'PACIENTE' : 'DESCONHECIDO',
-            city: null,
-          },
-        })
-        setFormError(strings.login.professionalOnly)
       } else {
-        setFormError(strings.login.sessionStartFailed)
+        setFormError(strings.login.notProfessional)
       }
     } catch (error) {
-      session.signOut()
       if (error instanceof ValidationError) {
         if (error.code === 'emailRequired' || error.code === 'emailInvalid') {
           setEmailError(error.message)
@@ -140,13 +73,13 @@ export function LoginPage() {
       }
     } finally {
       setSubmitting(false)
-      submittingLock.current = false
     }
   }
 
   return (
     <AuthCard title={strings.login.title} subtitle={strings.login.subtitle}>
       <form className="cb-auth__form" onSubmit={submit} noValidate>
+        {handoff?.notice && formError === null && <Banner message={handoff.notice} tone="success" />}
         <TextField
           label={strings.login.emailLabel}
           placeholder={strings.login.emailPlaceholder}
@@ -156,10 +89,9 @@ export function LoginPage() {
           onChange={setEmail}
           errorMessage={emailError}
         />
-        <TextField
+        <PasswordField
           label={strings.login.passwordLabel}
           placeholder={strings.login.passwordPlaceholder}
-          type="password"
           autoComplete="current-password"
           value={password}
           onChange={setPassword}

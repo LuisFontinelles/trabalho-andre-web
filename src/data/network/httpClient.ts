@@ -1,5 +1,4 @@
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
-export const SESSION_EXPIRED_EVENT = 'carebridge:session-expired'
 
 export interface Endpoint {
   path: string
@@ -7,34 +6,45 @@ export interface Endpoint {
   query?: Record<string, string>
   body?: unknown
   headers?: Record<string, string>
-  requiresAuth?: boolean
-  /** Alguns 401 validam uma credencial informada na acao, nao o token da sessao. */
-  invalidatesSessionOnUnauthorized?: boolean
+  /**
+   * Rota marcada com cadeado no contrato: leva `Authorization: Bearer` com o
+   * token da sessao. Sem token guardado, a requisicao sai sem o cabecalho e o
+   * servidor responde 401.
+   */
+  authenticated?: boolean
+  /** A rota confere a senha atual: 401 e senha errada, nao sessao vencida. */
+  checksPassword?: boolean
 }
 
 /**
- * Corpo de erro da API. O backend devolve sempre este formato, entao vale a
- * pena carrega-lo junto do erro em vez de so o codigo HTTP.
+ * Corpo de erro da API (contrato v2, secao 1). Todo erro traz pelo menos
+ * `status` e `message`; os campos padrao do Spring podem vir junto.
  */
 export interface ApiError {
-  status?: number
-  statusCode?: number
+  status: number
   message: string
   error?: string | null
-  requestId?: string | null
+  path?: string | null
+  timestamp?: string | null
 }
 
 export type NetworkErrorKind =
   | 'invalidURL'
   | 'transport'
+  | 'offline'
+  /** 400: corpo ou parametro invalido. */
+  | 'badRequest'
+  /** 401: sem token, token vencido ou senha errada. A sessao acabou. */
   | 'unauthorized'
+  /** 403: autenticado, mas sem permissao para aquilo. */
   | 'forbidden'
-  | 'conflict'
-  | 'rateLimited'
   | 'notFound'
+  /** 409: e-mail ja cadastrado, sem vagas, estado que nao permite a acao. */
+  | 'conflict'
+  /** 429: login bloqueado depois de 5 senhas erradas seguidas. */
+  | 'tooManyAttempts'
   | 'server'
   | 'decoding'
-  | 'offline'
   | 'noContent'
 
 export class NetworkError extends Error {
@@ -55,13 +65,35 @@ export class NetworkError extends Error {
     this.api = api
   }
 
-  /** Mensagem vinda do servidor, quando existe. */
+  /** Mensagem vinda do servidor, quando existe. Vem em portugues, pronta para a tela. */
   get apiMessage(): string | null {
-    return this.api?.message ?? null
+    const message = this.api?.message ?? ''
+    return message === '' ? null : message
   }
 
   get isRetryable(): boolean {
-    return this.kind === 'transport' || this.kind === 'offline' || this.kind === 'server'
+    if (this.kind === 'transport' || this.kind === 'offline') return true
+    return this.kind === 'server' && (this.status === null || this.status >= 500)
+  }
+}
+
+export function kindForStatus(status: number): NetworkErrorKind {
+  switch (status) {
+    case 400:
+    case 422:
+      return 'badRequest'
+    case 401:
+      return 'unauthorized'
+    case 403:
+      return 'forbidden'
+    case 404:
+      return 'notFound'
+    case 409:
+      return 'conflict'
+    case 429:
+      return 'tooManyAttempts'
+    default:
+      return 'server'
   }
 }
 
@@ -84,17 +116,41 @@ export function buildUrl(baseUrl: string, endpoint: Endpoint): string {
   return `${base}${path}?${search}`
 }
 
+export function bearer(token: string): Record<string, string> {
+  return { Authorization: `Bearer ${token}` }
+}
+
 export interface HttpClient {
   send<Response>(endpoint: Endpoint): Promise<Response>
-  sendWithStatus<Response>(
-    endpoint: Endpoint,
-  ): Promise<{ data: Response; status: number }>
+  sendWithStatus<Response>(endpoint: Endpoint): Promise<{ data: Response; status: number }>
+  /** Para rotas que podem responder 201 sem corpo: devolve null nesse caso. */
+  sendOptional<Response>(endpoint: Endpoint): Promise<Response | null>
   sendVoid(endpoint: Endpoint): Promise<void>
 }
 
 export interface HttpClientOptions {
+  /** Token da sessao, lido a cada requisicao autenticada. */
   getToken?: () => string | null
-  onSessionExpired?: () => void
+  /** Chamado quando uma rota autenticada responde 401: a sessao venceu. */
+  onUnauthorized?: () => void
+}
+
+function parseApiError(body: string, status: number): ApiError | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(body)
+  } catch {
+    return null
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null
+  const raw = parsed as Partial<ApiError>
+  // O Spring, quando nao manda `message`, devolve so `error` com a frase
+  // padrao do status. A mensagem fica vazia e a tela usa o texto dela.
+  return {
+    ...raw,
+    status: typeof raw.status === 'number' ? raw.status : status,
+    message: typeof raw.message === 'string' ? raw.message : '',
+  }
 }
 
 export function createHttpClient(
@@ -104,29 +160,28 @@ export function createHttpClient(
 ): HttpClient {
   async function perform(endpoint: Endpoint): Promise<{ body: string; status: number }> {
     const url = buildUrl(baseUrl, endpoint)
-    const token = endpoint.requiresAuth ? options.getToken?.()?.trim() : undefined
-    const headers: Record<string, string> = {
-      Accept: 'application/json',
-      ...endpoint.headers,
+    const headers: Record<string, string> = { Accept: 'application/json' }
+    if (endpoint.authenticated) {
+      const token = options.getToken?.() ?? null
+      if (token !== null && token !== '') Object.assign(headers, bearer(token))
     }
-    if (token) headers.Authorization = `Bearer ${token}`
-    const requestBody: BodyInit | undefined =
+    Object.assign(headers, endpoint.headers)
+    // FormData vai como esta: o navegador monta o multipart e o boundary.
+    const isForm = typeof FormData !== 'undefined' && endpoint.body instanceof FormData
+    if (endpoint.body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
+    const payload: BodyInit | undefined =
       endpoint.body === undefined
         ? undefined
-        : endpoint.body instanceof FormData
-          ? endpoint.body
+        : isForm
+          ? (endpoint.body as FormData)
           : JSON.stringify(endpoint.body)
-    const isFormData = requestBody instanceof FormData
-    if (endpoint.body !== undefined && !isFormData) {
-      headers['Content-Type'] = 'application/json'
-    }
 
     let response: Response
     try {
       response = await fetchImpl(url, {
         method: endpoint.method ?? 'GET',
         headers,
-        body: requestBody,
+        body: payload,
       })
     } catch (cause) {
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false
@@ -139,44 +194,18 @@ export function createHttpClient(
     const body = await response.text()
     if (response.ok) return { body, status: response.status }
 
-    let api: ApiError | null = null
-    try {
-      api = JSON.parse(body) as ApiError
-    } catch {
-      api = null
+    const api = parseApiError(body, response.status)
+    const message = api?.message || `HTTP ${response.status}`
+    const kind = kindForStatus(response.status)
+    if (kind === 'unauthorized' && endpoint.authenticated && !endpoint.checksPassword) {
+      options.onUnauthorized?.()
     }
-
-    const message = api?.message ?? `HTTP ${response.status}`
-    if (response.status === 401) {
-      if (token && endpoint.invalidatesSessionOnUnauthorized !== false) {
-        options.onSessionExpired?.()
-      }
-      throw new NetworkError('unauthorized', message, response.status, api)
-    }
-    if (response.status === 403) {
-      throw new NetworkError('forbidden', message, response.status, api)
-    }
-    if (response.status === 404) {
-      throw new NetworkError('notFound', message, response.status, api)
-    }
-    if (response.status === 409) {
-      throw new NetworkError('conflict', message, response.status, api)
-    }
-    if (response.status === 429) {
-      throw new NetworkError('rateLimited', message, response.status, api)
-    }
-    throw new NetworkError('server', message, response.status, api)
+    throw new NetworkError(kind, message, response.status, api)
   }
 
-  async function decode<Response>(
-    endpoint: Endpoint,
-  ): Promise<{ data: Response; status: number }> {
-    const { body, status } = await perform(endpoint)
-    if (status === 204 || body === '') {
-      throw new NetworkError('noContent', 'Resposta sem corpo', status)
-    }
+  function decode<Response>(body: string, status: number): Response {
     try {
-      return { data: JSON.parse(body) as Response, status }
+      return JSON.parse(body) as Response
     } catch (cause) {
       throw new NetworkError(
         'decoding',
@@ -188,12 +217,25 @@ export function createHttpClient(
 
   return {
     async send<Response>(endpoint: Endpoint): Promise<Response> {
-      const { data } = await decode<Response>(endpoint)
-      return data
+      const { body, status } = await perform(endpoint)
+      if (status === 204 || body === '') {
+        throw new NetworkError('noContent', 'Resposta sem corpo', status)
+      }
+      return decode<Response>(body, status)
     },
 
-    async sendWithStatus<Response>(endpoint: Endpoint) {
-      return decode<Response>(endpoint)
+    async sendWithStatus<Response>(endpoint: Endpoint): Promise<{ data: Response; status: number }> {
+      const { body, status } = await perform(endpoint)
+      if (status === 204 || body === '') {
+        throw new NetworkError('noContent', 'Resposta sem corpo', status)
+      }
+      return { data: decode<Response>(body, status), status }
+    },
+
+    async sendOptional<Response>(endpoint: Endpoint): Promise<Response | null> {
+      const { body, status } = await perform(endpoint)
+      if (status === 204 || body === '') return null
+      return decode<Response>(body, status)
     },
 
     async sendVoid(endpoint: Endpoint): Promise<void> {

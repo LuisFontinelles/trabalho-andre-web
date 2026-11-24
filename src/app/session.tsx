@@ -1,18 +1,5 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react'
-import {
-  authProfileFrom,
-  type AuthProfile,
-  type Session,
-} from '@/domain/entities'
-import { SESSION_EXPIRED_EVENT } from '@/data/network/httpClient'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { authProfileFrom, type Session } from '@/domain/entities'
 import { createDependencies, type Dependencies } from '@/app/dependencies'
 
 const DependenciesContext = createContext<Dependencies | null>(null)
@@ -39,9 +26,9 @@ export function useDependencies(): Dependencies {
 const SESSION_KEY = 'carebridge.session'
 
 /**
- * O que o painel mostra do registro profissional. A API de sessao ainda nao
- * devolve esses dados, entao eles vem do cadastro feito nesta sessao; quem
- * entra pelo login ja passou pela conferencia.
+ * O que o painel mostra do registro profissional. Vem do GET /user/me; quando
+ * a API ainda nao traz o registro, vale o que foi digitado no cadastro neste
+ * navegador.
  */
 export interface ProfessionalProfile {
   /** "CRM/DF 123456". Vazio quando nao se sabe. */
@@ -49,35 +36,41 @@ export interface ProfessionalProfile {
   isVerified: boolean
 }
 
+/** Perfil padrao quando nada foi informado: verificado, sem registro conhecido. */
 const VERIFIED_PROFILE: ProfessionalProfile = {
-  registration: 'CRM/DF 123456',
+  registration: '',
   isVerified: true,
+}
+
+const REGISTRATIONS_KEY = 'carebridge.registrations'
+
+/**
+ * O login da API real nao devolve o registro profissional. Guardamos o que a
+ * pessoa digitou no cadastro, por e-mail, para o painel poder mostra-lo nas
+ * proximas entradas neste navegador.
+ */
+export function rememberRegistration(email: string, registration: string): void {
+  try {
+    const all = JSON.parse(localStorage.getItem(REGISTRATIONS_KEY) ?? '{}') as Record<string, string>
+    all[email] = registration
+    localStorage.setItem(REGISTRATIONS_KEY, JSON.stringify(all))
+  } catch {
+    // Sem armazenamento o painel so nao mostra o numero do registro.
+  }
+}
+
+export function rememberedRegistration(email: string): string {
+  try {
+    const all = JSON.parse(localStorage.getItem(REGISTRATIONS_KEY) ?? '{}') as Record<string, string>
+    return all[email] ?? ''
+  } catch {
+    return ''
+  }
 }
 
 interface StoredSession {
   session: Session
   profile: ProfessionalProfile
-}
-
-interface StoredSessionData {
-  token: string
-  user: Session['user']
-  tipoPerfil?: AuthProfile
-  validadoInstitucionalmente?: boolean
-}
-
-function normalizeSession(raw: StoredSessionData): Session | null {
-  if (typeof raw.token !== 'string' || raw.token.trim() === '' || !raw.user) return null
-  const rawProfile =
-    raw.tipoPerfil ?? (raw.user.profile === 'PROFISSIONAL' ? 'PROFISSIONAL_SAUDE' : raw.user.profile)
-  const tipoPerfil = authProfileFrom(rawProfile)
-  return {
-    token: raw.token,
-    user: raw.user,
-    tipoPerfil,
-    validadoInstitucionalmente:
-      raw.validadoInstitucionalmente ?? tipoPerfil === 'PROFISSIONAL_SAUDE',
-  }
 }
 
 /**
@@ -91,31 +84,31 @@ function readStoredSession(): StoredSession | null {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY)
     if (raw === null) return null
-    const parsed = JSON.parse(raw) as
-      | { session: StoredSessionData; profile?: ProfessionalProfile }
-      | StoredSessionData
-    if ('session' in parsed) {
-      const session = normalizeSession(parsed.session)
-      return session
-        ? {
-            session,
-            profile: parsed.profile ?? {
-              registration: '',
-              isVerified: session.validadoInstitucionalmente,
-            },
-          }
-        : null
+    const parsed = JSON.parse(raw) as StoredSession | Session
+    // Formato antigo: so a sessao, sem o perfil profissional.
+    if ('token' in parsed) {
+      return {
+        session: {
+          ...parsed,
+          authProfile: authProfileFrom(
+            parsed.authProfile ?? (parsed.user.profile === 'PROFISSIONAL' ? 'PROFISSIONAL_SAUDE' : parsed.user.profile),
+          ),
+        },
+        profile: VERIFIED_PROFILE,
+      }
     }
-    const session = normalizeSession(parsed)
-    return session
-      ? {
-          session,
-          profile: {
-            registration: '',
-            isVerified: session.validadoInstitucionalmente,
-          },
-        }
-      : null
+    return {
+      ...parsed,
+      session: {
+        ...parsed.session,
+        authProfile: authProfileFrom(
+          parsed.session.authProfile ??
+            (parsed.session.user.profile === 'PROFISSIONAL'
+              ? 'PROFISSIONAL_SAUDE'
+              : parsed.session.user.profile),
+        ),
+      },
+    }
   } catch {
     return null
   }
@@ -131,11 +124,8 @@ function writeStoredSession(stored: StoredSession | null): void {
     } else {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(stored))
       sessionStorage.setItem('token', stored.session.token)
-      sessionStorage.setItem('tipoPerfil', stored.session.tipoPerfil)
-      sessionStorage.setItem(
-        'validadoInstitucionalmente',
-        String(stored.session.validadoInstitucionalmente),
-      )
+      sessionStorage.setItem('tipoPerfil', stored.session.authProfile)
+      sessionStorage.setItem('validadoInstitucionalmente', String(stored.session.isVerified))
     }
   } catch {
     // Sem armazenamento a sessao vale so para esta navegacao, e tudo bem.
@@ -145,85 +135,53 @@ function writeStoredSession(stored: StoredSession | null): void {
 interface SessionStore {
   session: Session | null
   profile: ProfessionalProfile
-  tipoPerfil: AuthProfile
   isAuthenticated: boolean
   canAccessOpportunities: boolean
-  canAccessAdmin: boolean
-  sessionExpired: boolean
   signIn: (session: Session, profile?: ProfessionalProfile) => void
-  updateProfessionalProfile: (profile: ProfessionalProfile) => void
   signOut: () => void
 }
 
 const SessionContext = createContext<SessionStore | null>(null)
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [stored, setStored] = useState<StoredSession | null>(readStoredSession)
-  const [sessionExpired, setSessionExpired] = useState(false)
+  const { tokens } = useDependencies()
+  const [stored, setStored] = useState<StoredSession | null>(() => {
+    const restored = readStoredSession()
+    // O token vai no cabecalho das rotas autenticadas desde a primeira tela.
+    tokens.set(restored?.session.token ?? null)
+    return restored
+  })
 
-  useEffect(() => {
-    function handleSessionExpired() {
-      writeStoredSession(null)
-      setStored(null)
-      setSessionExpired(true)
-    }
-    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired)
-    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired)
-  }, [])
-
-  const updateProfessionalProfile = useCallback((profile: ProfessionalProfile) => {
-    setStored((current) => {
-      if (current === null || current.session.tipoPerfil !== 'PROFISSIONAL_SAUDE') {
-        return current
-      }
-      const next = {
-        session: {
-          ...current.session,
-          validadoInstitucionalmente: profile.isVerified,
-        },
-        profile,
-      }
-      writeStoredSession(next)
-      return next
-    })
-  }, [])
+  // 401 numa rota autenticada: a sessao venceu e a pessoa entra de novo.
+  useEffect(
+    () =>
+      tokens.onExpired(() => {
+        writeStoredSession(null)
+        setStored(null)
+      }),
+    [tokens],
+  )
 
   const value = useMemo<SessionStore>(
     () => ({
       session: stored?.session ?? null,
       profile: stored?.profile ?? VERIFIED_PROFILE,
-      tipoPerfil: stored?.session.tipoPerfil ?? 'DESCONHECIDO',
       isAuthenticated: stored !== null,
       canAccessOpportunities:
-        Boolean(stored?.session.token.trim()) &&
-        stored?.session.tipoPerfil === 'PROFISSIONAL_SAUDE',
-      canAccessAdmin:
-        Boolean(stored?.session.token.trim()) && stored?.session.tipoPerfil === 'ADMIN',
-      sessionExpired,
-      signIn: (session: Session, profile?: ProfessionalProfile) => {
-        const effectiveProfile = profile ?? {
-          registration: '',
-          isVerified: session.validadoInstitucionalmente,
-        }
-        const next = {
-          session: {
-            ...session,
-            validadoInstitucionalmente: effectiveProfile.isVerified,
-          },
-          profile: effectiveProfile,
-        }
+        Boolean(stored?.session.token.trim()) && stored?.session.authProfile === 'PROFISSIONAL_SAUDE',
+      signIn: (session: Session, profile: ProfessionalProfile = VERIFIED_PROFILE) => {
+        const next = { session, profile }
+        tokens.set(session.token)
         writeStoredSession(next)
         setStored(next)
-        setSessionExpired(false)
       },
-      updateProfessionalProfile,
       signOut: () => {
+        tokens.set(null)
         writeStoredSession(null)
         setStored(null)
-        setSessionExpired(false)
       },
     }),
-    [stored, sessionExpired, updateProfessionalProfile],
+    [stored, tokens],
   )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

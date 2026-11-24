@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -11,28 +11,12 @@ function mountLogin(
   response: Record<string, unknown>,
   status = 200,
 ) {
-  const fetchImpl: typeof fetch = vi.fn(async (input) => {
-    const url = String(input)
-    const body = url.endsWith('/user/me')
-      ? {
-          id: 'prof-1',
-          email: 'ana@exemplo.com',
-          tipoPerfil: 'PROFISSIONAL_SAUDE',
-          nome: 'Ana Profissional',
-          situacaoRegistro:
-            response.validadoInstitucionalmente === true ? 'VERIFICADO' : 'EM_VERIFICACAO',
-          conselho: 'CRM',
-          uf: 'DF',
-          numeroRegistro: '123456',
-          especialidade: 'cardiologia',
-          ondeAtende: 'Instituto Movida',
-        }
-      : response
-    return new Response(JSON.stringify(body), {
+  const fetchImpl: typeof fetch = vi.fn(async () =>
+    new Response(JSON.stringify(response), {
       status,
       headers: { 'Content-Type': 'application/json' },
-    })
-  })
+    }),
+  )
   render(
     <DependenciesProvider value={createDependencies(fetchImpl)}>
       <SessionProvider>
@@ -40,7 +24,6 @@ function mountLogin(
           <Routes>
             <Route path="/" element={<LoginPage />} />
             <Route path="/oportunidades" element={<p>Área profissional</p>} />
-            <Route path="/admin/profissionais" element={<p>Área administrativa</p>} />
           </Routes>
         </MemoryRouter>
       </SessionProvider>
@@ -78,7 +61,7 @@ describe('LoginPage', () => {
 
     expect(await screen.findByText('Área profissional')).toBeInTheDocument()
     expect(fetchImpl).toHaveBeenCalledWith(
-      'https://carebridge-api-2.onrender.com/auth/login',
+      'https://carebridge-api-2.onrender.com/user/login',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
@@ -105,25 +88,10 @@ describe('LoginPage', () => {
     await submitLogin()
 
     expect(
-      await screen.findByText('Esta área está disponível somente para profissionais de saúde.'),
+      await screen.findByText('Esta conta não é de profissional de saúde. Use o app CareBridge para pacientes.'),
     ).toBeInTheDocument()
     expect(screen.queryByText('Área profissional')).not.toBeInTheDocument()
     expect(sessionStorage.getItem('tipoPerfil')).toBe('PACIENTE')
-  })
-
-  it('direciona administrador para a fila de cadastros', async () => {
-    mountLogin({
-      token: 'jwt-admin',
-      autenticado: true,
-      tipoPerfil: 'ADMIN',
-      validadoInstitucionalmente: false,
-    })
-
-    await submitLogin()
-
-    expect(await screen.findByText('Área administrativa')).toBeInTheDocument()
-    expect(sessionStorage.getItem('tipoPerfil')).toBe('ADMIN')
-    expect(screen.queryByText('Esta área está disponível somente para profissionais de saúde.')).not.toBeInTheDocument()
   })
 
   it('exige o valor exato PROFISSIONAL_SAUDE para direcionar ao painel', async () => {
@@ -137,7 +105,7 @@ describe('LoginPage', () => {
     await submitLogin()
 
     expect(
-      await screen.findByText('Esta área está disponível somente para profissionais de saúde.'),
+      await screen.findByText('Esta conta não é de profissional de saúde. Use o app CareBridge para pacientes.'),
     ).toBeInTheDocument()
     expect(screen.queryByText('Área profissional')).not.toBeInTheDocument()
     expect(sessionStorage.getItem('tipoPerfil')).toBe('DESCONHECIDO')
@@ -222,64 +190,5 @@ describe('LoginPage', () => {
 
     expect(await screen.findByRole('textbox', { name: 'E-mail' })).toBeInTheDocument()
     expect(screen.queryByText('Minhas oportunidades')).not.toBeInTheDocument()
-  })
-
-  it('atualiza uma sessão antiga quando o backend informa que o profissional foi verificado', async () => {
-    sessionStorage.setItem(
-      'carebridge.session',
-      JSON.stringify({
-        session: {
-          token: 'jwt-profissional',
-          tipoPerfil: 'PROFISSIONAL_SAUDE',
-          validadoInstitucionalmente: false,
-          user: {
-            id: 'a8244d6f-e2c6-4409-9a37-75f8f9cf903a',
-            name: 'Drauzio',
-            email: 'cursodopiru@gmail.com',
-            profile: 'PROFISSIONAL',
-            city: null,
-          },
-        },
-        profile: { registration: 'CRM DF 123456', isVerified: false },
-      }),
-    )
-    const fetchImpl: typeof fetch = vi.fn(async (input) => {
-      const url = String(input)
-      if (url.endsWith('/user/me')) {
-        return Response.json({
-          id: 'a8244d6f-e2c6-4409-9a37-75f8f9cf903a',
-          email: 'cursodopiru@gmail.com',
-          tipoPerfil: 'PROFISSIONAL_SAUDE',
-          nome: 'Drauzio',
-          situacaoRegistro: 'VERIFICADO',
-          conselho: 'CRM',
-          uf: 'DF',
-          numeroRegistro: '123456',
-          especialidade: 'cardiologia',
-          ondeAtende: 'Abbba Ulai',
-        })
-      }
-      return Response.json([])
-    })
-
-    render(
-      <DependenciesProvider value={createDependencies(fetchImpl)}>
-        <SessionProvider>
-          <MemoryRouter initialEntries={['/oportunidades']}>
-            <App />
-          </MemoryRouter>
-        </SessionProvider>
-      </DependenciesProvider>,
-    )
-
-    await waitFor(() => {
-      const stored = JSON.parse(sessionStorage.getItem('carebridge.session') ?? '{}') as {
-        profile?: { isVerified?: boolean }
-      }
-      expect(stored.profile?.isVerified).toBe(true)
-    })
-    expect(
-      screen.queryByText(/Seu cadastro está em verificação/),
-    ).not.toBeInTheDocument()
   })
 })

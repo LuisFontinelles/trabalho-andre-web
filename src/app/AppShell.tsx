@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useDependencies, useSession } from '@/app/session'
+import { useSession } from '@/app/session'
 import { Button, IconButton, Logo } from '@/designSystem/components'
 import { Icon, type IconName } from '@/designSystem/tokens/icons'
 import { strings } from '@/resources/strings'
@@ -34,34 +34,11 @@ export function initialsOf(name: string): string {
  * menu recolhido no mobile. O mesmo menu serve aos tres; o CSS decide a forma.
  */
 export function AppShell() {
-  const dependencies = useDependencies()
   const session = useSession()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [isMenuOpen, setMenuOpen] = useState(false)
   const user = session.session?.user
-  const { updateProfessionalProfile } = session
-
-  useEffect(() => {
-    let active = true
-    dependencies
-      .loadCurrentUser()
-      .then((currentUser) => {
-        if (!active) return
-        updateProfessionalProfile({
-          registration: [currentUser.conselho, currentUser.uf, currentUser.numeroRegistro]
-            .filter(Boolean)
-            .join(' '),
-          isVerified: currentUser.situacaoRegistro === 'VERIFICADO',
-        })
-      })
-      .catch(() => {
-        // A sessão existente continua válida quando a atualização pontual falha.
-      })
-    return () => {
-      active = false
-    }
-  }, [dependencies, updateProfessionalProfile])
 
   useEffect(() => {
     setMenuOpen(false)

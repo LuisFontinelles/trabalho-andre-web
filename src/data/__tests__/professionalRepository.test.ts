@@ -1,44 +1,95 @@
 import { describe, expect, it } from 'vitest'
-import { draftFromManagedOpportunity, draftToDTO } from '@/data/professionalMappers'
-import { emptyOpportunityDraft } from '@/domain/opportunityDraft'
+import { draftFromManagedOpportunity } from '@/data/professionalMappers'
+import { authorizationLog, requestLog } from '@/data/network/mockBackend'
+import { DEFAULT_QUESTIONS, emptyOpportunityDraft } from '@/domain/opportunityDraft'
 import { isDecided } from '@/domain/professional'
-import { createDependencies } from '@/app/dependencies'
-import { createMockFetch } from '@/data/network/mockBackend'
-import { testDependencies, validOpportunityDraft } from '@/test/factories'
+import { testDependencies, validOpportunityDraft, validProfessionalDraft } from '@/test/factories'
 
 const repo = () => testDependencies().professionalRepository
 
+describe('Autenticacao das rotas do profissional', () => {
+  it('toda chamada leva o token da sessao', async () => {
+    const repository = repo()
+    await repository.myOpportunities()
+    await repository.receivedRequests()
+    await repository.requestDetail('req-001')
+    expect(authorizationLog).toEqual([
+      'Bearer mock.profissional@teste.com',
+      'Bearer mock.profissional@teste.com',
+      'Bearer mock.profissional@teste.com',
+    ])
+  })
+
+  it('sem sessao a rota responde 401', async () => {
+    await expect(testDependencies(null).professionalRepository.myOpportunities()).rejects.toMatchObject({
+      kind: 'unauthorized',
+    })
+  })
+
+  it('401 numa rota do painel avisa a sessao, que encerra', async () => {
+    const dependencies = testDependencies()
+    dependencies.tokens.set('expired')
+    let expired = false
+    dependencies.tokens.onExpired(() => {
+      expired = true
+    })
+    await expect(dependencies.professionalRepository.receivedRequests()).rejects.toMatchObject({
+      kind: 'unauthorized',
+    })
+    expect(expired).toBe(true)
+    expect(dependencies.tokens.get()).toBeNull()
+  })
+
+  it('paciente logado recebe 403, nao 401', async () => {
+    await expect(
+      testDependencies('paciente@teste.com').professionalRepository.myOpportunities(),
+    ).rejects.toMatchObject({ kind: 'forbidden', status: 403 })
+  })
+})
+
 describe('Minhas oportunidades', () => {
-  it('traz a lista do profissional', async () => {
+  it('GET /profissional-saude/oportunidades traz a lista como array', async () => {
     const items = await repo().myOpportunities()
+    expect(requestLog).toEqual(['GET /profissional-saude/oportunidades'])
     expect(items).toHaveLength(6)
     expect(items[0]?.title).toBe('Cardiologia - vaga social')
   })
 
-  it('mapeia o status e a modalidade de acesso', async () => {
+  it('mapeia status e modalidades do fio para o dominio', async () => {
     const items = await repo().myOpportunities()
     const draft = items.find((item) => item.id === 'op-103')
     expect(draft?.status).toBe('RASCUNHO')
     expect(draft?.accessMode).toBe('pesquisa')
     expect(draft?.price).toBeNull()
+    const social = items.find((item) => item.id === 'op-104')
+    expect(social?.accessMode).toBe('preco-social')
+    expect(social?.modality).toBe('online')
   })
 
-  it('preserva vagas preenchidas e total separados', async () => {
+  it('preserva vagas preenchidas, total e inscricoes', async () => {
     const items = await repo().myOpportunities()
     const item = items.find((entry) => entry.id === 'op-101')
     expect(item?.filledVacancies).toBe(3)
     expect(item?.totalVacancies).toBe(5)
+    expect(item?.applicationCount).toBe(4)
+  })
+
+  it('traz a triagem salva, no formulario padrao', async () => {
+    const item = (await repo().myOpportunities()).find((entry) => entry.id === 'op-101')
+    expect(item?.triage.mode).toBe('PADRAO')
+    expect(item?.triage.questions).toEqual(DEFAULT_QUESTIONS)
+    expect(item?.triage.documents).toEqual([
+      { id: 'rg', label: 'RG' },
+      { id: 'encaminhamento', label: 'Encaminhamento médico' },
+    ])
   })
 })
 
 describe('Encerrar oportunidade', () => {
-  it('muda o status para encerrada', async () => {
+  it('POST /oportunidades/{id}/encerrar muda o status para encerrada', async () => {
     const repository = repo()
-    const before = (await repository.myOpportunities()).find((i) => i.id === 'op-105')
-    expect(before?.status).toBe('ATIVA')
-
     await repository.closeOpportunity('op-105')
-
+    expect(requestLog).toContain('POST /oportunidades/op-105/encerrar')
     const after = (await repository.myOpportunities()).find((i) => i.id === 'op-105')
     expect(after?.status).toBe('ENCERRADA')
   })
@@ -50,61 +101,69 @@ describe('Encerrar oportunidade', () => {
   })
 
   it('id inexistente responde 404', async () => {
-    await expect(repo().closeOpportunity('op-999')).rejects.toMatchObject({
-      kind: 'notFound',
-    })
+    await expect(repo().closeOpportunity('op-999')).rejects.toMatchObject({ kind: 'notFound' })
   })
 
-  it('encerrar nao deixa a oportunidade encerravel de novo', async () => {
-    const repository = repo()
-    await repository.closeOpportunity('op-105')
-    const item = (await repository.myOpportunities()).find((i) => i.id === 'op-105')
-    expect(item?.status).toBe('ENCERRADA')
+  it('so ativa pode ser encerrada: encerrada e rascunho dao 409', async () => {
+    await expect(repo().closeOpportunity('op-101')).rejects.toMatchObject({ kind: 'conflict' })
+    await expect(repo().closeOpportunity('op-103')).rejects.toMatchObject({ kind: 'conflict' })
   })
 })
 
 describe('Excluir oportunidade', () => {
-  it('some da lista', async () => {
+  it('rascunho some da lista', async () => {
     const repository = repo()
-    await repository.deleteOpportunity('op-101')
+    await repository.deleteOpportunity('op-103')
+    expect(requestLog).toContain('DELETE /oportunidades/op-103')
     const items = await repository.myOpportunities()
     expect(items).toHaveLength(5)
-    expect(items.some((item) => item.id === 'op-101')).toBe(false)
+    expect(items.some((item) => item.id === 'op-103')).toBe(false)
+  })
+
+  it.each(['op-101', 'op-105'])('%s nao e rascunho e responde 409', async (id) => {
+    await expect(repo().deleteOpportunity(id)).rejects.toMatchObject({
+      kind: 'conflict',
+      apiMessage: 'Só rascunho pode ser excluído.',
+    })
   })
 
   it('id inexistente responde 404', async () => {
-    await expect(repo().deleteOpportunity('op-999')).rejects.toMatchObject({
-      kind: 'notFound',
-    })
+    await expect(repo().deleteOpportunity('op-999')).rejects.toMatchObject({ kind: 'notFound' })
   })
 
   it('excluir duas vezes falha na segunda', async () => {
     const repository = repo()
-    await repository.deleteOpportunity('op-101')
-    await expect(repository.deleteOpportunity('op-101')).rejects.toMatchObject({
+    await repository.deleteOpportunity('op-103')
+    await expect(repository.deleteOpportunity('op-103')).rejects.toMatchObject({
       kind: 'notFound',
     })
   })
 })
 
 describe('Criar oportunidade', () => {
-  it('nasce ativa e sem vagas preenchidas', async () => {
+  it('POST /oportunidades nasce ativa, sem vagas preenchidas e com o ofertante', async () => {
     const created = await repo().createOpportunity(validOpportunityDraft())
+    expect(requestLog).toEqual(['POST /oportunidades'])
     expect(created.status).toBe('ATIVA')
     expect(created.filledVacancies).toBe(0)
     expect(created.applicationCount).toBe(0)
   })
 
   it('leva os dados do rascunho', async () => {
-    const draft = {
+    const created = await repo().createOpportunity({
       ...validOpportunityDraft(),
       title: 'Psicologia infantil',
       totalVacancies: '12',
-    }
-    const created = await repo().createOpportunity(draft)
+    })
     expect(created.title).toBe('Psicologia infantil')
     expect(created.totalVacancies).toBe(12)
     expect(created.specialtyId).toBe('cardiologia')
+  })
+
+  it('a triagem padrao volta igual, com os 8 ids e as dependencias', async () => {
+    const created = await repo().createOpportunity(validOpportunityDraft())
+    expect(created.triage.mode).toBe('PADRAO')
+    expect(created.triage.questions).toEqual(DEFAULT_QUESTIONS)
   })
 
   it('aparece no topo da lista depois de criada', async () => {
@@ -123,6 +182,7 @@ describe('Criar oportunidade', () => {
       price: '60,00',
     })
     expect(paid.price).toBeCloseTo(60)
+    expect(paid.accessMode).toBe('preco-social')
 
     const free = await repository.createOpportunity({
       ...validOpportunityDraft(),
@@ -139,32 +199,99 @@ describe('Criar oportunidade', () => {
       address: 'Rua das Flores, 120',
     })
     expect(created.address).toBeNull()
+    expect(created.cep).toBeNull()
+  })
+
+  it('publicar com descricao curta e recusado com 400 e o motivo', async () => {
+    await expect(
+      repo().createOpportunity({ ...validOpportunityDraft(), description: 'Curta demais' }),
+    ).rejects.toMatchObject({
+      kind: 'badRequest',
+      apiMessage: 'A descrição precisa ter de 40 a 600 caracteres.',
+    })
+  })
+
+  it('profissional em verificacao pode salvar rascunho, mas publicar da 403', async () => {
+    const dependencies = testDependencies(null)
+    const draft = validProfessionalDraft()
+    await dependencies.signUp(draft)
+    const session = await dependencies.verifyCode(draft.email, '0000')
+    dependencies.tokens.set(session!.token)
+    const repository = dependencies.professionalRepository
+
+    await expect(repository.createOpportunity(validOpportunityDraft())).rejects.toMatchObject({
+      kind: 'forbidden',
+      status: 403,
+    })
+    const saved = await repository.createOpportunity(validOpportunityDraft(), true)
+    expect(saved.status).toBe('RASCUNHO')
   })
 })
 
 describe('Solicitacoes recebidas', () => {
-  it('traz a lista com status mapeado', async () => {
+  it('GET /profissional-saude/inscricoes traz as 7, das mais recentes para as mais antigas', async () => {
     const items = await repo().receivedRequests()
-    expect(items).toHaveLength(4)
-    expect(items.map((item) => item.status)).toEqual([
+    expect(requestLog).toEqual(['GET /profissional-saude/inscricoes'])
+    expect(items.map((item) => item.patientName)).toEqual([
+      'Ana Souza',
+      'Paulo Mendes',
+      'Carlos Lima',
+      'Luiza Fernandes',
+      'Rafael Costa',
+      'Beatriz Alves',
+      'João Santos',
+    ])
+  })
+
+  it('a lista cobre os 6 estados do contrato', async () => {
+    const statuses = new Set((await repo().receivedRequests()).map((item) => item.status))
+    expect([...statuses].sort()).toEqual([
+      'AGUARDANDO_INFORMACOES',
       'APROVADA',
+      'CANCELADA',
       'EM_ANALISE',
-      'APROVADA',
+      'RECEBIDA',
       'RECUSADA',
     ])
   })
 
-  it('preserva o indicador de mensagem nao lida', async () => {
-    const items = await repo().receivedRequests()
-    expect(items.filter((item) => item.hasUnreadMessage)).toHaveLength(2)
+  it('?status= filtra no servidor', async () => {
+    const items = await repo().receivedRequests('APROVADA')
+    expect(requestLog).toEqual(['GET /profissional-saude/inscricoes?status=APROVADA'])
+    expect(items.map((item) => item.patientName)).toEqual(['Ana Souza', 'Beatriz Alves'])
   })
 
-  it('detalhe traz triagem, documentos e mensagens', async () => {
+  it('protocolo, prazo, nao lidas e permissao de mensagem vem da inscricao', async () => {
+    const items = await repo().receivedRequests()
+    const ana = items.find((item) => item.id === 'req-001')!
+    expect(ana.protocol).toBe('20418')
+    expect(ana.hasUnreadMessage).toBe(true)
+    expect(ana.canMessage).toBe(true)
+    expect(ana.deadline).not.toBeNull()
+    expect(items.filter((item) => item.canMessage).map((item) => item.id)).toEqual([
+      'req-001',
+      'req-003',
+    ])
+  })
+
+  it('detalhe traz triagem com o id da pergunta, documentos e mensagens', async () => {
     const detail = await repo().requestDetail('req-001')
     expect(detail.patientName).toBe('Ana Souza')
-    expect(detail.triage).toHaveLength(4)
-    expect(detail.documents).toHaveLength(2)
-    expect(detail.messages).toHaveLength(2)
+    expect(detail.triage).toHaveLength(8)
+    expect(detail.triage[0]).toEqual({
+      questionId: 'motivo',
+      question: 'Qual o motivo principal?',
+      answer: 'Dor no peito ao esforço',
+    })
+    expect(detail.documents.map((item) => [item.documentId, item.name, item.sizeKb])).toEqual([
+      ['rg', 'RG_frente.jpg', 420],
+      ['encaminhamento', 'Encaminhamento.pdf', 128],
+    ])
+    expect(detail.messages.map((item) => [item.author, item.authorName])).toEqual([
+      ['PACIENTE', 'Ana Souza'],
+      ['PROFISSIONAL', 'Marcos Vieira'],
+    ])
+    expect(detail.agreement?.when).toBe('A combinar')
   })
 
   it('detalhe reflete o paciente pedido, nao um fixo', async () => {
@@ -172,54 +299,115 @@ describe('Solicitacoes recebidas', () => {
     expect(detail.id).toBe('req-002')
     expect(detail.patientName).toBe('Carlos Lima')
     expect(detail.opportunityTitle).toBe('Fisioterapia ortopédica')
+    expect(detail.messages).toEqual([])
+  })
+
+  it('aguardando informacoes traz o pedido e o prazo', async () => {
+    const detail = await repo().requestDetail('req-006')
+    expect(detail.status).toBe('AGUARDANDO_INFORMACOES')
+    expect(detail.infoRequest?.text).toBe(
+      'Pode enviar a foto do Cartão do SUS? O arquivo veio cortado.',
+    )
+    expect(detail.infoRequest?.deadline).not.toBeNull()
+  })
+
+  it('cancelada nao tem respostas nem documentos', async () => {
+    const detail = await repo().requestDetail('req-007')
+    expect(detail.status).toBe('CANCELADA')
+    expect(detail.triage).toEqual([])
+    expect(detail.documents).toEqual([])
+    expect(isDecided(detail.status)).toBe(true)
+  })
+
+  it('recusada traz o motivo', async () => {
+    const detail = await repo().requestDetail('req-004')
+    expect(detail.decisionReason).toBe('As vagas desta turma são para recuperação pós-cirúrgica.')
   })
 
   it('solicitacao inexistente responde 404', async () => {
-    await expect(repo().requestDetail('req-999')).rejects.toMatchObject({
-      kind: 'notFound',
-    })
+    await expect(repo().requestDetail('req-999')).rejects.toMatchObject({ kind: 'notFound' })
   })
 })
 
 describe('Decisao sobre a solicitacao', () => {
-  it.each(['APROVADA', 'RECUSADA', 'EM_ANALISE'] as const)(
-    'registra o status %s',
-    async (status) => {
-      const updated = await repo().decideRequest('req-002', status)
-      expect(updated.status).toBe(status)
-    },
-  )
+  it('aprovar envia o combinado e libera as mensagens', async () => {
+    const repository = repo()
+    const agreement = { when: 'Terça, 10h', where: 'Quadra 302, Brasília', bring: 'RG' }
+    const updated = await repository.decideRequest('req-002', 'APROVADA', { agreement })
+    expect(requestLog).toContain('POST /profissional-saude/inscricoes/req-002/decisao')
+    expect(updated.status).toBe('APROVADA')
+    expect(updated.agreement).toEqual(agreement)
+    expect(updated.canMessage).toBe(true)
+    expect(updated.decidedAt).not.toBeNull()
+  })
+
+  it('aprovar soma uma vaga preenchida na oportunidade', async () => {
+    const repository = repo()
+    await repository.decideRequest('req-002', 'APROVADA')
+    const opportunity = await repository.opportunity('op-102')
+    expect(opportunity.filledVacancies).toBe(9)
+  })
+
+  it('aprovar sem vagas restantes responde 409', async () => {
+    const repository = repo()
+    // op-105 tem 2 de 8 preenchidas; reduzir para 2 vagas a deixa lotada.
+    const current = await repository.opportunity('op-105')
+    await repository.updateOpportunity('op-105', {
+      ...draftFromManagedOpportunity(current),
+      totalVacancies: '2',
+    })
+    await expect(repository.decideRequest('req-005', 'APROVADA')).rejects.toMatchObject({
+      kind: 'conflict',
+      apiMessage: 'Não há vagas restantes nesta oportunidade.',
+    })
+  })
+
+  it('recusar envia o motivo e fecha a conversa', async () => {
+    const repository = repo()
+    const updated = await repository.decideRequest('req-002', 'RECUSADA', {
+      reason: '  Vagas so para moradores de Ceilandia.  ',
+    })
+    expect(updated.status).toBe('RECUSADA')
+    expect(updated.decisionReason).toBe('Vagas so para moradores de Ceilandia.')
+    expect(updated.canMessage).toBe(false)
+    expect(updated.agreement).toBeNull()
+  })
+
+  it('recusar sem motivo responde 400', async () => {
+    await expect(repo().decideRequest('req-002', 'RECUSADA', { reason: '   ' })).rejects.toMatchObject({
+      kind: 'badRequest',
+      apiMessage: 'Informe o motivo da recusa.',
+    })
+  })
 
   it('a decisao aparece na lista depois', async () => {
     const repository = repo()
-    await repository.decideRequest('req-002', 'APROVADA')
-    const item = (await repository.receivedRequests()).find((i) => i.id === 'req-002')
+    await repository.decideRequest('req-005', 'APROVADA')
+    const item = (await repository.receivedRequests()).find((i) => i.id === 'req-005')
     expect(item?.status).toBe('APROVADA')
-    expect(isDecided(item!.status)).toBe(true)
   })
 
-  it('aprovar libera a conversa com o paciente', async () => {
+  it.each(['req-001', 'req-004', 'req-007'])(
+    'decisao final nao volta atras: %s responde 409',
+    async (id) => {
+      await expect(repo().decideRequest(id, 'RECUSADA', { reason: 'Mudei de ideia agora.' })).rejects.toMatchObject({
+        kind: 'conflict',
+        apiMessage: 'Esta solicitação já foi decidida.',
+      })
+    },
+  )
+
+  it('decidir duas vezes falha na segunda', async () => {
     const repository = repo()
     await repository.decideRequest('req-002', 'APROVADA')
-
-    const after = (await repository.receivedRequests()).find((i) => i.id === 'req-002')
-    expect(after?.canMessage).toBe(true)
+    await expect(
+      repository.decideRequest('req-002', 'RECUSADA', { reason: 'Mudei de ideia agora.' }),
+    ).rejects.toMatchObject({ kind: 'conflict' })
   })
 
-  it('recusar fecha a conversa', async () => {
-    const repository = repo()
-    await repository.decideRequest('req-002', 'RECUSADA')
-    const item = (await repository.receivedRequests()).find((i) => i.id === 'req-002')
-    expect(item?.canMessage).toBe(false)
-  })
-
-  it('a decisao final nao pode ser revista', async () => {
-    const repository = repo()
-    await repository.decideRequest('req-002', 'APROVADA')
-    await expect(repository.decideRequest('req-002', 'RECUSADA')).rejects.toMatchObject({
-      kind: 'conflict',
-      status: 409,
-    })
+  it('quem aguarda informacoes ainda pode ser decidido', async () => {
+    const updated = await repo().decideRequest('req-006', 'APROVADA')
+    expect(updated.status).toBe('APROVADA')
   })
 
   it('solicitacao inexistente responde 404', async () => {
@@ -229,18 +417,62 @@ describe('Decisao sobre a solicitacao', () => {
   })
 })
 
+describe('Pedir informacoes', () => {
+  it('deixa o pedido aguardando, com o texto e prazo de 3 dias', async () => {
+    const repository = repo()
+    const before = Date.now()
+    const updated = await repository.requestInfo('req-002', '  Pode enviar o raio X mais recente?  ')
+    expect(requestLog).toContain('POST /profissional-saude/inscricoes/req-002/pedido-informacao')
+    expect(updated.status).toBe('AGUARDANDO_INFORMACOES')
+    expect(updated.infoRequest?.text).toBe('Pode enviar o raio X mais recente?')
+    const days = (Date.parse(updated.infoRequest!.deadline!) - before) / (24 * 3600 * 1000)
+    expect(days).toBeGreaterThanOrEqual(2.99)
+    expect(days).toBeLessThan(3.01)
+    const listed = (await repository.receivedRequests()).find((i) => i.id === 'req-002')
+    expect(listed?.status).toBe('AGUARDANDO_INFORMACOES')
+  })
+
+  it('pedido vazio e rejeitado com 400', async () => {
+    await expect(repo().requestInfo('req-002', '   ')).rejects.toMatchObject({ kind: 'badRequest' })
+  })
+
+  it('pedido ja decidido responde 409', async () => {
+    await expect(repo().requestInfo('req-004', 'Falta o RG.')).rejects.toMatchObject({
+      kind: 'conflict',
+    })
+  })
+
+  it('solicitacao inexistente da 404', async () => {
+    await expect(repo().requestInfo('req-999', 'Falta o RG.')).rejects.toMatchObject({
+      kind: 'notFound',
+    })
+  })
+})
+
 describe('Mensagens', () => {
-  it('a resposta volta como do profissional', async () => {
+  it('a resposta volta como do profissional, com o nome dele', async () => {
     const message = await repo().sendMessage('req-001', 'Bom dia, pode sim!')
+    expect(requestLog).toContain('POST /profissional-saude/inscricoes/req-001/mensagens')
     expect(message.author).toBe('PROFISSIONAL')
+    expect(message.authorName).toBe('Marcos Vieira')
     expect(message.text).toBe('Bom dia, pode sim!')
     expect(message.id).not.toBe('')
   })
 
-  it.each(['', '   '])('mensagem vazia e recusada com 422', async (text) => {
-    await expect(repo().sendMessage('req-001', text)).rejects.toMatchObject({
-      status: 422,
-    })
+  it('a mensagem fica no detalhe depois', async () => {
+    const repository = repo()
+    await repository.sendMessage('req-001', 'Até terça.')
+    const detail = await repository.requestDetail('req-001')
+    expect(detail.messages.at(-1)?.text).toBe('Até terça.')
+    expect(detail.messages).toHaveLength(3)
+  })
+
+  it.each(['', '   '])('mensagem vazia e recusada com 400', async (text) => {
+    await expect(repo().sendMessage('req-001', text)).rejects.toMatchObject({ kind: 'badRequest' })
+  })
+
+  it.each(['req-002', 'req-004', 'req-007'])('fora de APROVADA (%s) responde 409', async (id) => {
+    await expect(repo().sendMessage(id, 'Oi')).rejects.toMatchObject({ kind: 'conflict' })
   })
 
   it('mensagens em sequencia recebem ids diferentes', async () => {
@@ -255,7 +487,7 @@ describe('Isolamento entre testes', () => {
   it('a lista volta ao estado original a cada teste', async () => {
     const items = await repo().myOpportunities()
     expect(items).toHaveLength(6)
-    expect(items.some((item) => item.id === 'op-101')).toBe(true)
+    expect(items.some((item) => item.id === 'op-103')).toBe(true)
   })
 
   it('as solicitacoes tambem voltam', async () => {
@@ -265,38 +497,41 @@ describe('Isolamento entre testes', () => {
 })
 
 describe('Carregar uma oportunidade para edicao', () => {
-  it('traz a oportunidade pedida', async () => {
+  it('GET /oportunidades/{id} traz a oportunidade pedida', async () => {
     const item = await repo().opportunity('op-105')
+    expect(requestLog).toEqual(['GET /oportunidades/op-105'])
     expect(item.id).toBe('op-105')
     expect(item.title).toBe('Psicologia adulto')
     expect(item.status).toBe('ATIVA')
   })
 
+  it('rascunho so aparece para o dono', async () => {
+    await expect(repo().opportunity('op-103')).resolves.toMatchObject({ status: 'RASCUNHO' })
+    await expect(
+      testDependencies(null).professionalRepository.opportunity('op-103'),
+    ).rejects.toMatchObject({ kind: 'notFound' })
+  })
+
   it('id inexistente responde 404', async () => {
-    await expect(repo().opportunity('op-999')).rejects.toMatchObject({
-      kind: 'notFound',
-    })
+    await expect(repo().opportunity('op-999')).rejects.toMatchObject({ kind: 'notFound' })
   })
 })
 
 describe('Editar oportunidade', () => {
-  it('salva o que mudou', async () => {
-    const repository = repo()
-    const updated = await repository.updateOpportunity('op-105', {
+  it('PUT /oportunidades/{id} salva o que mudou', async () => {
+    const updated = await repo().updateOpportunity('op-105', {
       ...validOpportunityDraft(),
       title: 'Psicologia adulto e adolescente',
       totalVacancies: '15',
     })
+    expect(requestLog).toEqual(['PUT /oportunidades/op-105'])
     expect(updated.title).toBe('Psicologia adulto e adolescente')
     expect(updated.totalVacancies).toBe(15)
   })
 
   it('a mudanca aparece na lista', async () => {
     const repository = repo()
-    await repository.updateOpportunity('op-105', {
-      ...validOpportunityDraft(),
-      title: 'Titulo novo',
-    })
+    await repository.updateOpportunity('op-105', { ...validOpportunityDraft(), title: 'Titulo novo' })
     const item = (await repository.myOpportunities()).find((i) => i.id === 'op-105')
     expect(item?.title).toBe('Titulo novo')
   })
@@ -307,7 +542,7 @@ describe('Editar oportunidade', () => {
     expect(await repository.myOpportunities()).toHaveLength(6)
   })
 
-  it('preserva as vagas ja preenchidas e as solicitacoes', async () => {
+  it('preserva as vagas ja preenchidas e as inscricoes', async () => {
     const repository = repo()
     const before = await repository.opportunity('op-105')
     const updated = await repository.updateOpportunity('op-105', {
@@ -318,24 +553,37 @@ describe('Editar oportunidade', () => {
     expect(updated.applicationCount).toBe(before.applicationCount)
   })
 
-  it('oportunidade encerrada nao pode ser editada', async () => {
-    await expect(
-      repo().updateOpportunity('op-101', validOpportunityDraft()),
-    ).rejects.toMatchObject({ status: 409 })
+  it('editar pelo formulario devolve cidade e UF que a tela nao mostra', async () => {
+    const repository = repo()
+    const before = await repository.opportunity('op-106')
+    const updated = await repository.updateOpportunity('op-106', {
+      ...draftFromManagedOpportunity(before),
+      title: 'Avaliação odontológica infantil',
+    })
+    expect(updated.city).toBe('Brasília')
+    expect(updated.state).toBe('DF')
+    expect(updated.triage.documents.map((item) => item.id)).toEqual(['rg', 'sus'])
+  })
+
+  it('oportunidade encerrada nao pode ser editada: 409', async () => {
+    await expect(repo().updateOpportunity('op-101', validOpportunityDraft())).rejects.toMatchObject({
+      kind: 'conflict',
+      apiMessage: 'Oportunidade encerrada não pode ser editada.',
+    })
   })
 
   it('encerrar e depois tentar editar tambem e barrado', async () => {
     const repository = repo()
     await repository.closeOpportunity('op-105')
-    await expect(
-      repository.updateOpportunity('op-105', validOpportunityDraft()),
-    ).rejects.toMatchObject({ status: 409 })
+    await expect(repository.updateOpportunity('op-105', validOpportunityDraft())).rejects.toMatchObject({
+      kind: 'conflict',
+    })
   })
 
   it('id inexistente responde 404', async () => {
-    await expect(
-      repo().updateOpportunity('op-999', validOpportunityDraft()),
-    ).rejects.toMatchObject({ kind: 'notFound' })
+    await expect(repo().updateOpportunity('op-999', validOpportunityDraft())).rejects.toMatchObject({
+      kind: 'notFound',
+    })
   })
 
   it('rascunho pode ser editado', async () => {
@@ -348,15 +596,20 @@ describe('Editar oportunidade', () => {
 })
 
 describe('Rascunho', () => {
-  it('salvar como rascunho nao publica', async () => {
-    const repository = repo()
-    const created = await repository.createOpportunity(
+  it('salvar como rascunho nao publica e aceita campos vazios', async () => {
+    const created = await repo().createOpportunity(
       { ...emptyOpportunityDraft(), title: 'Nutricao clinica' },
       true,
     )
     expect(created.status).toBe('RASCUNHO')
     expect(created.title).toBe('Nutricao clinica')
     expect(created.totalVacancies).toBe(0)
+  })
+
+  it('rascunho sem titulo e recusado com 400', async () => {
+    await expect(repo().createOpportunity(emptyOpportunityDraft(), true)).rejects.toMatchObject({
+      kind: 'badRequest',
+    })
   })
 
   it('rascunho pela metade volta para o formulario como foi salvo', async () => {
@@ -369,30 +622,28 @@ describe('Rascunho', () => {
     expect(draft.title).toBe('Nutricao clinica')
     expect(draft.serviceType).toBe('consulta')
     expect(draft.specialtyId).toBeNull()
+    expect(draft.modality).toBe('presencial')
     expect(draft.totalVacancies).toBe('')
     expect(draft.opensAt).toBe('')
   })
 
   it('salvar de novo como rascunho continua rascunho', async () => {
-    const repository = repo()
-    const updated = await repository.updateOpportunity('op-103', validOpportunityDraft(), true)
+    const updated = await repo().updateOpportunity('op-103', validOpportunityDraft(), true)
     expect(updated.status).toBe('RASCUNHO')
   })
 
   it('publicar um rascunho o deixa ativo', async () => {
-    const repository = repo()
-    const updated = await repository.updateOpportunity('op-103', validOpportunityDraft())
+    const updated = await repo().updateOpportunity('op-103', validOpportunityDraft())
     expect(updated.status).toBe('ATIVA')
   })
 
   it('salvar alteracoes de uma ativa nao a transforma em rascunho', async () => {
-    const repository = repo()
-    const updated = await repository.updateOpportunity('op-105', validOpportunityDraft(), true)
+    const updated = await repo().updateOpportunity('op-105', validOpportunityDraft(), true)
     expect(updated.status).toBe('ATIVA')
   })
 })
 
-describe('Campos novos do formulario', () => {
+describe('Campos do formulario', () => {
   it('a oportunidade criada guarda tipo, publico, CEP, criterios e contato', async () => {
     const created = await repo().createOpportunity({
       ...validOpportunityDraft(),
@@ -408,126 +659,13 @@ describe('Campos novos do formulario', () => {
     expect(created.contactMethod).toBe('plataforma')
   })
 
-  it('online nao envia CEP nem endereco', () => {
-    const dto = draftToDTO({ ...validOpportunityDraft(), modality: 'online' })
-    expect(dto.cep).toBeNull()
-    expect(dto.endereco).toBeNull()
-  })
-
-  it('sem restricoes nao envia o texto dos criterios', () => {
-    const dto = draftToDTO({ ...validOpportunityDraft(), hasNoRestrictions: true })
-    expect(dto.semRestricoes).toBe(true)
-    expect(dto.criteriosElegibilidade).toBeNull()
-  })
-
-  it('as perguntas vao com tipo, obrigatoriedade e opcoes', () => {
-    const dto = draftToDTO(validOpportunityDraft())
-    expect(dto.status).toBe('ATIVA')
-    expect(dto.triagem.perguntas[1]).toEqual({
-      id: 'q2',
-      rotulo: 'Há quanto tempo?',
-      tipo: 'MULTIPLA',
-      obrigatoria: true,
-      opcoes: ['Menos de 1 semana', 'De 1 a 4 semanas', 'De 1 a 6 meses', 'Mais de 6 meses'],
-    })
-  })
-
-  it('a fixture traz os campos novos para a edicao', async () => {
-    const item = await repo().opportunity('op-105')
-    const draft = draftFromManagedOpportunity(item)
+  it('a fixture traz os campos para a edicao', async () => {
+    const draft = draftFromManagedOpportunity(await repo().opportunity('op-105'))
     expect(draft.serviceType).toBe('terapia')
     expect(draft.audiences).toEqual(['adultos'])
     expect(draft.hasNoRestrictions).toBe(true)
     expect(draft.contactMethod).toBe('plataforma')
-  })
-})
-
-describe('Recusar e pedir informacoes', () => {
-  it('a recusa envia o motivo junto', async () => {
-    const dependencies = testDependencies()
-    const updated = await dependencies.professionalRepository.decideRequest(
-      'req-002',
-      'RECUSADA',
-      '  Vagas so para moradores de Ceilandia.  ',
-    )
-    expect(updated.status).toBe('RECUSADA')
-    expect(updated.decidedAt).not.toBeNull()
-  })
-
-  it('a aprovacao registra quando foi decidida', async () => {
-    const updated = await repo().decideRequest('req-002', 'APROVADA')
-    expect(updated.decidedAt).not.toBeNull()
-  })
-
-  it('a aprovacao envia os dados combinados preenchidos', async () => {
-    const mockFetch = createMockFetch({ latency: false })
-    let sentBody: Record<string, unknown> | null = null
-    const capturingFetch: typeof fetch = async (input, init) => {
-      if (String(input).includes('/profissional-saude/inscricoes/req-002/decisao')) {
-        sentBody = JSON.parse(String(init?.body)) as Record<string, unknown>
-      }
-      return mockFetch(input, init)
-    }
-    const repository = createDependencies(capturingFetch).professionalRepository
-
-    await repository.decideRequest('req-002', 'APROVADA', undefined, {
-      when: ' Terça, às 10h ',
-      where: ' Sala 204 ',
-      bring: ' Exames anteriores ',
-    })
-
-    expect(sentBody).toMatchObject({
-      status: 'APROVADA',
-      combinado: {
-        quando: 'Terça, às 10h',
-        onde: 'Sala 204',
-        levar: 'Exames anteriores',
-      },
-    })
-  })
-
-  it('campos vazios da aprovacao usam valores seguros', async () => {
-    const mockFetch = createMockFetch({ latency: false })
-    let sentBody: Record<string, unknown> | null = null
-    const capturingFetch: typeof fetch = async (input, init) => {
-      if (String(input).includes('/profissional-saude/inscricoes/req-002/decisao')) {
-        sentBody = JSON.parse(String(init?.body)) as Record<string, unknown>
-      }
-      return mockFetch(input, init)
-    }
-
-    await createDependencies(capturingFetch).professionalRepository.decideRequest(
-      'req-002',
-      'APROVADA',
-      undefined,
-      { when: '', where: ' ', bring: '' },
-    )
-
-    expect(sentBody).toMatchObject({
-      combinado: { quando: 'A combinar', onde: 'A combinar', levar: '' },
-    })
-  })
-
-  it('pedir informacoes deixa o pedido aguardando', async () => {
-    const repository = repo()
-    const updated = await repository.requestInfo('req-002', 'Pode enviar o raio X mais recente?')
-    expect(updated.status).toBe('AGUARDANDO_INFO')
-    const listed = (await repository.receivedRequests()).find((i) => i.id === 'req-002')
-    expect(listed?.status).toBe('AGUARDANDO_INFO')
-  })
-
-  it('pedido de informacao vazio e rejeitado', async () => {
-    await expect(repo().requestInfo('req-002', '   ')).rejects.toMatchObject({ status: 422 })
-  })
-
-  it('pedir informacoes de solicitacao inexistente da 404', async () => {
-    await expect(repo().requestInfo('req-999', 'Falta o RG.')).rejects.toMatchObject({
-      kind: 'notFound',
-    })
-  })
-
-  it('o detalhe traz o protocolo do pedido', async () => {
-    expect((await repo().requestDetail('req-001')).protocol).toBe('20418')
-    expect((await repo().requestDetail('req-002')).protocol).toBe('20419')
+    expect(draft.triageMode).toBe('PADRAO')
+    expect(draft.selectedDocumentIds).toEqual(['rg'])
   })
 })

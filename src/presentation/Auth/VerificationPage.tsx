@@ -1,18 +1,21 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { useDependencies } from '@/app/session'
+import { useDependencies, useSession } from '@/app/session'
 import { Banner, Button, CodeField } from '@/designSystem/components'
 import { NetworkError } from '@/data/network/httpClient'
 import { ValidationError } from '@/domain/useCases'
 import { AuthCard } from '@/presentation/Auth/AuthCard'
+import type { LoginHandoff } from '@/presentation/Auth/LoginPage'
 import type { SignUpHandoff } from '@/presentation/Auth/SignUpPage'
 import { useCountdown } from '@/presentation/Auth/useCountdown'
 import { strings } from '@/resources/strings'
 
-const RESEND_SECONDS = 45
+// A API so aceita outro codigo 60 s depois do anterior.
+const RESEND_SECONDS = 60
 
 export function VerificationPage() {
   const dependencies = useDependencies()
+  const session = useSession()
   const navigate = useNavigate()
   const location = useLocation()
   const pending = location.state as SignUpHandoff | null
@@ -32,13 +35,23 @@ export function VerificationPage() {
     setNotice(null)
     setSubmitting(true)
     try {
-      await dependencies.verifyCode(email, code, codeLength)
-      navigate('/', { replace: true, state: { verified: true, registration } })
+      const result = await dependencies.verifyCode(email, code, codeLength)
+      if (result === null) {
+        const handoff: LoginHandoff = { notice: strings.verification.confirmed, email }
+        navigate('/', { replace: true, state: handoff })
+        return
+      }
+      // Quem acabou de se cadastrar ainda tem o registro em conferencia.
+      session.signIn(result, { registration, isVerified: false })
+      navigate('/cadastro-em-verificacao', { replace: true })
     } catch (error) {
       if (error instanceof ValidationError) {
         setCodeError(error.message)
-      } else if (error instanceof NetworkError && error.status === 400) {
-        setCodeError(strings.verification.invalid)
+      } else if (
+        error instanceof NetworkError &&
+        (error.kind === 'unauthorized' || error.kind === 'badRequest')
+      ) {
+        setCodeError(error.apiMessage ?? strings.verification.invalid)
       } else {
         setCodeError(strings.common.failed)
       }
@@ -55,21 +68,21 @@ export function VerificationPage() {
       setCode('')
       setNotice(strings.verification.resent)
       restartCountdown()
-    } catch {
-      setCodeError(strings.common.failed)
+    } catch (error) {
+      setCodeError(error instanceof NetworkError && error.apiMessage ? error.apiMessage : strings.common.failed)
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <AuthCard title={strings.verification.title} subtitle={strings.verification.sentTo(email)}>
+    <AuthCard title={strings.verification.title} subtitle={strings.verification.sentTo(email, codeLength)}>
       <form className="cb-auth__form" onSubmit={submit} noValidate>
         <CodeField
           length={codeLength}
           value={code}
           onChange={setCode}
-          label={strings.verification.fieldLabel}
+          label={strings.verification.fieldLabel(codeLength)}
         />
         {codeError && <Banner message={codeError} tone="danger" />}
         {notice && <Banner message={notice} tone="success" />}

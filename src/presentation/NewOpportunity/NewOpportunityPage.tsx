@@ -10,9 +10,9 @@ import {
   Stepper,
   type Crumb,
 } from '@/designSystem/components'
-import { draftFromManagedOpportunity } from '@/data/professionalMappers'
 import { NetworkError } from '@/data/network/httpClient'
-import { EMPTY_FILTER_CATALOG, type FilterCatalog } from '@/domain/entities'
+import { draftFromManagedOpportunity } from '@/data/professionalMappers'
+import { EMPTY_CATALOG, type Catalog } from '@/domain/entities'
 import {
   DRAFT_STEPS,
   DRAFT_STEP_LABEL,
@@ -32,6 +32,16 @@ import { strings } from '@/resources/strings'
 
 const text = strings.newOpportunity
 
+/**
+ * Recusa com motivo (400, 403, 409): a `message` do servidor vem em
+ * portugues e explica o que fazer. Falha de rede usa o texto da tela.
+ */
+function serverMessage(error: unknown): string | null {
+  if (!(error instanceof NetworkError)) return null
+  const explains = ['badRequest', 'forbidden', 'conflict'].includes(error.kind)
+  return explains ? error.apiMessage : null
+}
+
 /** "2026-12-10" vira "10/12/2026", como a tela de publicada mostra. */
 function longDate(iso: string): string {
   const day = shortDate(iso)
@@ -41,7 +51,6 @@ function longDate(iso: string): string {
 export function NewOpportunityPage() {
   const dependencies = useDependencies()
   const session = useSession()
-  const { updateProfessionalProfile } = session
   const navigate = useNavigate()
   const { id } = useParams()
   const isEditing = id !== undefined
@@ -49,37 +58,12 @@ export function NewOpportunityPage() {
   const [draft, setDraft] = useState<OpportunityDraft>(emptyOpportunityDraft)
   const [original, setOriginal] = useState<ManagedOpportunity | null>(null)
   const [step, setStep] = useState<DraftStep>('DADOS')
-  const [catalog, setCatalog] = useState<FilterCatalog>(EMPTY_FILTER_CATALOG)
+  const [catalog, setCatalog] = useState<Catalog>(EMPTY_CATALOG)
   const [errors, setErrors] = useState<DraftErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'publish' | 'draft' | null>(null)
   const [isLoading, setLoading] = useState(isEditing)
   const [published, setPublished] = useState<ManagedOpportunity | null>(null)
-  const [isCheckingVerification, setCheckingVerification] = useState(true)
-
-  useEffect(() => {
-    let active = true
-    dependencies
-      .loadCurrentUser()
-      .then((currentUser) => {
-        if (!active) return
-        updateProfessionalProfile({
-          registration: [currentUser.conselho, currentUser.uf, currentUser.numeroRegistro]
-            .filter(Boolean)
-            .join(' '),
-          isVerified: currentUser.situacaoRegistro === 'VERIFICADO',
-        })
-      })
-      .catch(() => {
-        // Mantém o valor conhecido da sessão se a conferência não responder.
-      })
-      .finally(() => {
-        if (active) setCheckingVerification(false)
-      })
-    return () => {
-      active = false
-    }
-  }, [dependencies, updateProfessionalProfile])
 
   // Na edicao o formulario abre com o que ja esta salvo.
   useEffect(() => {
@@ -106,12 +90,12 @@ export function NewOpportunityPage() {
   useEffect(() => {
     let active = true
     dependencies
-      .loadFilters()
+      .loadCatalog()
       .then((value) => {
         if (active) setCatalog(value)
       })
       .catch(() => {
-        if (active) setCatalog(EMPTY_FILTER_CATALOG)
+        if (active) setCatalog(EMPTY_CATALOG)
       })
     return () => {
       active = false
@@ -164,9 +148,7 @@ export function NewOpportunityPage() {
       }
       setPublished(saved)
     } catch (error) {
-      setFormError(
-        error instanceof NetworkError && error.apiMessage ? error.apiMessage : text.failed,
-      )
+      setFormError(serverMessage(error) ?? text.failed)
     } finally {
       setBusy(null)
     }
@@ -189,8 +171,8 @@ export function NewOpportunityPage() {
         replace: true,
         state: { notice: strings.myOpportunities.draftSaved },
       })
-    } catch {
-      setFormError(strings.common.failed)
+    } catch (error) {
+      setFormError(serverMessage(error) ?? strings.common.failed)
     } finally {
       setBusy(null)
     }
@@ -243,7 +225,7 @@ export function NewOpportunityPage() {
 
       {missing > 0 && <Banner message={text.missingFields(missing)} tone="danger" />}
       {formError && <Banner message={formError} tone="danger" />}
-      {isLast && !isCheckingVerification && !canPublish && !isPublishedItem && (
+      {isLast && !canPublish && !isPublishedItem && (
         <Banner message={text.publishLocked} tone="warning" icon="hourglass_top" />
       )}
 
@@ -275,10 +257,7 @@ export function NewOpportunityPage() {
             />
             <Button
               title={!isLast ? strings.common.continue : isPublishedItem ? text.save : text.publish}
-              isEnabled={
-                busy === null &&
-                (!isLast || (!isCheckingVerification && canPublish) || isPublishedItem)
-              }
+              isEnabled={busy === null && (!isLast || canPublish || isPublishedItem)}
               isLoading={busy === 'publish'}
               onClick={advance}
             />

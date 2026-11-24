@@ -1,0 +1,772 @@
+[
+  {
+    "id": "op-101",
+    "titulo": "Cardiologia - vaga social",
+    "descricao": "Avaliação cardiológica com ECG, voltada a pacientes sem convênio. Requer triagem prévia.",
+    "tipoServico": "CONSULTA",
+    "especialidade": "cardiologia",
+    "modalidade": "PRESENCIAL",
+    "modalidadeAcesso": "PRECO_SOCIAL",
+    "preco": 60,
+    "publicoAlvo": [
+      "ADULTOS",
+      "IDOSOS"
+    ],
+    "publicoAlvoObservacao": null,
+    "vagasTotais": 5,
+    "vagasPreenchidas": 3,
+    "cep": "70000-000",
+    "endereco": "Rua das Flores, 120, Brasília",
+    "cidade": "Brasília",
+    "uf": "DF",
+    "distanciaKm": null,
+    "inscricoesDe": "2026-09-01",
+    "inscricoesAte": "2026-10-15",
+    "criteriosElegibilidade": "Adultos sem convênio, moradores do DF.",
+    "semRestricoes": false,
+    "formaContato": "PLATAFORMA",
+    "prazoRespostaDias": 15,
+    "status": "ENCERRADA",
+    "ultimaAtualizacao": "2026-10-05T14:00:00Z",
+    "ofertante": {
+      "id": "pr-101",
+      "nome": "Marcos Vieira",
+      "conselho": "CRM",
+      "uf": "DF",
+      "numeroRegistro": "123456",
+      "ondeAtende": "Espaço Cuidar",
+      "verificado": true
+    },
+    "triagem": {
+      "modo": "PADRAO",
+      "perguntas": [
+        {
+          "id": "motivo",
+          "rotulo": "Qual o motivo principal?",
+          "tipo": "TEXTO_LONGO",
+          "obrigatoria": true,
+          "minCaracteres": 10,
+          "maxCaracteres": 300
+        },
+        {
+          "id": "tempo",
+          "rotulo": "Há quanto tempo?",
+          "tipo": "MULTIPLA",
+          "obrigatoria": true,
+          "opcoes": [
+            "Menos de 1 semana",
+            "De 1 a 4 semanas",
+            "De 1 a 6 meses",
+            "Mais de 6 meses"
+          ]
+        },
+        {
+          "id": "diagnostico",
+          "rotulo": "Já tem diagnóstico?",
+          "tipo": "SIM_NAO",
+          "obrigatoria": true
+        },
+        {
+          "id": "qual-diagnostico",
+          "rotulo": "Qual diagnóstico?",
+          "tipo": "TEXTO_CURTO",
+          "obrigatoria": true,
+          "dependeDe": {
+            "perguntaId": "diagnostico",
+            "resposta": "Sim"
+          }
+        },
+        {
+          "id": "medicacao",
+          "rotulo": "Usa medicação contínua?",
+          "tipo": "SIM_NAO",
+          "obrigatoria": true
+        },
+        {
+          "id": "quais-medicacoes",
+          "rotulo": "Quais medicações?",
+          "tipo": "TEXTO_CURTO",
+          "obrigatoria": true,
+          "dependeDe": {
+            "perguntaId": "medicacao",
+            "resposta": "Sim"
+          }
+        },
+        {
+          "id": "urgencia",
+          "rotulo": "Urgência percebida",
+          "tipo": "MULTIPLA",
+          "obrigatoria": true,
+          "opcoes": [
+            "Baixa",
+            "Média",
+            "Alta"
+          ],
+          "ajuda": "Alta: atrapalha suas atividades do dia a dia."
+        },
+        {
+          "id": "horario",
+          "rotulo": "Melhor horário",
+          "tipo": "MULTIPLA",
+          "obrigatoria": false,
+          "opcoes": [
+            "Manhã",
+            "Tarde",
+            "Noite"
+          ],
+          "permiteVarias": true
+        }
+      ],
+      "documentosExigidos": [
+        {
+          "id": "rg",
+          "rotulo": "RG"
+        },
+        {
+          "id": "encaminhamento",
+          "rotulo": "Encaminhamento médico"
+        }
+      ]
+    },
+    "totalInscricoes": 4
+  },
+  {
+    "id": "op-102",
+    "titulo": "Fisioterapia ortopédica",
+    "descricao": "Sessões de fisioterapia para recuperação de lesões ortopédicas, com avaliação inicial.",
+    "tipoServico": "TERAPIA",
+    "especialidade": "fisioterapia",
+    "modalidade": "PRESENCIAL",
+    "modalidadeAcesso": "GRATUITO",
+    "preco": null,
+    "publicoAlvo": [
+      "ADULTOS"
+    ],
+    "publicoAlvoObservacao": null,
+    "vagasTotais": 10,
+    "vagasPreenchidas": 8,
+    "cep": "70000-000",
+    "endereco": "Quadra 302, Brasília",
+    "cidade": "Brasília",
+    "uf": "DF",
+    "distanciaKm": null,
+    "inscricoesDe": "2026-08-20",
+    "inscricoesAte": "2026-10-10",
+    "criteriosElegibilidade": null,
+    "semRestricoes": true,
+    "formaContato": "PLATAFORMA",
+    "prazoRespostaDias": 15,
+    "status": "ENCERRADA",
+    "ultimaAtualizacao": "2026-10-04T10:30:00Z",
+    "ofertante": {
+      "id": "pr-101",
+      "nome": "Marcos Vieira",
+      "conselho": "CRM",
+      "uf": "DF",
+      "numeroRegistro": "123456",
+      "ondeAtende": "Espaço Cuidar",
+      "verificado": true
+    },
+    "triagem": {
+      "modo": "PADRAO",
+      "perguntas": [
+        {
+          "id": "motivo",
+          "rotulo": "Qual o motivo principal?",
+          "tipo": "TEXTO_LONGO",
+          "obrigatoria": true,
+          "minCaracteres": 10,
+          "maxCaracteres": 300
+        },
+        {
+          "id": "tempo",
+          "rotulo": "Há quanto tempo?",
+          "tipo": "MULTIPLA",
+          "obrigatoria": true,
+          "opcoes": [
+            "Menos de 1 semana",
+            "De 1 a 4 semanas",
+            "De 1 a 6 meses",
+            "Mais de 6 meses"
+          ]
+        },
+        {
+          "id": "diagnostico",
+          "rotulo": "Já tem diagnóstico?",
+          "tipo": "SIM_NAO",
+          "obrigatoria": true
+        },
+        {
+          "id": "qual-diagnostico",
+          "rotulo": "Qual diagnóstico?",
+          "tipo": "TEXTO_CURTO",
+          "obrigatoria": true,
+          "dependeDe": {
+            "perguntaId": "diagnostico",
+            "resposta": "Sim"
+          }
+        },
+        {
+          "id": "medicacao",
+          "rotulo": "Usa medicação contínua?",
+          "tipo": "SIM_NAO",
+          "obrigatoria": true
+        },
+        {
+          "id": "quais-medicacoes",
+          "rotulo": "Quais medicações?",
+          "tipo": "TEXTO_CURTO",
+          "obrigatoria": true,
+          "dependeDe": {
+            "perguntaId": "medicacao",
+            "resposta": "Sim"
+          }
+        },
+        {
+          "id": "urgencia",
+          "rotulo": "Urgência percebida",
+          "tipo": "MULTIPLA",
+          "obrigatoria": true,
+          "opcoes": [
+            "Baixa",
+            "Média",
+            "Alta"
+          ],
+          "ajuda": "Alta: atrapalha suas atividades do dia a dia."
+        },
+        {
+          "id": "horario",
+          "rotulo": "Melhor horário",
+          "tipo": "MULTIPLA",
+          "obrigatoria": false,
+          "opcoes": [
+            "Manhã",
+            "Tarde",
+            "Noite"
+          ],
+          "permiteVarias": true
+        }
+      ],
+      "documentosExigidos": [
+        {
+          "id": "rg",
+          "rotulo": "RG"
+        },
+        {
+          "id": "exames",
+          "rotulo": "Exames anteriores"
+        }
+      ]
+    },
+    "totalInscricoes": 9
+  },
+  {
+    "id": "op-103",
+    "titulo": "Estudo sobre hipertensão",
+    "descricao": null,
+    "tipoServico": null,
+    "especialidade": "cardiologia",
+    "modalidade": "PRESENCIAL",
+    "modalidadeAcesso": "PESQUISA",
+    "preco": null,
+    "publicoAlvo": [],
+    "publicoAlvoObservacao": null,
+    "vagasTotais": 20,
+    "vagasPreenchidas": 0,
+    "cep": null,
+    "endereco": "Hospital Universitário, Brasília",
+    "cidade": "Brasília",
+    "uf": "DF",
+    "distanciaKm": null,
+    "inscricoesDe": null,
+    "inscricoesAte": null,
+    "criteriosElegibilidade": null,
+    "semRestricoes": false,
+    "formaContato": null,
+    "prazoRespostaDias": 15,
+    "status": "RASCUNHO",
+    "ultimaAtualizacao": "2026-10-18T09:00:00Z",
+    "ofertante": {
+      "id": "pr-101",
+      "nome": "Marcos Vieira",
+      "conselho": "CRM",
+      "uf": "DF",
+      "numeroRegistro": "123456",
+      "ondeAtende": "Espaço Cuidar",
+      "verificado": true
+    },
+    "triagem": {
+      "modo": "PADRAO",
+      "perguntas": [
+        {
+          "id": "motivo",
+          "rotulo": "Qual o motivo principal?",
+          "tipo": "TEXTO_LONGO",
+          "obrigatoria": true,
+          "minCaracteres": 10,
+          "maxCaracteres": 300
+        },
+        {
+          "id": "tempo",
+          "rotulo": "Há quanto tempo?",
+          "tipo": "MULTIPLA",
+          "obrigatoria": true,
+          "opcoes": [
+            "Menos de 1 semana",
+            "De 1 a 4 semanas",
+            "De 1 a 6 meses",
+            "Mais de 6 meses"
+          ]
+        },
+        {
+          "id": "diagnostico",
+          "rotulo": "Já tem diagnóstico?",
+          "tipo": "SIM_NAO",
+          "obrigatoria": true
+        },
+        {
+          "id": "qual-diagnostico",
+          "rotulo": "Qual diagnóstico?",
+          "tipo": "TEXTO_CURTO",
+          "obrigatoria": true,
+          "dependeDe": {
+            "perguntaId": "diagnostico",
+            "resposta": "Sim"
+          }
+        },
+        {
+          "id": "medicacao",
+          "rotulo": "Usa medicação contínua?",
+          "tipo": "SIM_NAO",
+          "obrigatoria": true
+        },
+        {
+          "id": "quais-medicacoes",
+          "rotulo": "Quais medicações?",
+          "tipo": "TEXTO_CURTO",
+          "obrigatoria": true,
+          "dependeDe": {
+            "perguntaId": "medicacao",
+            "resposta": "Sim"
+          }
+        },
+        {
+          "id": "urgencia",
+          "rotulo": "Urgência percebida",
+          "tipo": "MULTIPLA",
+          "obrigatoria": true,
+          "opcoes": [
+            "Baixa",
+            "Média",
+            "Alta"
+          ],
+          "ajuda": "Alta: atrapalha suas atividades do dia a dia."
+        },
+        {
+          "id": "horario",
+          "rotulo": "Melhor horário",
+          "tipo": "MULTIPLA",
+          "obrigatoria": false,
+          "opcoes": [
+            "Manhã",
+            "Tarde",
+            "Noite"
+          ],
+          "permiteVarias": true
+        }
+      ],
+      "documentosExigidos": [
+        {
+          "id": "rg",
+          "rotulo": "RG"
+        }
+      ]
+    },
+    "totalInscricoes": 0
+  },
+  {
+    "id": "op-104",
+    "titulo": "Nutrição esportiva",
+    "descricao": "Orientação nutricional para praticantes de esporte amador, com plano alimentar.",
+    "tipoServico": "CONSULTA",
+    "especialidade": "nutricao",
+    "modalidade": "ONLINE",
+    "modalidadeAcesso": "PRECO_SOCIAL",
+    "preco": 45,
+    "publicoAlvo": [
+      "ADOLESCENTES",
+      "ADULTOS"
+    ],
+    "publicoAlvoObservacao": null,
+    "vagasTotais": 6,
+    "vagasPreenchidas": 6,
+    "cep": null,
+    "endereco": null,
+    "cidade": null,
+    "uf": null,
+    "distanciaKm": null,
+    "inscricoesDe": "2026-07-10",
+    "inscricoesAte": "2026-09-30",
+    "criteriosElegibilidade": "Praticantes de esporte amador.",
+    "semRestricoes": false,
+    "formaContato": "TELEFONE",
+    "prazoRespostaDias": 15,
+    "status": "ENCERRADA",
+    "ultimaAtualizacao": "2026-09-30T18:00:00Z",
+    "ofertante": {
+      "id": "pr-101",
+      "nome": "Marcos Vieira",
+      "conselho": "CRM",
+      "uf": "DF",
+      "numeroRegistro": "123456",
+      "ondeAtende": "Espaço Cuidar",
+      "verificado": true
+    },
+    "triagem": {
+      "modo": "PADRAO",
+      "perguntas": [
+        {
+          "id": "motivo",
+          "rotulo": "Qual o motivo principal?",
+          "tipo": "TEXTO_LONGO",
+          "obrigatoria": true,
+          "minCaracteres": 10,
+          "maxCaracteres": 300
+        },
+        {
+          "id": "tempo",
+          "rotulo": "Há quanto tempo?",
+          "tipo": "MULTIPLA",
+          "obrigatoria": true,
+          "opcoes": [
+            "Menos de 1 semana",
+            "De 1 a 4 semanas",
+            "De 1 a 6 meses",
+            "Mais de 6 meses"
+          ]
+        },
+        {
+          "id": "diagnostico",
+          "rotulo": "Já tem diagnóstico?",
+          "tipo": "SIM_NAO",
+          "obrigatoria": true
+        },
+        {
+          "id": "qual-diagnostico",
+          "rotulo": "Qual diagnóstico?",
+          "tipo": "TEXTO_CURTO",
+          "obrigatoria": true,
+          "dependeDe": {
+            "perguntaId": "diagnostico",
+            "resposta": "Sim"
+          }
+        },
+        {
+          "id": "medicacao",
+          "rotulo": "Usa medicação contínua?",
+          "tipo": "SIM_NAO",
+          "obrigatoria": true
+        },
+        {
+          "id": "quais-medicacoes",
+          "rotulo": "Quais medicações?",
+          "tipo": "TEXTO_CURTO",
+          "obrigatoria": true,
+          "dependeDe": {
+            "perguntaId": "medicacao",
+            "resposta": "Sim"
+          }
+        },
+        {
+          "id": "urgencia",
+          "rotulo": "Urgência percebida",
+          "tipo": "MULTIPLA",
+          "obrigatoria": true,
+          "opcoes": [
+            "Baixa",
+            "Média",
+            "Alta"
+          ],
+          "ajuda": "Alta: atrapalha suas atividades do dia a dia."
+        },
+        {
+          "id": "horario",
+          "rotulo": "Melhor horário",
+          "tipo": "MULTIPLA",
+          "obrigatoria": false,
+          "opcoes": [
+            "Manhã",
+            "Tarde",
+            "Noite"
+          ],
+          "permiteVarias": true
+        }
+      ],
+      "documentosExigidos": [
+        {
+          "id": "rg",
+          "rotulo": "RG"
+        }
+      ]
+    },
+    "totalInscricoes": 12
+  },
+  {
+    "id": "op-105",
+    "titulo": "Psicologia adulto",
+    "descricao": "Atendimento psicológico individual para adultos, com encontros semanais de 50 minutos.",
+    "tipoServico": "TERAPIA",
+    "especialidade": "psicologia",
+    "modalidade": "ONLINE",
+    "modalidadeAcesso": "GRATUITO",
+    "preco": null,
+    "publicoAlvo": [
+      "ADULTOS"
+    ],
+    "publicoAlvoObservacao": null,
+    "vagasTotais": 8,
+    "vagasPreenchidas": 2,
+    "cep": null,
+    "endereco": null,
+    "cidade": null,
+    "uf": null,
+    "distanciaKm": null,
+    "inscricoesDe": "2026-10-01",
+    "inscricoesAte": "2026-12-20",
+    "criteriosElegibilidade": null,
+    "semRestricoes": true,
+    "formaContato": "PLATAFORMA",
+    "prazoRespostaDias": 15,
+    "status": "ATIVA",
+    "ultimaAtualizacao": "2026-10-20T11:15:00Z",
+    "ofertante": {
+      "id": "pr-101",
+      "nome": "Marcos Vieira",
+      "conselho": "CRM",
+      "uf": "DF",
+      "numeroRegistro": "123456",
+      "ondeAtende": "Espaço Cuidar",
+      "verificado": true
+    },
+    "triagem": {
+      "modo": "PADRAO",
+      "perguntas": [
+        {
+          "id": "motivo",
+          "rotulo": "Qual o motivo principal?",
+          "tipo": "TEXTO_LONGO",
+          "obrigatoria": true,
+          "minCaracteres": 10,
+          "maxCaracteres": 300
+        },
+        {
+          "id": "tempo",
+          "rotulo": "Há quanto tempo?",
+          "tipo": "MULTIPLA",
+          "obrigatoria": true,
+          "opcoes": [
+            "Menos de 1 semana",
+            "De 1 a 4 semanas",
+            "De 1 a 6 meses",
+            "Mais de 6 meses"
+          ]
+        },
+        {
+          "id": "diagnostico",
+          "rotulo": "Já tem diagnóstico?",
+          "tipo": "SIM_NAO",
+          "obrigatoria": true
+        },
+        {
+          "id": "qual-diagnostico",
+          "rotulo": "Qual diagnóstico?",
+          "tipo": "TEXTO_CURTO",
+          "obrigatoria": true,
+          "dependeDe": {
+            "perguntaId": "diagnostico",
+            "resposta": "Sim"
+          }
+        },
+        {
+          "id": "medicacao",
+          "rotulo": "Usa medicação contínua?",
+          "tipo": "SIM_NAO",
+          "obrigatoria": true
+        },
+        {
+          "id": "quais-medicacoes",
+          "rotulo": "Quais medicações?",
+          "tipo": "TEXTO_CURTO",
+          "obrigatoria": true,
+          "dependeDe": {
+            "perguntaId": "medicacao",
+            "resposta": "Sim"
+          }
+        },
+        {
+          "id": "urgencia",
+          "rotulo": "Urgência percebida",
+          "tipo": "MULTIPLA",
+          "obrigatoria": true,
+          "opcoes": [
+            "Baixa",
+            "Média",
+            "Alta"
+          ],
+          "ajuda": "Alta: atrapalha suas atividades do dia a dia."
+        },
+        {
+          "id": "horario",
+          "rotulo": "Melhor horário",
+          "tipo": "MULTIPLA",
+          "obrigatoria": false,
+          "opcoes": [
+            "Manhã",
+            "Tarde",
+            "Noite"
+          ],
+          "permiteVarias": true
+        }
+      ],
+      "documentosExigidos": [
+        {
+          "id": "rg",
+          "rotulo": "RG"
+        }
+      ]
+    },
+    "totalInscricoes": 5
+  },
+  {
+    "id": "op-106",
+    "titulo": "Avaliação odontológica",
+    "descricao": "Avaliação odontológica completa com orientação de higiene e encaminhamento quando preciso.",
+    "tipoServico": "EXAME",
+    "especialidade": "odontologia",
+    "modalidade": "PRESENCIAL",
+    "modalidadeAcesso": "GRATUITO",
+    "preco": null,
+    "publicoAlvo": [
+      "CRIANCAS",
+      "ADOLESCENTES",
+      "ADULTOS"
+    ],
+    "publicoAlvoObservacao": null,
+    "vagasTotais": 8,
+    "vagasPreenchidas": 1,
+    "cep": "70000-000",
+    "endereco": "Espaço Cuidar, Brasília",
+    "cidade": "Brasília",
+    "uf": "DF",
+    "distanciaKm": null,
+    "inscricoesDe": "2026-10-05",
+    "inscricoesAte": "2026-11-30",
+    "criteriosElegibilidade": null,
+    "semRestricoes": true,
+    "formaContato": "EMAIL",
+    "prazoRespostaDias": 15,
+    "status": "ATIVA",
+    "ultimaAtualizacao": "2026-10-21T08:40:00Z",
+    "ofertante": {
+      "id": "pr-101",
+      "nome": "Marcos Vieira",
+      "conselho": "CRM",
+      "uf": "DF",
+      "numeroRegistro": "123456",
+      "ondeAtende": "Espaço Cuidar",
+      "verificado": true
+    },
+    "triagem": {
+      "modo": "PADRAO",
+      "perguntas": [
+        {
+          "id": "motivo",
+          "rotulo": "Qual o motivo principal?",
+          "tipo": "TEXTO_LONGO",
+          "obrigatoria": true,
+          "minCaracteres": 10,
+          "maxCaracteres": 300
+        },
+        {
+          "id": "tempo",
+          "rotulo": "Há quanto tempo?",
+          "tipo": "MULTIPLA",
+          "obrigatoria": true,
+          "opcoes": [
+            "Menos de 1 semana",
+            "De 1 a 4 semanas",
+            "De 1 a 6 meses",
+            "Mais de 6 meses"
+          ]
+        },
+        {
+          "id": "diagnostico",
+          "rotulo": "Já tem diagnóstico?",
+          "tipo": "SIM_NAO",
+          "obrigatoria": true
+        },
+        {
+          "id": "qual-diagnostico",
+          "rotulo": "Qual diagnóstico?",
+          "tipo": "TEXTO_CURTO",
+          "obrigatoria": true,
+          "dependeDe": {
+            "perguntaId": "diagnostico",
+            "resposta": "Sim"
+          }
+        },
+        {
+          "id": "medicacao",
+          "rotulo": "Usa medicação contínua?",
+          "tipo": "SIM_NAO",
+          "obrigatoria": true
+        },
+        {
+          "id": "quais-medicacoes",
+          "rotulo": "Quais medicações?",
+          "tipo": "TEXTO_CURTO",
+          "obrigatoria": true,
+          "dependeDe": {
+            "perguntaId": "medicacao",
+            "resposta": "Sim"
+          }
+        },
+        {
+          "id": "urgencia",
+          "rotulo": "Urgência percebida",
+          "tipo": "MULTIPLA",
+          "obrigatoria": true,
+          "opcoes": [
+            "Baixa",
+            "Média",
+            "Alta"
+          ],
+          "ajuda": "Alta: atrapalha suas atividades do dia a dia."
+        },
+        {
+          "id": "horario",
+          "rotulo": "Melhor horário",
+          "tipo": "MULTIPLA",
+          "obrigatoria": false,
+          "opcoes": [
+            "Manhã",
+            "Tarde",
+            "Noite"
+          ],
+          "permiteVarias": true
+        }
+      ],
+      "documentosExigidos": [
+        {
+          "id": "rg",
+          "rotulo": "RG"
+        },
+        {
+          "id": "sus",
+          "rotulo": "Cartão do SUS"
+        }
+      ]
+    },
+    "totalInscricoes": 3
+  }
+]

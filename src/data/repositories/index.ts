@@ -1,123 +1,95 @@
 import type {
-  ApplicationDTO,
-  CurrentUserDTO,
-  FilterCatalogDTO,
+  CadastroResponseDTO,
+  CatalogosDTO,
   LoginResponseDTO,
-  OpportunityDTO,
-  PageDTO,
-  PendingProfessionalDTO,
-  ProfessionalCatalogDTO,
-  VerificationChallengeDTO,
+  MeDTO,
 } from '@/data/dto'
 import {
-  applicationFromDTO,
-  currentUserFromDTO,
-  filterCatalogFromDTO,
-  loginResultFromDTO,
-  opportunityFromDTO,
-  opportunityPageFromDTO,
+  catalogFromDTO,
   pendingVerificationFromDTO,
-  pendingProfessionalFromDTO,
-  professionalCatalogFromDTO,
-  professionalHealthSignupToDTO,
-  signUpDraftToDTO,
+  sessionFromDTO,
+  signUpForm,
 } from '@/data/mappers'
-import type { HttpClient } from '@/data/network/httpClient'
-import {
-  queryItems,
-  type Application,
-  type CurrentUser,
-  type FilterCatalog,
-  type LoginResult,
-  type Opportunity,
-  type OpportunityPage,
-  type PendingVerification,
-  type PendingProfessional,
-  type ProfessionalCatalog,
-  type SignUpDraft,
-} from '@/domain/entities'
-import type {
-  ApplicationRepository,
-  AdminRepository,
-  AuthRepository,
-  OpportunityRepository,
-} from '@/domain/repositories'
+import { bearer, NetworkError, type HttpClient } from '@/data/network/httpClient'
+import type { Session } from '@/domain/entities'
+import type { AuthRepository } from '@/domain/repositories'
 
+export const PROFESSIONAL_SIGNUP_URL = 'profissional-saude/cadastro'
+export const USER_LOGIN_URL = 'user/login'
+
+/**
+ * GET /user/me logo depois do login, para ter o nome. A rota e nova no
+ * contrato: se a API ainda nao tem (404), barra (401/403) ou nao responde,
+ * o login segue com o nome tirado do e-mail.
+ */
+async function fetchMe(client: HttpClient, token: string): Promise<MeDTO | null> {
+  try {
+    return await client.send<MeDTO>({ path: 'user/me', headers: bearer(token) })
+  } catch (error) {
+    if (error instanceof NetworkError) return null
+    throw error
+  }
+}
+
+/** Acesso (/auth/*) e catalogo da carebridge-api. */
 export function createAuthRepository(client: HttpClient): AuthRepository {
+  async function sessionFor(login: LoginResponseDTO, email: string): Promise<Session> {
+    const me = await fetchMe(client, login.token)
+    return sessionFromDTO(login, me, email)
+  }
+
+  // /auth/verify so confirma o e-mail e nao devolve token. A senha do cadastro
+  // fica so na memoria para entrar logo depois; recarregar a pagina a perde.
+  const pendingPasswords = new Map<string, string>()
+
+  async function login(email: string, password: string): Promise<Session> {
+    const { data: dto, status } = await client.sendWithStatus<LoginResponseDTO>({
+      path: USER_LOGIN_URL,
+      method: 'POST',
+      body: { email, password },
+    })
+    if (
+      status !== 200 ||
+      dto.autenticado !== true ||
+      typeof dto.token !== 'string' ||
+      dto.token.trim() === ''
+    ) {
+      throw new NetworkError('decoding', 'Não foi possível iniciar a sessão.', status)
+    }
+    return sessionFor(dto, email)
+  }
+
   return {
-    async login(email, password): Promise<LoginResult> {
-      const { data, status } = await client.sendWithStatus<LoginResponseDTO>({
-        path: 'auth/login',
+    login,
+
+    async signUp(draft, biographyOrDescription = '', documents = []) {
+      const dto = await client.sendOptional<CadastroResponseDTO>({
+        path: PROFESSIONAL_SIGNUP_URL,
         method: 'POST',
-        body: { email, password },
+        body: signUpForm(draft, biographyOrDescription, documents),
       })
-      return loginResultFromDTO(data, status)
+      const pending = pendingVerificationFromDTO(dto, draft.email)
+      if (pending.requiresCode) pendingPasswords.set(pending.email, draft.password)
+      return pending
     },
 
-    async me(): Promise<CurrentUser> {
-      const dto = await client.send<CurrentUserDTO>({
-        path: 'user/me',
-        requiresAuth: true,
-      })
-      return currentUserFromDTO(dto)
+    async verify(email, code) {
+      await client.sendVoid({ path: 'auth/verify', method: 'POST', body: { email, code } })
+      const password = pendingPasswords.get(email)
+      if (password === undefined) return null
+      pendingPasswords.delete(email)
+      return login(email, password)
     },
 
-    async signUp(draft: SignUpDraft): Promise<PendingVerification> {
-      const dto = await client.send<VerificationChallengeDTO>({
-        path: 'auth/register',
-        method: 'POST',
-        body: signUpDraftToDTO(draft),
-      })
-      return pendingVerificationFromDTO(dto)
+    async resendCode(email) {
+      await client.sendVoid({ path: 'auth/resend-code', method: 'POST', body: { email } })
     },
 
-    async registerProfessional(
-      draft: SignUpDraft,
-      biographyOrDescription: string,
-      documents: readonly File[],
-    ): Promise<PendingVerification> {
-      const body = new FormData()
-      body.append(
-        'dados',
-        new Blob(
-          [JSON.stringify(professionalHealthSignupToDTO(draft, biographyOrDescription))],
-          { type: 'application/json' },
-        ),
-      )
-      for (const document of documents) body.append('documentos', document)
-      const dto = await client.send<VerificationChallengeDTO>({
-        path: 'auth/register',
-        method: 'POST',
-        body,
-      })
-      return pendingVerificationFromDTO(dto)
+    async requestPasswordReset(email) {
+      await client.sendVoid({ path: 'auth/password-reset', method: 'POST', body: { email } })
     },
 
-    async verify(email, code): Promise<void> {
-      await client.send<{ message: string }>({
-        path: 'auth/verify',
-        method: 'POST',
-        body: { email, code },
-      })
-    },
-
-    async resendCode(email): Promise<void> {
-      await client.sendVoid({
-        path: 'auth/resend-code',
-        method: 'POST',
-        body: { email },
-      })
-    },
-
-    async requestPasswordReset(email): Promise<void> {
-      await client.sendVoid({
-        path: 'auth/password-reset',
-        method: 'POST',
-        body: { email },
-      })
-    },
-
-    async confirmPasswordReset(email, code, newPassword): Promise<void> {
+    async resetPassword(email, code, newPassword) {
       await client.sendVoid({
         path: 'auth/password-reset',
         method: 'POST',
@@ -125,91 +97,22 @@ export function createAuthRepository(client: HttpClient): AuthRepository {
       })
     },
 
-    async deleteAccount(password): Promise<void> {
+    async exportMyData() {
+      return client.send<unknown>({ path: 'me/data-export', method: 'POST', authenticated: true })
+    },
+
+    async deleteAccount(password) {
       await client.sendVoid({
         path: 'me',
         method: 'DELETE',
         body: { password },
-        requiresAuth: true,
-        invalidatesSessionOnUnauthorized: false,
+        authenticated: true,
+        checksPassword: true,
       })
     },
 
-    async professionalCatalog(): Promise<ProfessionalCatalog> {
-      const dto = await client.send<ProfessionalCatalogDTO>({
-        path: 'catalogos',
-      })
-      return professionalCatalogFromDTO(dto)
-    },
-  }
-}
-
-export function createOpportunityRepository(
-  client: HttpClient,
-): OpportunityRepository {
-  return {
-    async search(criteria): Promise<OpportunityPage> {
-      const dto = await client.send<PageDTO<OpportunityDTO>>({
-        path: 'oportunidades',
-        query: queryItems(criteria),
-      })
-      return opportunityPageFromDTO(dto)
-    },
-
-    async detail(id): Promise<Opportunity> {
-      const dto = await client.send<OpportunityDTO>({ path: `oportunidades/${id}` })
-      return opportunityFromDTO(dto)
-    },
-
-    async filters(): Promise<FilterCatalog> {
-      const dto = await client.send<FilterCatalogDTO>({ path: 'catalogos' })
-      return filterCatalogFromDTO(dto)
-    },
-  }
-}
-
-export function createApplicationRepository(
-  client: HttpClient,
-): ApplicationRepository {
-  return {
-    async status(id): Promise<Application> {
-      const dto = await client.send<ApplicationDTO>({
-        path: `profissional-saude/inscricoes/${id}`,
-        requiresAuth: true,
-      })
-      return applicationFromDTO(dto)
-    },
-  }
-}
-
-export function createAdminRepository(client: HttpClient): AdminRepository {
-  async function changeStatus(
-    id: string,
-    action: 'aprovar' | 'recusar',
-  ): Promise<PendingProfessional> {
-    const dto = await client.send<PendingProfessionalDTO>({
-      path: `user/profissionais/${id}/${action}`,
-      method: 'PATCH',
-      requiresAuth: true,
-    })
-    return pendingProfessionalFromDTO(dto)
-  }
-
-  return {
-    async pendingProfessionals(): Promise<readonly PendingProfessional[]> {
-      const items = await client.send<PendingProfessionalDTO[]>({
-        path: 'user/profissionais/pendentes',
-        requiresAuth: true,
-      })
-      return items.map(pendingProfessionalFromDTO)
-    },
-
-    approveProfessional(id): Promise<PendingProfessional> {
-      return changeStatus(id, 'aprovar')
-    },
-
-    rejectProfessional(id): Promise<PendingProfessional> {
-      return changeStatus(id, 'recusar')
+    async catalog() {
+      return catalogFromDTO(await client.send<CatalogosDTO>({ path: 'catalogos' }))
     },
   }
 }

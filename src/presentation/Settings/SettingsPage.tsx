@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDependencies, useSession } from '@/app/session'
 import { readTheme, saveTheme, type ThemeChoice } from '@/app/theme'
-import { NetworkError } from '@/data/network/httpClient'
 import {
   Banner,
   Button,
@@ -10,8 +9,11 @@ import {
   Modal,
   PageHeader,
   Panel,
+  PasswordField,
   TextField,
 } from '@/designSystem/components'
+import { NetworkError } from '@/data/network/httpClient'
+import { ValidationError } from '@/domain/useCases'
 import { strings } from '@/resources/strings'
 
 const text = strings.settings
@@ -51,8 +53,8 @@ function noop() {
 }
 
 export function SettingsPage() {
-  const session = useSession()
   const dependencies = useDependencies()
+  const session = useSession()
   const navigate = useNavigate()
   const user = session.session?.user
   const { registration, isVerified } = session.profile
@@ -61,9 +63,10 @@ export function SettingsPage() {
   const [notices, setNotices] = useState(readNotices)
   const [notice, setNotice] = useState<string | null>(null)
   const [isDeleting, setDeleting] = useState(false)
-  const [deletePassword, setDeletePassword] = useState('')
-  const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [isDeleteBusy, setDeleteBusy] = useState(false)
+  const [isBusy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [password, setPassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
 
   function chooseTheme(choice: ThemeChoice) {
     setTheme(choice)
@@ -80,19 +83,56 @@ export function SettingsPage() {
     }
   }
 
-  /** Entrega em JSON o que o painel sabe da conta, como a LGPD pede. */
-  function downloadData() {
-    const blob = new Blob(
-      [JSON.stringify({ user, registration, isVerified, notices, theme }, null, 2)],
-      { type: 'application/json' },
-    )
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'carebridge-meus-dados.json'
-    link.click()
-    URL.revokeObjectURL(url)
-    setNotice(text.downloadReady)
+  /** LGPD: o que a API guarda da conta, mais as preferencias deste navegador. */
+  async function downloadData() {
+    setNotice(null)
+    setError(null)
+    setBusy(true)
+    try {
+      const conta = await dependencies.exportMyData()
+      const blob = new Blob(
+        [JSON.stringify({ conta, preferenciasDoPainel: { notices, theme } }, null, 2)],
+        { type: 'application/json' },
+      )
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'carebridge-meus-dados.json'
+      link.click()
+      URL.revokeObjectURL(url)
+      setNotice(text.downloadReady)
+    } catch {
+      setError(strings.common.failed)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function closeDelete() {
+    setDeleting(false)
+    setPassword('')
+    setPasswordError(null)
+  }
+
+  async function deleteAccount() {
+    setPasswordError(null)
+    setBusy(true)
+    try {
+      await dependencies.deleteAccount(password)
+      session.signOut()
+      navigate('/', { replace: true })
+    } catch (caught) {
+      if (caught instanceof ValidationError) {
+        setPasswordError(caught.message)
+      } else if (caught instanceof NetworkError && caught.kind === 'unauthorized') {
+        // 401 aqui e senha errada ou sessao vencida; a mensagem da API diz qual.
+        setPasswordError(caught.apiMessage ?? text.deleteWrongPassword)
+      } else {
+        setPasswordError(caught instanceof NetworkError && caught.apiMessage ? caught.apiMessage : strings.common.failed)
+      }
+    } finally {
+      setBusy(false)
+    }
   }
 
   function signOut() {
@@ -100,38 +140,12 @@ export function SettingsPage() {
     navigate('/', { replace: true })
   }
 
-  function closeDelete() {
-    if (isDeleteBusy) return
-    setDeleting(false)
-    setDeletePassword('')
-    setDeleteError(null)
-  }
-
-  async function deleteAccount() {
-    if (deletePassword === '') {
-      setDeleteError(text.deletePasswordRequired)
-      return
-    }
-    setDeleteBusy(true)
-    setDeleteError(null)
-    try {
-      await dependencies.authRepository.deleteAccount(deletePassword)
-      session.signOut()
-      navigate('/', { replace: true })
-    } catch (error) {
-      setDeleteError(
-        error instanceof NetworkError ? error.apiMessage ?? text.deleteFailed : text.deleteFailed,
-      )
-    } finally {
-      setDeleteBusy(false)
-    }
-  }
-
   return (
     <>
       <PageHeader crumbs={[{ label: text.title }]} title={text.title} subtitle={text.subtitle} />
 
       {notice && <Banner message={notice} tone="success" />}
+      {error && <Banner message={error} tone="danger" />}
 
       <Panel title={text.profileTitle}>
         <div className="cb-row">
@@ -177,7 +191,12 @@ export function SettingsPage() {
 
       <Panel title={text.accountTitle} gap="md">
         <div className="cb-account-actions">
-          <Button title={text.download} kind="outline" onClick={downloadData} />
+          <Button
+            title={text.download}
+            kind="outline"
+            isLoading={isBusy && !isDeleting}
+            onClick={() => void downloadData()}
+          />
           <Button title={text.signOut} kind="outline" onClick={signOut} />
           <Button title={text.deleteAccount} kind="dangerSoft" onClick={() => setDeleting(true)} />
         </div>
@@ -190,21 +209,23 @@ export function SettingsPage() {
           onDismiss={closeDelete}
           actions={
             <>
-              <Button title={strings.common.cancel} kind="outline" isEnabled={!isDeleteBusy} onClick={closeDelete} />
-              <Button title={text.deleteConfirm} kind="danger" isLoading={isDeleteBusy} onClick={() => void deleteAccount()} />
+              <Button title={strings.common.cancel} kind="outline" onClick={closeDelete} />
+              <Button
+                title={text.deleteConfirm}
+                kind="danger"
+                isEnabled={password !== ''}
+                isLoading={isBusy}
+                onClick={() => void deleteAccount()}
+              />
             </>
           }
         >
-          <TextField
-            label={text.deletePassword}
-            type="password"
+          <PasswordField
+            label={text.deletePasswordLabel}
             autoComplete="current-password"
-            value={deletePassword}
-            onChange={(value) => {
-              setDeletePassword(value)
-              setDeleteError(null)
-            }}
-            errorMessage={deleteError}
+            value={password}
+            onChange={setPassword}
+            errorMessage={passwordError}
           />
         </Modal>
       )}

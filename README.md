@@ -7,9 +7,9 @@
 
 **https://luisfontinelles.github.io/trabalho-andre-web/**
 
-Não precisa instalar nada: o site roda no navegador e se conecta à API configurada no deploy. Para entrar, use uma conta cadastrada no backend.
+Não precisa instalar nada: o site roda no navegador, sobre dados de demonstração. Entre com **`profissional@teste.com`** e qualquer senha; se o cadastro pedir código de verificação, use **`0000`**.
 
-A sessão dura enquanto a aba estiver aberta, então recarregar a página não desloga.
+A sessão dura enquanto a aba estiver aberta, então recarregar a página não desloga. Como os dados são de demonstração, o que você criar ou alterar volta ao estado inicial quando a aba é fechada.
 
 Aplicação web do trabalho final de **Soluções Computacionais** (Universidade Católica de Brasília, 2026/2, prof. Andre Gustavo Bastos Lima). É o cliente do profissional de saúde na plataforma CareBridge, que reúne oportunidades de cuidado em saúde gratuitas, acessíveis ou direcionadas a públicos específicos.
 
@@ -19,28 +19,29 @@ Repositórios irmãos: [mobile](https://github.com/LuisFontinelles/trabalho-andr
 
 ## Estado atual
 
-Por padrão, a aplicação usa a API definida em `VITE_API_BASE_URL`, com fallback para o backend publicado no Render. O servidor simulado por fixtures continua isolado nos testes automatizados, exercitando montagem da URL, códigos de status, decodificação e tratamento de erros sem afetar produção.
+O painel fala o [contrato da API, versão 2](CONTRATO-API-CareBridge.md): caminhos sem `/v1`, nomes em português, valores fechados em MAIÚSCULAS e erro `{status, message}`, igual ao app iOS. A aplicação usa a API real em todos os fluxos. O servidor simulado por fixtures fica restrito aos testes automatizados.
 
 | Área | Situação |
 |---|---|
-| Login e guards por perfil | Pronto, integrado à API |
+| Login | Pronto, integrado à API |
 | Cadastro de profissional, com conselho e registro | Pronto, com validação completa |
-| Verificação por código de 6 dígitos, com reenvio cronometrado | Pronto |
+| Verificação por código de 4 dígitos, com reenvio cronometrado | Pronto |
 | Cadastro em verificação, com aviso no painel | Pronto |
-| Recuperação de senha por código e definição da nova senha | Pronto, integrado à API |
-| Aprovação e recusa administrativa de profissionais | Pronto, em área isolada de ADMIN |
+| Recuperação de senha | Pronto, integrada à API |
 | Minhas oportunidades: indicadores, tabela e estados vazio, carregando e erro | Pronto |
 | Encerrar oportunidade e excluir rascunho, com confirmação | Pronto |
 | Nova oportunidade, nos três passos do protótipo | Pronto |
 | Salvar rascunho e tela de oportunidade publicada | Pronto |
 | Editar oportunidade | Pronto |
 | Triagem: perguntas com tipo de resposta e documentos exigidos | Pronto |
-| Solicitações recebidas, com filtro por status | Pronto |
+| Triagem padrão do contrato: 8 perguntas, com as condicionais de diagnóstico e medicação | Pronto |
+| Solicitações recebidas, com os 6 estados e filtro por estado | Pronto |
 | Detalhe da solicitação: triagem, documentos, decisão e mensagens | Pronto |
-| Aprovar com dados do atendimento, recusar com motivo e pedir informações | Pronto |
+| Aprovar, recusar com motivo e pedir informações | Pronto |
+| Combinado da aprovação (quando, onde, levar) | Pronto, com campos opcionais; vazios usam "A combinar" |
 | Abrir documento anexado | Pronto, com a pré-visualização do protótipo |
 | Baixar documento anexado | **Desativado e marcado** |
-| Configurações: perfil, tema, avisos, exportação local e exclusão da conta | Pronto |
+| Configurações: perfil, tema claro e escuro, avisos e dados da conta | Pronto |
 | Ver a oportunidade como paciente | **Desativado e marcado** |
 
 As telas seguem o protótipo do Figma nas três larguras: **desktop** (1440, menu lateral completo), **tablet** (834, trilho de ícones) e **mobile** (390, barra superior e menu recolhido). No mobile as tabelas viram cartões e as linhas de campos viram colunas. Os tokens de cor, espaço e raio, a escala de texto em Inter e os ícones Material Symbols Rounded são os do arquivo de design, com tema claro e escuro.
@@ -58,9 +59,23 @@ npm install
 npm run dev
 ```
 
-### Contas de teste
+### API real
 
-As credenciais dependem do ambiente do backend. Para testes automatizados, o projeto injeta `createMockFetch()` e usa contas, códigos e dados exclusivamente locais; essas credenciais não são usadas pela aplicação em produção.
+Todos os fluxos falam com a API configurada em `VITE_API_URL`. Sem essa variável, a aplicação usa o backend publicado no Render. As contas e credenciais disponíveis dependem do ambiente do backend.
+
+```bash
+cp .env.example .env.local   # VITE_API_URL=/api
+npm run dev
+```
+
+A API pode ser acessada pelo proxy de desenvolvimento: o `npm run dev` repassa `/api/*` para o destino configurado. Para apontar para a API rodando na sua máquina, defina `API_PROXY_TARGET=http://localhost:8080` no `.env.local`.
+
+| Tela | Rota da API | Observação |
+|---|---|---|
+| Login | `POST /user/login` e, logo depois, `GET /user/me` | O nome vem do `/user/me`. Perfis não profissionais mantêm a sessão, mas o guard bloqueia o painel. |
+| Cadastro | `POST /profissional-saude/cadastro` (multipart, partes `dados` e `documentos`) | Envia registro, especialidade, local de atendimento, biografia e até 2 documentos. |
+
+Recuperação de senha, catálogo, oportunidades, solicitações, configurações e decisões usam os respectivos endpoints reais. Fixtures e `createMockFetch()` são usados somente pela suíte automatizada.
 
 ## Scripts
 
@@ -74,19 +89,20 @@ As credenciais dependem do ambiente do backend. Para testes automatizados, o pro
 
 ## Testes
 
-364 testes em Vitest cobrem domínio, dados e os fluxos críticos de interface.
+454 testes em Vitest, com **98,1% de cobertura de linhas** em domínio e camada de dados.
 
 | Suíte | O que cobre |
 |---|---|
 | `validation` | E-mail, senha e as regras do cadastro, na ordem dos campos |
-| `entities` | Vagas, critérios de busca, perfis e valores desconhecidos |
-| `professional` | Status, ações permitidas por status, resumo do painel, filtros e tempo relativo |
+| `entities` | Perfis e cadastro |
+| `professional` | Os 6 estados, atrasada, ações por status, resumo, filtros, combinado e tempo relativo |
 | `opportunityDraft` | Os três passos do formulário, campo a campo |
-| `triage` | Modos da triagem, perguntas e documentos exigidos |
-| `network` | Montagem de URL, casamento de rotas e cada código de erro |
-| `repositories` | Login, cadastro, verificação, redefinição de senha, conta, busca e candidatura |
-| `professionalRepository` | Criar, editar, encerrar, excluir, decidir, combinar atendimento e responder |
-| telas críticas | Login, administração, recuperação de senha e exclusão da conta |
+| `triage` | Formulário padrão do contrato, condicionais, perguntas e documentos exigidos |
+| `network` | URL sem `/v1`, token Bearer, 401 que encerra a sessão, cada código de erro e as fixtures |
+| `repositories` | Login com `/user/me`, bloqueio por tentativas, cadastro, verificação e catálogo |
+| `carebridgeApi` | Login e cadastro na API real, com o nome tirado do e-mail quando `/user/me` falha |
+| `professionalMappers` | Ida e volta entre o domínio e o contrato, com as fixtures |
+| `professionalRepository` | Criar, editar, encerrar, excluir, decidir, pedir informação e mensagens, com as regras de 400, 403 e 409 |
 
 O estado do mock é reiniciado antes e depois de cada teste, então nenhum teste depende do que outro deixou.
 
@@ -110,7 +126,7 @@ src/
 └── resources/        textos e fixtures JSON
 ```
 
-O domínio não importa React. Quando uma decisão visual depende de uma regra, o domínio expõe um conceito próprio e o design system faz a tradução, como em `vacancyLevel`, que devolve um nível e não uma cor.
+O domínio não importa React. Quando uma decisão visual depende de uma regra, o domínio expõe um conceito próprio e o design system faz a tradução, como em `REQUEST_STATUS_TONE`, que devolve um tom e não uma cor.
 
 ### Design system
 
@@ -123,20 +139,27 @@ Os tokens espelham os do aplicativo iOS, então as duas interfaces falam a mesma
 
 ### Camada de rede
 
-O corpo de erro é o mesmo acordado com o backend:
+Só a camada de dados fala português: os DTOs (`src/data/dto`, `src/data/professionalDto.ts`) espelham o contrato, e os mappers traduzem para o domínio, que segue em inglês. Valor fechado vai em MAIÚSCULAS no fio e em minúsculas no domínio (`PRECO_SOCIAL` ↔ `preco-social`).
+
+As rotas com cadeado levam `Authorization: Bearer <token>`. Um 401 numa delas encerra a sessão e volta para o login; 403 é falta de permissão e não desloga.
+
+O corpo de erro é o do contrato, com os campos do Spring junto:
 
 ```json
 {
-  "statusCode": 404,
-  "message": "Not Found: user not found",
-  "error": "Not Found",
-  "requestId": "ddfd6adc-59d5-4ef0-a1f1-7bc904c9b17e"
+  "status": 409,
+  "message": "Já existe um usuário cadastrado com este e-mail.",
+  "error": "Conflict",
+  "path": "/profissional-saude/cadastro",
+  "timestamp": "2026-11-19T02:52:06Z"
 }
 ```
 
-Rotas dedicadas a exercitar o tratamento de erro: `/v1/debug/no-content` (204), `/v1/debug/bad-request` (400), `/v1/debug/unauthorized` (401), `/v1/debug/not-found` (404) e `/v1/debug/server-error` (500).
+O `NetworkError` separa `unauthorized` (401), `forbidden` (403), `notFound` (404), `conflict` (409), `tooManyAttempts` (429), `badRequest` (400) e `server`, e as telas mostram a `message` quando ela explica o que fazer.
 
-O contrato completo da API está documentado em `CONTRATO-API-CareBridge.md`, na raiz do projeto.
+Rotas dedicadas a exercitar o tratamento de erro: `/debug/no-content` (204), `/debug/bad-request` (400), `/debug/unauthorized` (401), `/debug/forbidden` (403), `/debug/not-found` (404), `/debug/conflict` (409), `/debug/too-many` (429) e `/debug/server-error` (500).
+
+O contrato completo está em `CONTRATO-API-CareBridge.md`, na raiz do projeto.
 
 ## Integração contínua
 

@@ -1,234 +1,99 @@
-import {
-  modalityFrom,
-  offerTypeFrom,
-  authProfileFrom,
-  userProfileFrom,
-  FALLBACK_PROFESSIONAL_CATALOG,
-  type Application,
-  type CurrentUser,
-  type FilterCatalog,
-  type LoginResult,
-  type FilterOption,
-  type Opportunity,
-  type OpportunityPage,
-  type PendingVerification,
-  type PendingProfessional,
-  type ProfessionalCatalog,
-  type Provider,
-  type Session,
-  type SignUpDraft,
-  type User,
-} from '@/domain/entities'
 import type {
-  ApplicationDTO,
-  AuthResponseDTO,
-  CurrentUserDTO,
-  FilterCatalogDTO,
-  FilterOptionDTO,
+  CadastroResponseDTO,
+  CatalogosDTO,
   LoginResponseDTO,
-  OpportunityDTO,
-  PageDTO,
-  PendingProfessionalDTO,
-  ProfessionalCatalogDTO,
-  ProfessionalHealthSignupDTO,
-  ProviderDTO,
-  SignUpRequestDTO,
-  UserDTO,
-  VerificationChallengeDTO,
+  MeDTO,
+  ProfissionalCadastroDTO,
 } from '@/data/dto'
+import type {
+  AuthProfile,
+  Catalog,
+  PendingVerification,
+  Session,
+  SignUpDraft,
+  User,
+  UserProfile,
+} from '@/domain/entities'
+import { DEFAULT_CODE_LENGTH } from '@/domain/entities'
 
-export function userFromDTO(dto: UserDTO): User {
+/**
+ * Valor fechado do dominio para o fio: `preco-social` vira `PRECO_SOCIAL`.
+ * O dominio guarda em minusculas com hifen; o contrato, como enum Java.
+ */
+export function toWireEnum(value: string): string {
+  return value.toUpperCase().replace(/-/g, '_')
+}
+
+/** O caminho de volta: `PRECO_SOCIAL` vira `preco-social`. */
+export function fromWireEnum(value: string | null | undefined): string {
+  return (value ?? '').toLowerCase().replace(/_/g, '-')
+}
+
+export function profileFromWire(raw: string | null | undefined): UserProfile {
+  if (raw === 'PROFISSIONAL_SAUDE') return 'PROFISSIONAL'
+  if (raw === 'PACIENTE') return 'PACIENTE'
+  return 'DESCONHECIDO'
+}
+
+/**
+ * Nome provisorio enquanto GET /user/me nao responde: a parte local do
+ * e-mail ("ana.souza@..." vira "Ana Souza"), para a sidebar nao ficar vazia.
+ */
+export function nameFromEmail(email: string): string {
+  const local = email.split('@')[0] ?? ''
+  const words = local
+    .split(/[._-]+/)
+    .filter((word) => word !== '')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+  return words.length > 0 ? words.join(' ') : email
+}
+
+/**
+ * A sessao junta o login com GET /user/me. Sem o /me, o nome sai do e-mail
+ * e o id fica sendo o e-mail, que e o subject do token.
+ */
+export function sessionFromDTO(
+  login: LoginResponseDTO,
+  me: MeDTO | null,
+  email: string,
+): Session {
+  const authProfile: AuthProfile =
+    login.tipoPerfil === 'PROFISSIONAL_SAUDE' ||
+    login.tipoPerfil === 'PACIENTE' ||
+    login.tipoPerfil === 'ADMIN'
+      ? login.tipoPerfil
+      : 'DESCONHECIDO'
+  const user: User = {
+    id: me?.id ?? email,
+    name: me?.nome?.trim() ? me.nome.trim() : nameFromEmail(email),
+    email: me?.email ?? email,
+    profile: profileFromWire(me?.tipoPerfil ?? login.tipoPerfil),
+  }
+  const registration = registrationFromMe(me)
   return {
-    id: dto.email,
-    name: dto.username,
-    email: dto.email,
-    profile: userProfileFrom(dto.profile),
-    city: dto.address?.city ?? null,
+    token: login.token,
+    user,
+    authProfile,
+    isVerified: login.validadoInstitucionalmente,
+    ...(registration === undefined ? {} : { registration }),
   }
 }
 
-export function sessionFromDTO(dto: AuthResponseDTO): Session {
-  const tipoPerfil =
-    dto.user.profile === 'PROFISSIONAL'
-      ? 'PROFISSIONAL_SAUDE'
-      : authProfileFrom(dto.user.profile)
-  return {
-    token: dto.token,
-    user: userFromDTO(dto.user),
-    tipoPerfil,
-    validadoInstitucionalmente: tipoPerfil === 'PROFISSIONAL_SAUDE',
-  }
+/** "CRM/DF 123456" a partir do /user/me; indefinido se faltar alguma parte. */
+export function registrationFromMe(me: MeDTO | null): string | undefined {
+  const council = me?.conselho?.trim()
+  const state = me?.uf?.trim()
+  const number = me?.numeroRegistro?.trim()
+  if (!council || !state || !number) return undefined
+  return `${council}/${state} ${number}`
 }
 
-export function loginResultFromDTO(
-  dto: LoginResponseDTO,
-  status: number,
-): LoginResult {
-  return { status, data: dto }
-}
-
-export function currentUserFromDTO(dto: CurrentUserDTO): CurrentUser {
-  const status =
-    dto.situacaoRegistro === 'EM_VERIFICACAO' ||
-    dto.situacaoRegistro === 'VERIFICADO' ||
-    dto.situacaoRegistro === 'RECUSADO'
-      ? dto.situacaoRegistro
-      : null
-  return {
-    id: dto.id,
-    email: dto.email,
-    tipoPerfil: authProfileFrom(dto.tipoPerfil),
-    nome: dto.nome,
-    situacaoRegistro: status,
-    conselho: dto.conselho ?? null,
-    uf: dto.uf ?? null,
-    numeroRegistro: dto.numeroRegistro ?? null,
-    especialidade: dto.especialidade ?? null,
-    ondeAtende: dto.ondeAtende ?? null,
-  }
-}
-
-export function pendingProfessionalFromDTO(
-  dto: PendingProfessionalDTO,
-): PendingProfessional {
-  return {
-    id: dto.id,
-    email: dto.email,
-    name: dto.nome,
-    council: dto.conselho ?? '',
-    state: dto.uf ?? '',
-    registrationNumber: dto.numeroRegistro ?? '',
-    specialty: dto.especialidade ?? '',
-    workplace: dto.ondeAtende ?? '',
-  }
-}
-
-export function providerFromDTO(dto: ProviderDTO): Provider {
-  return { id: dto.id, name: dto.nome, isVerified: dto.verificado }
-}
-
-export function opportunityFromDTO(dto: OpportunityDTO): Opportunity {
-  return {
-    id: dto.id,
-    title: dto.titulo,
-    specialtyId: dto.especialidade,
-    modality: modalityFrom(dto.modalidade),
-    offerType: offerTypeFrom(dto.modalidadeAcesso),
-    vacancies: Math.max(dto.vagasTotais - dto.vagasPreenchidas, 0),
-    provider: providerFromDTO(dto.ofertante),
-    city: dto.cidade ?? '',
-    address: dto.endereco ?? null,
-    distanceKm: dto.distanciaKm ?? null,
-    summary: dto.descricao ?? '',
-    requiredDocuments: dto.triagem?.documentosExigidos?.map((item) => item.rotulo) ?? [],
-    updatedAt: dto.ultimaAtualizacao,
-  }
-}
-
-export function opportunityPageFromDTO(
-  dto: PageDTO<OpportunityDTO>,
-): OpportunityPage {
-  return {
-    items: dto.content.map(opportunityFromDTO),
-    page: dto.number + 1,
-    totalPages: dto.totalPages,
-    totalItems: dto.totalElements,
-  }
-}
-
-export function filterOptionFromDTO(dto: FilterOptionDTO): FilterOption {
-  return { id: dto.id, label: dto.label }
-}
-
-export function filterCatalogFromDTO(dto: FilterCatalogDTO): FilterCatalog {
-  return {
-    specialties: dto.especialidades.map((item) => ({ id: item.id, label: item.nome })),
-    modalities: [
-      { id: 'presencial', label: 'Presencial' },
-      { id: 'online', label: 'Online' },
-      { id: 'hibrido', label: 'Híbrido' },
-    ],
-    distances: dto.distanciasKm.map((item) => ({ id: String(item), label: `Até ${item} km` })),
-    offerTypes: [
-      { id: 'gratuita', label: 'Gratuito' },
-      { id: 'sus', label: 'SUS' },
-      { id: 'social', label: 'Preço social' },
-      { id: 'pesquisa', label: 'Pesquisa' },
-    ],
-  }
-}
-
-export function professionalCatalogFromDTO(
-  dto: ProfessionalCatalogDTO,
-): ProfessionalCatalog {
-  const councils =
-    dto.conselhos?.map((item) => ({
-      id: item.sigla,
-      label: item.profissao ? `${item.sigla} — ${item.profissao}` : item.sigla,
-    })) ?? dto.councils?.map(filterOptionFromDTO) ?? []
-  const states =
-    dto.ufs?.map((item) => ({ id: item, label: item })) ??
-    dto.states?.map(filterOptionFromDTO) ??
-    []
-  const specialties =
-    dto.especialidades?.map((item) => ({ id: item.id, label: item.nome })) ?? []
-
-  return {
-    councils:
-      councils.length > 0 ? councils : FALLBACK_PROFESSIONAL_CATALOG.councils,
-    states: states.length > 0 ? states : FALLBACK_PROFESSIONAL_CATALOG.states,
-    specialties:
-      specialties.length > 0 ? specialties : FALLBACK_PROFESSIONAL_CATALOG.specialties,
-  }
-}
-
-export function pendingVerificationFromDTO(
-  dto: VerificationChallengeDTO,
-): PendingVerification {
-  return {
-    email: dto.email,
-    profile: userProfileFrom(dto.tipoPerfil ?? dto.profile ?? ''),
-    codeLength: dto.tamanhoCodigo ?? dto.codeLength ?? 6,
-  }
-}
-
-export function applicationFromDTO(dto: ApplicationDTO): Application {
-  return {
-    id: dto.id,
-    protocolNumber: dto.protocolNumber,
-    opportunityId: dto.opportunityId,
-    status: dto.status,
-    steps: dto.timeline.map((step) => ({
-      title: step.title,
-      detail: step.detail,
-      isDone: step.done,
-    })),
-  }
-}
-
-export function signUpDraftToDTO(draft: SignUpDraft): SignUpRequestDTO {
-  const isProfessional = draft.profile === 'PROFISSIONAL'
-  return {
-    username: draft.name,
-    email: draft.email,
-    password: draft.password,
-    profile: draft.profile,
-    acceptedTerms: draft.acceptedTerms,
-    professional: isProfessional
-      ? {
-          council: draft.professional.councilId ?? '',
-          state: draft.professional.stateId ?? '',
-          number: draft.professional.number,
-        }
-      : null,
-  }
-}
-
-export function professionalHealthSignupToDTO(
+/** Parte `dados` do cadastro. A tela nao tem biografia; vai nula. */
+export function signUpDraftToDTO(
   draft: SignUpDraft,
-  biographyOrDescription: string,
-): ProfessionalHealthSignupDTO {
-  const { councilId, stateId, number } = draft.professional
+  biographyOrDescription = '',
+): ProfissionalCadastroDTO {
+  const { councilId, stateId, number, specialtyId, workplace } = draft.professional
   return {
     tipoPerfil: 'PROFISSIONAL_SAUDE',
     usuarioDto: {
@@ -240,9 +105,49 @@ export function professionalHealthSignupToDTO(
     conselho: councilId ?? '',
     uf: stateId ?? '',
     numeroRegistro: number,
-    especialidade: draft.professional.specialtyId ?? '',
-    ondeAtende: draft.professional.workplace,
-    biografiaOuDescricao: biographyOrDescription || null,
+    especialidade: specialtyId,
+    ondeAtende: workplace.trim() === '' ? null : workplace.trim(),
+    biografiaOuDescricao: biographyOrDescription.trim() || null,
+    aceitouTermos: draft.acceptedTerms,
     acceptedTerms: draft.acceptedTerms,
+  }
+}
+
+/** Monta o multipart: o JSON vai como parte `dados`, com tipo application/json. */
+export function signUpForm(
+  draft: SignUpDraft,
+  biographyOrDescription = '',
+  documents: readonly File[] = [],
+): FormData {
+  const form = new FormData()
+  form.append(
+    'dados',
+    new Blob([JSON.stringify(signUpDraftToDTO(draft, biographyOrDescription))], { type: 'application/json' }),
+  )
+  for (const document of documents) form.append('documentos', document)
+  return form
+}
+
+/** 201 sem corpo e lido como conta que ja nasce ativa, sem codigo. */
+export function pendingVerificationFromDTO(
+  dto: CadastroResponseDTO | null,
+  email: string,
+): PendingVerification {
+  if (dto === null) {
+    return { email, profile: 'PROFISSIONAL', codeLength: 0, requiresCode: false }
+  }
+  return {
+    email: dto.email || email,
+    profile: profileFromWire(dto.tipoPerfil),
+    codeLength: dto.exigeVerificacao ? (dto.tamanhoCodigo ?? DEFAULT_CODE_LENGTH) : 0,
+    requiresCode: dto.exigeVerificacao,
+  }
+}
+
+export function catalogFromDTO(dto: CatalogosDTO): Catalog {
+  return {
+    specialties: dto.especialidades.map((item) => ({ id: item.id, label: item.nome })),
+    councils: dto.conselhos.map((item) => ({ id: item.sigla, label: item.sigla })),
+    states: dto.ufs.map((uf) => ({ id: uf, label: uf })),
   }
 }
